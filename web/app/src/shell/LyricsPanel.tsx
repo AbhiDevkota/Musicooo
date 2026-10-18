@@ -357,6 +357,10 @@ const fullSizes =
 export function LyricsPanel({ variant = 'panel' }: { variant?: 'panel' | 'full' }) {
   const lyrics = useLyrics();
   const hasTrack = usePlayer((s) => s.nowPlaying !== null);
+  const videoId = usePlayer((s) => s.nowPlaying?.videoId ?? '');
+  // A provider picked by hand that came back with nothing is named in the
+  // empty state: the lyrics didn't go missing, this one provider hasn't got them.
+  const picked = useLyricsUi((s) => s.picked[videoId]);
   const ungranted = useUngranted();
   const canvas = useCanvas();
   const fontReady = useLyricFont();
@@ -384,6 +388,11 @@ export function LyricsPanel({ variant = 'panel' }: { variant?: 'panel' | 'full' 
         </div>
       ) : result ? (
         <LyricsView ttml={result.ttml} full={full} />
+      ) : picked ? (
+        <div className={empty}>
+          <p className={emptyTitle}>Not on {sourceById(picked)?.label ?? 'this provider'}</p>
+          <p>This provider hasn’t got this song. Pick another, or Best available, in the list above.</p>
+        </div>
       ) : (
         <div className={empty}>
           <p className={emptyTitle}>No lyrics available</p>
