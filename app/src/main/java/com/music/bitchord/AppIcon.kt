@@ -11,11 +11,12 @@ import android.content.pm.PackageManager
  * The glass icons are adaptive icons whose foreground already holds the finished
  * icon in its own shape (Apple squircle, Samsung squircle or Pixel circle), so
  * [previewRes] — that foreground — shows the variant as designed rather than
- * through the device's launcher mask. The first two keep yesterday's alias
+ * through the device's launcher mask. Default and LiquidGlass keep yesterday's alias
  * names so a choice made before the update stays enabled.
  */
 enum class AppIcon(val alias: String, val iconRes: Int, val labelRes: Int, val previewRes: Int? = null) {
     Default("LauncherDefault", R.mipmap.ic_launcher, R.string.app_icon_default),
+    Monochrome("LauncherMonochrome", R.mipmap.ic_monochrome, R.string.app_icon_monochrome),
     LiquidGlass("LauncherGlassLight", R.mipmap.ic_liquid_glass, R.string.app_icon_liquid_glass, R.mipmap.ic_liquid_glass_foreground),
     LiquidGlassDark("LauncherGlassDark", R.mipmap.ic_liquid_glass_dark, R.string.app_icon_liquid_glass_dark, R.mipmap.ic_liquid_glass_dark_foreground),
     LiquidGlassClear("LauncherGlassClear", R.mipmap.ic_liquid_glass_clear, R.string.app_icon_liquid_glass_clear, R.mipmap.ic_liquid_glass_clear_foreground),
