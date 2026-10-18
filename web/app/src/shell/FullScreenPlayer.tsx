@@ -29,6 +29,7 @@ import { LyricsPanel } from './LyricsPanel';
 import { MeshBackdrop } from './MeshBackdrop';
 import { albumPageFor } from './nowPlayingLinks';
 import { UpNext } from './UpNext';
+import { VideoQuality } from './VideoQuality';
 import { useScrubber } from './useScrubber';
 
 function useBrowserFullScreen(): boolean {
@@ -246,6 +247,10 @@ export function FullScreenPlayer() {
 
       <button ref={close} className={`${corner} top-4 left-5`} aria-label="Close" onClick={() => setFullScreen(false)}>
         <X size={20} />
+      {/* The music video's quality, just inside the full-screen button. */}
+      {video && (
+        <VideoQuality className={`absolute top-[18px] z-1${hidden}${document.fullscreenEnabled ? ' right-15' : ' right-5'}`} />
+      )}
       </button>
       {document.fullscreenEnabled && (
         <button

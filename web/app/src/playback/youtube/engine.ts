@@ -38,6 +38,8 @@ export interface VideoStream {
   manifest: string;
   /** Width over height of the largest rendition, e.g. 16/9. */
   aspect: number;
+  /** Every height the response offers, largest first: what the quality switcher lists. */
+  heights: number[];
 }
 
 /**
@@ -286,8 +288,14 @@ export class YouTubeEngine {
    * renditions from the same response, as a DASH manifest for a second,
    * muted player. Null for a song (YouTube's square art track), for a track
    * that streams over SABR, and while nothing is loaded.
+   *
+   * [height] keeps only the renditions of that height, which is how a picked
+   * quality is held: Shaka would otherwise drop every codec but the preferred
+   * one (StreamUtils.chooseCodecsAndFilterManifest), and YouTube's H.264
+   * ladder stops at 1080p, so 1440p and 2160p are only reachable with the
+   * manifest cut down to them.
    */
-  async videoStream(): Promise<VideoStream | null> {
+  async videoStream(height: number | null = null): Promise<VideoStream | null> {
     const resolved = this.direct;
     if (!resolved) return null;
     const { videoId, client, info } = resolved;
@@ -296,17 +304,19 @@ export class YouTubeEngine {
     );
     const largest = pictures.sort((a, b) => b.width! * b.height! - a.width! * a.height!)[0];
     if (!largest || largest.width! / largest.height! < MIN_VIDEO_ASPECT) return null;
+    const heights = [...new Set(pictures.map((f) => f.height!))].sort((a, b) => b - a);
+    const wanted = height !== null && heights.includes(height) ? height : null;
     const pot = usesWebPo(client) ? await botguard.mint(videoId) : undefined;
     const manifest = await info.toDash({
       // YouTube.js drops the formats this returns true for.
-      format_filter: (format) => !format.has_video || format.has_audio,
+      format_filter: (format) => !format.has_video || format.has_audio || (wanted !== null && format.height !== wanted),
       url_transformer: (url) => {
         if (pot) url.searchParams.set('pot', pot);
         return url;
       },
       manifest_options: { include_thumbnails: false },
     });
-    return { videoId, manifest, aspect: largest.width! / largest.height! };
+    return { videoId, manifest, aspect: largest.width! / largest.height!, heights };
   }
 
   /** The SABR session: googlevideo's adapter in front of Shaka (Kira, googlevideo's example). */
