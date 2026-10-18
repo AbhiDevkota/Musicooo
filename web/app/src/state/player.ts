@@ -564,12 +564,13 @@ function refillAutoplay(force = false): Promise<void> {
   refilling ??= (async () => {
     try {
       const { fetchRadio } = await import('@/data/music/api');
-      const candidates = await fetchRadio(seed.videoId);
+      const { candidates, seedIsVideo } = await fetchRadio(seed.videoId);
       const current = usePlayer.getState();
       const extra = extendStation(
         current.queue.map((e) => e.track),
         candidates,
         needed,
+        seedIsVideo,
       );
       if (!extra.length) {
         exhaustedSeeds.add(seed.videoId);
