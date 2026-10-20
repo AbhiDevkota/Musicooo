@@ -69,7 +69,7 @@ function LockupArtwork({ item, width, aspect }: { item: MusicItem; width: number
         <button className={overlayLink} aria-label={`Play ${item.title}`} onClick={() => playTrack(item)} />
       )}
       {/* Hover scrim and platter (report §2: --lockupHoverBGColor, opacity .1s ease-in). */}
-      <div className="pointer-events-none absolute inset-0 z-2 rounded-[inherit] bg-lockup-hover opacity-0 transition-opacity duration-100 ease-in group-focus-within/art:opacity-100 group-hover/art:opacity-100">{isPlayable(item) && <PlayPlatter item={item} />}</div>
+      <div className="pointer-events-none absolute inset-0 z-2 rounded-[inherit] bg-lockup-hover opacity-0 transition-opacity duration-100 ease-in group-focus-visible/art:opacity-100 group-hover/art:opacity-100">{isPlayable(item) && <PlayPlatter item={item} />}</div>
       {/* The track menu (report §14) for playable items: top-right, the
           platter's counterpart in the same glass, revealed with the scrim
           and held visible while its menu is open. */}
