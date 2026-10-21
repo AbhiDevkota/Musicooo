@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -68,6 +69,8 @@ import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.TopPick
+import com.music.bitchord.data.model.TopPickMood
 import com.music.bitchord.data.model.UiState
 import java.util.Locale
 import com.music.bitchord.data.model.artworkAt
@@ -142,8 +145,26 @@ fun HomeScreen(
     leadHero: Boolean = true,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
+    /**
+     * The "Top Picks for You" row above Recents. Null while it has not been
+     * built yet, empty when there is nothing to pick from. The row is only
+     * drawn by a caller that can act on it, i.e. passes [onTopPickClick].
+     */
+    topPicks: List<TopPick>? = null,
+    topPicksLoading: Boolean = false,
+    /** The signed-in account's name, for the personal station's "Name's Station". */
+    listenerName: String? = null,
+    onTopPickClick: ((TopPick, String) -> Unit)? = null,
+    onTopPickLongPress: ((TopPick) -> Unit)? = null,
+    /** A Find Your Mood tile, and its name. The shelf is only drawn when this is set. */
+    onMoodClick: ((TopPickMood, String) -> Unit)? = null,
+    /** Find Your Mood's Show all: every mood and activity. */
+    onMoodsShowAll: () -> Unit = {},
+    /** Whether the Top Picks and mood artwork may animate — see [LocalArtworkMotion]. */
+    artworkMotion: Boolean = true,
 ) {
     val recentsViewType by AppUi.host.homeRecentsViewType.collectAsStateWithLifecycle()
+    CompositionLocalProvider(LocalArtworkMotion provides artworkMotion) {
 
     PullToRefresh(
         refreshing = refreshing,
@@ -173,6 +194,19 @@ fun HomeScreen(
                     SignInBanner(onSignIn = onSignIn, modifier = Modifier.padding(bottom = 8.dp))
                 }
             }
+            if (onTopPickClick != null) {
+                when {
+                    !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
+                        TopPicksShelf(
+                            picks = topPicks,
+                            listenerName = listenerName,
+                            onClick = onTopPickClick,
+                            onLongPress = onTopPickLongPress,
+                        )
+                    }
+                    topPicks == null && topPicksLoading -> topPicksSkeleton()
+                }
+            }
             when (state) {
                 is UiState.Loading -> {
                     if (recentlyPlayedLoading) {
@@ -197,6 +231,8 @@ fun HomeScreen(
                     // compact-card layout instead of briefly becoming a hero.
                     itemsIndexedShelves(
                         shelves = state.data,
+                        onMoodClick = onMoodClick,
+                        onMoodsShowAll = onMoodsShowAll,
                         onItemClick = onItemClick,
                         onItemLongPress = onItemLongPress,
                         currentSong = currentSong,
@@ -217,6 +253,8 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
     }
 
     if (onLoadMore != null && state is UiState.Success) {
@@ -252,8 +290,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     firstIsHero: Boolean = true,
     recentsViewType: LibraryViewType,
     onRecentsViewTypeToggle: () -> Unit,
+    onMoodClick: ((TopPickMood, String) -> Unit)? = null,
+    onMoodsShowAll: () -> Unit = {},
 ) {
     shelves.forEachIndexed { index, shelf ->
+        // Find Your Mood follows the lead shelf, as on Apple Music's Home.
+        if (index == 1 && onMoodClick != null) {
+            item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
+        }
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
             if (index == 0 && shelf.title.equals(RECENTS_TITLE, ignoreCase = true)) {
@@ -510,11 +554,12 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
                 .height(logoHeight)
                 .aspectRatio(LOGO_ASPECT),
         )
-        Text(
-            text = title,
-            style = style,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        // "Listen now" is hidden for now; the wordmark above stays.
+        // Text(
+        //     text = title,
+        //     style = style,
+        //     color = MaterialTheme.colorScheme.onBackground,
+        // )
     }
 }
 

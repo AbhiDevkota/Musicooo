@@ -276,6 +276,11 @@ import com.music.bitchord.ui.components.FieldConfig
 import com.music.bitchord.ui.icons.BitChordIcons
 import androidx.media3.common.Player
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.TopPicks
+import com.music.bitchord.data.model.TopPick
+import com.music.bitchord.data.model.TopPickKind
+import com.music.bitchord.data.model.TopPickMood
+import com.music.bitchord.ui.screens.MoodGridPage
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.PlayerSheetMotion
 import androidx.compose.ui.geometry.Offset
@@ -507,6 +512,15 @@ private fun BitChordApp(
      * permanent pane.
      */
     var showNowPlaying by remember { mutableStateOf(false) }
+    // The Top Picks and mood artwork loop forever; nobody sees it with the
+    // app in the background or Now Playing pulled up over the page.
+    val appForeground = com.music.bitchord.ui.rememberIsForeground()
+    val artworkMotion = appForeground && !showNowPlaying
+    // Top Picks turns over each hour; coming back to the app after a
+    // turn-over is an open too.
+    LaunchedEffect(appForeground) {
+        if (appForeground) viewModel.refreshTopPicksIfStale()
+    }
     // Where the two ends of opening and closing the player meet: the mini
     // player's cover reports itself here, the sheet its offset, and the player
     // flies its artwork between them — see [PlayerDock].
@@ -723,6 +737,8 @@ private fun BitChordApp(
     val homeState by viewModel.home.collectAsStateWithLifecycle()
     val homeLoadingMore by viewModel.homeLoadingMore.collectAsStateWithLifecycle()
     val homeRecentlyPlayedLoading by viewModel.homeRecentlyPlayedLoading.collectAsStateWithLifecycle()
+    val topPicks by viewModel.topPicks.collectAsStateWithLifecycle()
+    val topPicksLoading by viewModel.topPicksLoading.collectAsStateWithLifecycle()
 
     // The top bar's icon is the quiet, always-there nudge; this is the
     // once-per-launch popup version of the same news. `updateDialogShown`
@@ -1034,6 +1050,7 @@ private fun BitChordApp(
     val libraryListState = rememberLazyListState()
     val historyListState = rememberLazyListState()
     val libraryShowAllGridState = rememberLazyGridState()
+    val moodsGridState = rememberLazyGridState()
     val searchListState = rememberLazyListState()
     val currentListState = when (selectedTab) {
         TAB_HOME -> homeListState
@@ -1570,6 +1587,62 @@ private fun BitChordApp(
                 ).show()
             }
         }
+    }
+    /**
+     * A Top Picks card: opens the release, or starts the station behind it.
+     *
+     * A station is YouTube Music's own queue for it — the Supermix, the
+     * artist's Mix, a mood playlist's radio — fetched only now, on the tap,
+     * and loaded before the player is touched so a failed request leaves the
+     * current queue playing. It then replaces the queue the way [startRadio]
+     * does, and AutoPlay carries it on past its last track.
+     */
+    val openTopPick: (TopPick, String) -> Unit = { pick, label ->
+        val browseId = pick.browseId
+        if (pick.kind == TopPickKind.LATEST_RELEASE && browseId != null) {
+            viewModel.openDetail(
+                browseId = browseId,
+                title = pick.title,
+                subtitle = pick.artistName.orEmpty(),
+                thumbnailUrl = pick.images.firstOrNull(),
+            )
+        } else if (controller != null && !refusedByHost()) {
+            val request = ++playRequestGeneration
+            scope.launch {
+                val songs = TopPicks.queue(pick).getOrNull().orEmpty()
+                if (request != playRequestGeneration) return@launch
+                val activeController = controller ?: return@launch
+                if (songs.isEmpty()) {
+                    Toast.makeText(context, R.string.couldnt_load_tracks, Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                val sourceId = pick.watch?.playlistId ?: pick.mood?.name
+                val station = songs.map {
+                    it.copy(
+                        radioName = label,
+                        playbackSource = label,
+                        playbackSourceType = PlaybackSourceType.HOME,
+                        playbackSourceId = sourceId,
+                    )
+                }
+                activeRadioSeed = null
+                activeController.beginRadioQueue()
+                activeController.playSongs(station, 0)
+                activeController.commitRadioQueue()
+            }
+        }
+    }
+    /**
+     * A Find Your Mood tile, on Home or on its Show all grid: that mood's
+     * station, steered by the same scene words the Mood for You card was
+     * built with.
+     */
+    val playMood: (TopPickMood, String) -> Unit = { mood, title ->
+        val hints = topPicks?.firstOrNull { it.kind == TopPickKind.MOOD }?.hints
+        openTopPick(
+            if (hints != null) TopPicks.moodStation(mood, hints) else TopPicks.moodStation(mood),
+            title,
+        )
     }
     val addToQueue: (Song) -> Unit = { song ->
         scope.launch {
@@ -2706,6 +2779,13 @@ private fun BitChordApp(
                                     contentPadding = listPadding,
                                 )
                             }
+                        } else if (pageRoute == AppRoute.Moods) {
+                            MoodGridPage(
+                                artworkMotion = artworkMotion,
+                                gridState = moodsGridState,
+                                onClick = playMood,
+                                contentPadding = listPadding,
+                            )
                         } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,
@@ -3087,6 +3167,26 @@ private fun BitChordApp(
                                 onLoadMore = viewModel::loadMoreHome,
                                 loadingMore = homeLoadingMore,
                                 recentlyPlayedLoading = homeRecentlyPlayedLoading,
+                                topPicks = topPicks,
+                                topPicksLoading = topPicksLoading,
+                                listenerName = account?.name,
+                                onTopPickClick = openTopPick,
+                                onMoodClick = playMood,
+                                onMoodsShowAll = { navigator.push(AppRoute.Moods) },
+                                artworkMotion = artworkMotion,
+                                onTopPickLongPress = { pick ->
+                                    pick.browseId?.let { browseId ->
+                                        onShelfLongPress(
+                                            ShelfItem(
+                                                title = pick.title,
+                                                subtitle = pick.artistName.orEmpty(),
+                                                thumbnailUrl = pick.images.firstOrNull(),
+                                                videoId = null,
+                                                browseId = browseId,
+                                            ),
+                                        )
+                                    }
+                                },
                             )
                             TAB_EXPLORE -> selectedMoodGenre?.let { category ->
                                 MoodGenrePlaylistsScreen(
@@ -3411,6 +3511,7 @@ private fun BitChordApp(
                         AppRoute.Discord -> "Discord"
                         AppRoute.History -> stringResource(R.string.history)
                         is AppRoute.LibraryShowAll -> route.shelf.title
+                        AppRoute.Moods -> stringResource(R.string.find_your_mood)
                         AppRoute.AccountScrobbling -> stringResource(R.string.account_scrobbling)
                         AppRoute.Sources -> stringResource(R.string.sources)
                         AppRoute.ListenTogether -> stringResource(R.string.listen_together)
