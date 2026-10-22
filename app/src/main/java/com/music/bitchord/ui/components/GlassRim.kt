@@ -22,9 +22,8 @@ import androidx.compose.ui.unit.dp
  * The edge of Apple's Liquid Glass, drawn over a surface of [shape].
  *
  * Three parts, outermost first:
- *  - a dark outline along the very edge, black at plus-darker, gathered into
- *    two dark crescents at the ends and faint along the flat run between,
- *    where the rim already draws the edge;
+ *  - a dark outline along the very edge, only at the two ends: a crescent
+ *    round each, gone by the flat run between, where the rim draws the edge;
  *  - a bright rim along the top and, mirrored, along the bottom, at its
  *    thickest where the edge runs flat and thinning to nothing round the
  *    corners, where the edge turns vertical;
@@ -103,16 +102,16 @@ private val FullRim = { 1f }
 
 /**
  * The outline's opacity across the surface: [GLASS_OUTLINE_ALPHA] at each end,
- * down to [GLASS_OUTLINE_MIDDLE_ALPHA] within an end cap's width of it, and
- * flat between — so the dark gathers into crescents round the two ends. On a
- * circle the caps meet in the middle and it is one ramp each side.
+ * fading to nothing within an end cap's width of it, and none between — a
+ * crescent round each end. On a circle the caps meet in the middle and it is
+ * one ramp each side.
  */
 private fun outlineStops(size: Size): List<Pair<Float, Float>> {
     val cap = (size.minDimension / 2f / size.width).coerceIn(0f, 0.5f)
     return listOf(
         0f to GLASS_OUTLINE_ALPHA,
-        cap to GLASS_OUTLINE_MIDDLE_ALPHA,
-        1f - cap to GLASS_OUTLINE_MIDDLE_ALPHA,
+        cap to 0f,
+        1f - cap to 0f,
         1f to GLASS_OUTLINE_ALPHA,
     )
 }
@@ -133,13 +132,9 @@ private fun rims(body: Path, depth: Float): Path {
     return Path().apply { op(top, bottom, PathOperation.Union) }
 }
 
-/**
- * The dark outline: the outermost band of the shape (2.3px at 3x), at its
- * darkest at the two ends and at its faintest along the run between.
- */
+/** The dark outline: the outermost band of the shape (2.3px at 3x), at its darkest at the two ends. */
 private val GLASS_OUTLINE_WIDTH = 0.77.dp
 private const val GLASS_OUTLINE_ALPHA = 0.5f
-private const val GLASS_OUTLINE_MIDDLE_ALPHA = 0.15f
 
 /**
  * How deep the bright rim shows inside the outline, at the middle of a flat
