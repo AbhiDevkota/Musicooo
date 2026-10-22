@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -151,49 +150,6 @@ private const val DARK_INDICATOR_OPACITY = 0.14f
 /** Whether liquid glass is drawn here: switched on, and supported by the device. */
 @Composable
 fun isLiquidGlassActive(): Boolean = LocalLiquidGlassEnabled.current && isGlassSupported()
-
-/**
- * A lightweight visual match for liquid glass over a stable background.
- *
- * This keeps the same continuous shape, translucent tint and [glassRim] as
- * [liquidGlass], but intentionally performs no backdrop capture, blur, lens
- * refraction or shadow rendering. When Liquid Glass is disabled or unsupported,
- * [fallbackColor] and the hairline preserve the control's existing filled
- * appearance.
- */
-@Composable
-fun Modifier.lightweightLiquidGlass(
-    shape: CornerBasedShape,
-    fallbackColor: Color,
-): Modifier {
-    if (!isLiquidGlassActive()) {
-        return clip(shape)
-            .background(fallbackColor, shape)
-            .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
-    }
-    val glassShape = remember(shape) { shape.continuous() }
-    val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
-    return clip(glassShape)
-        .drawBehind { drawGlassFill(light, glassShape) }
-        .glassRim(glassShape)
-}
-
-/**
- * Just the rim of liquid glass — [glassRim]'s outline, rim and glow — for a
- * control that keeps its own fill.
- *
- * Over a flat, stable page the blur and lens of [liquidGlass] would sample a
- * single colour and change nothing a reader could see; the rim is the part
- * that reads as glass. No backdrop capture, so it costs a few path fills.
- * Nothing at all while Liquid Glass is off or unsupported — a caller with an
- * edge of its own for that case keeps it behind [isLiquidGlassActive].
- */
-@Composable
-fun Modifier.liquidGlassRim(shape: CornerBasedShape): Modifier {
-    if (!isLiquidGlassActive()) return this
-    val glassShape = remember(shape) { shape.continuous() }
-    return glassRim(glassShape)
-}
 
 /**
  * Renders this composable as a liquid glass surface sampling [LocalAppBackdrop]:

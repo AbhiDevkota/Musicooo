@@ -15,7 +15,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import com.music.bitchord.ui.components.isLiquidGlassActive
-import com.music.bitchord.ui.components.liquidGlassRim
+import com.music.bitchord.ui.components.LocalAppBackdrop
+import com.music.bitchord.ui.components.GLASS_EDGE_COLOR
+import com.music.bitchord.ui.components.GLASS_EDGE_WIDTH
+import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
+import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
+import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +73,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,6 +118,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -168,7 +175,6 @@ import com.music.bitchord.ui.components.SHELF_CARD_WIDTH
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.libraryGrid
-import com.music.bitchord.ui.components.lightweightLiquidGlass
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.components.vibrancy
 import com.music.bitchord.ui.components.vibrantBackground
@@ -525,7 +531,13 @@ fun DetailScreen(
             // dissolve, so it takes the same [ArtworkPalette.background] the
             // bars at either end of the screen are already fading into.
             val pageColor = if (isArtist) palette.wash else palette.background
-            BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
+            // The page's background on its own, under the list, for the glass
+            // controls in the list to sample. The app's backdrop is the whole
+            // page, those controls included, and a control drawing the layer
+            // it is being recorded into is a cycle.
+            val pageGlass = if (pageSamplesGlass()) rememberLayerBackdrop() else null
+            CompositionLocalProvider(LocalAppBackdrop provides (pageGlass ?: LocalAppBackdrop.current)) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
                 // landscape is the *whole* window. Straight off that width, the ratio hands back
@@ -544,16 +556,23 @@ fun DetailScreen(
                 // both need to agree on its height without being able to ask each
                 // other — see [artHeight]. A release has no such layer: its sleeve
                 // is an ordinary item at the top of the list.
-                if (isArtist) {
-                    PageBackground(
-                        page = page,
-                        palette = palette,
-                        canvas = canvas,
-                        artHeight = artHeight,
-                        listState = listState,
-                        heroUrl = appleArt?.heroUrl,
-                        modifier = Modifier.matchParentSize(),
-                    )
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .then(if (pageGlass != null) Modifier.layerBackdrop(pageGlass) else Modifier)
+                        .background(pageColor),
+                ) {
+                    if (isArtist) {
+                        PageBackground(
+                            page = page,
+                            palette = palette,
+                            canvas = canvas,
+                            artHeight = artHeight,
+                            listState = listState,
+                            heroUrl = appleArt?.heroUrl,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                    }
                 }
 
                 if (reorder != null) {
@@ -870,6 +889,7 @@ fun DetailScreen(
                 }
 
     }
+            }
 } else {
     ArtistShelfGridPage(
         shelf = targetShelf,
@@ -1579,7 +1599,6 @@ private fun ActionPill(
     // says so.
     val haptics = rememberHaptics()
     val content = if (filled) Color.Black else MaterialTheme.colorScheme.onSurface
-    val glassRim = isLiquidGlassActive()
     Row(
         modifier = modifier
             .height(size)
@@ -1588,10 +1607,7 @@ private fun ActionPill(
                 if (filled) {
                     Modifier.background(Color.White)
                 } else {
-                    Modifier
-                        .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
-                        .liquidGlassRim(CircleShape)
-                        .then(if (glassRim) Modifier else Modifier.lightReleaseEdge(CircleShape))
+                    Modifier.detailGlass(CircleShape)
                 },
             )
             .clickable {
@@ -1695,12 +1711,7 @@ private fun CircleIconButton(
             .size(size)
             .alpha(if (enabled) 1f else DISABLED_ACTION_ALPHA)
             .clip(CircleShape)
-            .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
-            // The glass rim the floating bars wear, with Liquid Glass on. Rim
-            // only: over the page's flat tint a blurred fill would look the same.
-            // It brings its own edge, so the light one is only for without it.
-            .liquidGlassRim(CircleShape)
-            .then(if (isLiquidGlassActive()) Modifier else Modifier.lightReleaseEdge(CircleShape))
+            .detailGlass(CircleShape)
             .clickable(enabled = enabled) {
                 haptics.play(haptic)
                 onClick()
@@ -1758,9 +1769,15 @@ private fun StatChip(icon: ImageVector, text: String, palette: ArtworkPalette) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .lightweightLiquidGlass(
-                shape = CircleShape,
-                fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+            .clip(CircleShape)
+            .then(
+                if (pageSamplesGlass()) {
+                    Modifier.liquidGlass(CircleShape)
+                } else {
+                    Modifier
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f), CircleShape)
+                        .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, CircleShape)
+                },
             )
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -2225,6 +2242,30 @@ private const val TOP_RELEASE_EDGE_ALPHA = 0.10f
 /** The light hairline round those containers and buttons, added onto the page like the veil. */
 private fun Modifier.lightReleaseEdge(shape: Shape): Modifier =
     vibrantBorder(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), shape)
+
+/**
+ * Whether the page's glass controls sample it: liquid glass on and supported,
+ * and dynamic blur not reduced — the test the app's own backdrop is recorded
+ * under, so nothing samples a layer that is not being drawn.
+ */
+@Composable
+private fun pageSamplesGlass(): Boolean {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    return isLiquidGlassActive() && !reduceDynamicBlur
+}
+
+/**
+ * The page's own glass controls, in the floating bars' own compositing while
+ * the page's background is recorded for them — sampled, blurred, saturated and
+ * lifted, with the same rim — and in the light veil and hairline otherwise.
+ */
+@Composable
+private fun Modifier.detailGlass(shape: CornerBasedShape): Modifier =
+    if (pageSamplesGlass()) {
+        liquidGlass(shape)
+    } else {
+        vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), shape).lightReleaseEdge(shape)
+    }
 private const val TOP_RELEASE_COVER_EDGE_ALPHA = 0.215f
 
 @OptIn(ExperimentalFoundationApi::class)
