@@ -457,8 +457,8 @@ object TopPicks {
                     ?: YtMusicRepository.browseSongs(item.browseId!!).getOrNull()?.songs.orEmpty()
             }
         }.awaitAll().flatten()
-            // A row YouTube couldn't pair stays the video, and the player
-            // swaps it for its audio version as it plays (see preferMusicOnly).
+            // A row YouTube couldn't pair stays the video, and plays as one;
+            // the player menu's version switch turns it into the song.
             .distinctBy { it.videoId }
             .shuffled()
             .take(MOOD_QUEUE)

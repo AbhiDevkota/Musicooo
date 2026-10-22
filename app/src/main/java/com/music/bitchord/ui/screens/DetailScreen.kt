@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.components.trackArtSize
 import android.os.Build
 import com.music.bitchord.R
 
@@ -837,6 +838,7 @@ fun DetailScreen(
                                 palette = palette,
                                 onClick = { onSectionItemClick(item) },
                                 onLongPress = onSectionItemLongPress?.let { { it(item) } },
+                                modifier = Modifier.width(if (item.isVideo) VIDEO_CARD_WIDTH else SHELF_CARD_WIDTH),
                             )
                         }
                     }
@@ -1960,12 +1962,13 @@ private fun CompactSongRow(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(48.dp)) {
+        Box(Modifier.trackArtSize(48.dp, song.isVideo)) {
             AsyncImage(
                 model = song.artworkAt(ROW_ART_PX),
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(48.dp)
+                    .matchParentSize()
                     .clip(RoundedCornerShape(7.dp))
                     .thumbnailBorder(RoundedCornerShape(7.dp))
                     .background(palette.elevated),
@@ -2019,12 +2022,13 @@ private fun SuggestedSongRow(
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(52.dp)) {
+        Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
             AsyncImage(
                 model = song.artworkAt(ROW_ART_PX),
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(52.dp)
+                    .matchParentSize()
                     .clip(RoundedCornerShape(8.dp))
                     .thumbnailBorder(RoundedCornerShape(8.dp))
                     .background(palette.elevated),
@@ -2215,6 +2219,19 @@ private fun SectionCard(
     modifier: Modifier = Modifier.width(SHELF_CARD_WIDTH),
     onLongPress: (() -> Unit)? = null,
 ) {
+    // An artist's Videos shelf: widescreen, as on the web player.
+    if (item.isVideo) {
+        VideoShelfCard(
+            item = item,
+            onClick = onClick,
+            onLongPress = onLongPress,
+            modifier = modifier,
+            titleColor = palette.onBackground,
+            subtitleColor = palette.onBackgroundVariant,
+            placeholderColor = palette.elevated,
+        )
+        return
+    }
     Column(
         modifier = modifier
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress),
@@ -2272,7 +2289,7 @@ private fun ArtistShelfGridPage(
                 .fillMaxSize()
                 .padding(horizontal = PAGE_GUTTER),
         ) {
-            items(shelf.items, key = { it.browseId ?: it.title }) { item ->
+            items(shelf.items, key = { it.browseId ?: it.videoId ?: it.title }) { item ->
                 SectionCard(
                     item = item,
                     palette = palette,

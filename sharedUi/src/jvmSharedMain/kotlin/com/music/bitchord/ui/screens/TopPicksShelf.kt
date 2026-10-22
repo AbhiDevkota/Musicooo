@@ -93,6 +93,7 @@ import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.rememberBlurredBackdrop
 import com.music.bitchord.ui.components.ShelfRow
+import com.music.bitchord.ui.components.SectionHeaderSkeleton
 import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.components.longPressMenuClickable
@@ -163,7 +164,7 @@ internal fun TopPicksShelf(
 fun LazyListScope.topPicksSkeleton() {
     item(key = "skeleton:top-picks") {
         Column(Modifier.padding(bottom = 26.dp)) {
-            SectionHeader(stringResource(Res.string.top_picks_for_you))
+            SectionHeaderSkeleton()
             BoxWithConstraints {
                 val cardWidth = topPickWidth(maxWidth)
                 LazyRow(
