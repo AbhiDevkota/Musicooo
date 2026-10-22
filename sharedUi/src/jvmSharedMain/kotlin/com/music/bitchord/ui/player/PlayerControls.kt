@@ -109,6 +109,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.music.bitchord.ui.components.vibrancy
+import com.music.bitchord.ui.components.vibrantBackground
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
@@ -241,11 +243,13 @@ internal fun PlayerScrubber(
                     text = formatTime((shown * durationMs).toLong()),
                     style = MaterialTheme.typography.labelMedium,
                     color = LocalPlayerTint.current.copy(alpha = 0.55f),
+                    modifier = Modifier.vibrancy(LocalPlayerTint.current),
                 )
                 Text(
                     text = "-" + formatTime(durationMs - (shown * durationMs).toLong()),
                     style = MaterialTheme.typography.labelMedium,
                     color = LocalPlayerTint.current.copy(alpha = 0.55f),
+                    modifier = Modifier.vibrancy(LocalPlayerTint.current),
                 )
             }
             // Pinned to the box's own centre rather than squeezed into the gap
@@ -277,7 +281,9 @@ internal fun PlayerScrubber(
 private fun MixingLabel(pulse: MixPulse, modifier: Modifier = Modifier) {
     Text(
         text = stringResource(Res.string.mixing),
-        modifier = modifier.graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) },
+        modifier = modifier
+            .vibrancy(LocalPlayerTint.current)
+            .graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) },
         style = MaterialTheme.typography.labelMedium.copy(
             fontWeight = FontWeight.Medium,
             fontSize = (MaterialTheme.typography.labelMedium.fontSize.value + BADGE_SIZE_BUMP).sp,
@@ -527,7 +533,7 @@ internal fun VolumeRow(
             Icons.AutoMirrored.Rounded.VolumeDown,
             contentDescription = null,
             tint = LocalPlayerTint.current.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(20.dp).vibrancy(LocalPlayerTint.current),
         )
         Spacer(Modifier.width(10.dp))
         ThinSlider(
@@ -543,7 +549,7 @@ internal fun VolumeRow(
             Icons.AutoMirrored.Rounded.VolumeUp,
             contentDescription = null,
             tint = LocalPlayerTint.current.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(20.dp).vibrancy(LocalPlayerTint.current),
         )
     }
 }
@@ -725,7 +731,7 @@ internal fun CircleGlyph(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .vibrantBackground(LocalPlayerTint.current.copy(alpha = discAlpha))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -792,6 +798,7 @@ private fun TransportGlyph(
             tint = Color.White.copy(alpha = alpha),
             modifier = Modifier
                 .size(size)
+                .vibrancy()
                 .then(if (heightScale != 1f) Modifier.graphicsLayer { scaleY = heightScale } else Modifier),
         )
     }
@@ -867,7 +874,7 @@ private fun Pill(
         modifier = modifier
             .height(BOTTOM_ACTION_SIZE)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = 0.12f))
+            .vibrantBackground(LocalPlayerTint.current.copy(alpha = 0.12f))
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = 0.82f,
@@ -885,7 +892,7 @@ private fun PillDivider() {
         Modifier
             .width(1.dp)
             .fillMaxHeight()
-            .background(LocalPlayerTint.current.copy(alpha = 0.20f)),
+            .vibrantBackground(LocalPlayerTint.current.copy(alpha = 0.20f)),
     )
 }
 
@@ -1010,7 +1017,7 @@ private fun PillSegment(
         modifier = Modifier
             .width(width)
             .height(BOTTOM_ACTION_SIZE)
-            .background(if (highlighted) LocalPlayerTint.current.copy(alpha = 0.14f) else Color.Transparent)
+            .vibrantBackground(if (highlighted) LocalPlayerTint.current.copy(alpha = 0.14f) else Color.Transparent)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1051,7 +1058,7 @@ private fun PillSegment(
                             imageVector = currentIcon,
                             contentDescription = null,
                             tint = tint,
-                            modifier = Modifier.size(currentSize),
+                            modifier = Modifier.size(currentSize).vibrancy(tint),
                         )
                     }
                     if (trailingLabel != null) {
@@ -1061,6 +1068,7 @@ private fun PillSegment(
                             color = tint,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
+                            modifier = Modifier.vibrancy(tint),
                         )
                     }
                 }
@@ -1070,6 +1078,7 @@ private fun PillSegment(
                     color = tint,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.vibrancy(tint),
                 )
             }
         }
@@ -1144,7 +1153,7 @@ internal fun OutputCaption(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = captionModifier,
+            modifier = captionModifier.vibrancy(LocalPlayerTint.current),
         )
     }
 }
@@ -1229,7 +1238,7 @@ private fun BottomGlyph(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
             .clip(CircleShape)
-            .background(
+            .vibrantBackground(
                 if (highlighted) LocalPlayerTint.current.copy(alpha = 0.20f) else Color.Transparent,
             )
             .clickable(
@@ -1252,7 +1261,7 @@ private fun BottomGlyph(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(26.dp).vibrancy(tint),
             )
         } else if (label != null) {
             Text(
@@ -1260,6 +1269,7 @@ private fun BottomGlyph(
                 color = tint,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.vibrancy(tint),
             )
         }
     }
@@ -1453,7 +1463,7 @@ internal fun ArtistCreditsMarquee(
     val textMeasurer = rememberTextMeasurer()
     val segments = remember(text, credits) { creditSegments(text, credits) }
 
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier.vibrancy(color), verticalAlignment = Alignment.CenterVertically) {
         if (!enabled) {
             CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
             return@Row
@@ -1710,7 +1720,7 @@ private fun LosslessLabel(
             painter = iconPainter,
             contentDescription = null,
             tint = tint,
-            modifier = if (iconSize.isSpecified) Modifier.size(iconSize) else Modifier,
+            modifier = (if (iconSize.isSpecified) Modifier.size(iconSize) else Modifier).vibrancy(tint),
         )
         Spacer(Modifier.width(4.dp))
         if (animated) {
@@ -1725,6 +1735,7 @@ private fun LosslessLabel(
                 color = LocalPlayerTint.current.copy(alpha = 0.45f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.vibrancy(LocalPlayerTint.current),
             )
         }
     }
@@ -1777,6 +1788,7 @@ private fun ShimmerText(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
+            .vibrancy(tint)
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()

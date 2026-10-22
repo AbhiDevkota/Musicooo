@@ -276,10 +276,15 @@ private class DrawBackdropNode(
 
     private var graphicsLayer: GraphicsLayer? = null
 
+    // Vendored change: upstream renders the surface's content offscreen. Its
+    // label and glyph layers then blend against a transparent buffer instead of
+    // the glass drawn just below them, and plus-lighter content (see the app's
+    // Modifier.vibrancy) loses the glass it is meant to add onto. Nothing here
+    // needs the buffer: the layer only clips, and any alpha is applied by the
+    // separate layerBlock layer outside it.
     private val layoutLayerBlock: GraphicsLayerScope.() -> Unit = {
         clip = true
         shape = shapeProvider.shape
-        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
     }
 
     private var layoutCoordinates: LayoutCoordinates? by mutableStateOf(null, neverEqualPolicy())

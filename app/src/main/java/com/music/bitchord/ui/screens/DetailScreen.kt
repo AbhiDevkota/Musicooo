@@ -14,6 +14,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import com.music.bitchord.ui.components.isLiquidGlassActive
 import com.music.bitchord.ui.components.liquidGlassRim
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +96,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -168,6 +170,9 @@ import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.libraryGrid
 import com.music.bitchord.ui.components.lightweightLiquidGlass
 import com.music.bitchord.ui.components.thumbnailBorder
+import com.music.bitchord.ui.components.vibrancy
+import com.music.bitchord.ui.components.vibrantBackground
+import com.music.bitchord.ui.components.vibrantBorder
 import com.music.bitchord.ui.components.detailSkeleton
 import com.music.bitchord.ui.components.topBarContentPadding
 import com.music.bitchord.ui.components.trackColumnWidth
@@ -1133,7 +1138,7 @@ private fun DetailSearchField(
             .height(46.dp)
             .clip(PILL_SHAPE)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.10f), PILL_SHAPE)
+            .vibrantBorder(0.5.dp, Color.White.copy(alpha = 0.10f), PILL_SHAPE)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1574,6 +1579,7 @@ private fun ActionPill(
     // says so.
     val haptics = rememberHaptics()
     val content = if (filled) Color.Black else MaterialTheme.colorScheme.onSurface
+    val glassRim = isLiquidGlassActive()
     Row(
         modifier = modifier
             .height(size)
@@ -1583,9 +1589,9 @@ private fun ActionPill(
                     Modifier.background(Color.White)
                 } else {
                     Modifier
-                        .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
+                        .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
                         .liquidGlassRim(CircleShape)
-                        .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
+                        .then(if (glassRim) Modifier else Modifier.lightReleaseEdge(CircleShape))
                 },
             )
             .clickable {
@@ -1689,11 +1695,12 @@ private fun CircleIconButton(
             .size(size)
             .alpha(if (enabled) 1f else DISABLED_ACTION_ALPHA)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
+            .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
             // The glass rim the floating bars wear, with Liquid Glass on. Rim
             // only: over the page's flat tint a blurred fill would look the same.
+            // It brings its own edge, so the light one is only for without it.
             .liquidGlassRim(CircleShape)
-            .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
+            .then(if (isLiquidGlassActive()) Modifier else Modifier.lightReleaseEdge(CircleShape))
             .clickable(enabled = enabled) {
                 haptics.play(haptic)
                 onClick()
@@ -1805,7 +1812,7 @@ private fun SignedByCaption(
         textAlign = textAlign,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
+        modifier = modifier.vibrancy(palette.onBackground),
     )
 }
 
@@ -2141,8 +2148,8 @@ private fun TopReleaseCard(
             // A light veil rather than the dark glass: Apple's containers read
             // slightly white against the page, and a dark panel reads as a hole.
             .clip(shape)
-            .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), shape)
-            .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), shape)
+            .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), shape)
+            .lightReleaseEdge(shape)
             .clip(shape)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .padding(16.dp),
@@ -2186,8 +2193,8 @@ private fun TopReleaseCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
-                    .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
+                    .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
+                    .lightReleaseEdge(CircleShape)
                     .clickable {
                         haptics.play(if (saved) Haptic.ToggleOff else Haptic.ToggleOn)
                         onToggleSaved()
@@ -2207,13 +2214,17 @@ private fun TopReleaseCard(
     }
 }
 
-/** The white veil under Apple-style containers and their buttons. */
+/** The white veil under Apple-style containers and their buttons, added onto the page. */
 private const val LIGHT_FILL_ALPHA = 0.07f
 /** A side button this user can't use — a guest's Add or Subscribe. */
 private const val DISABLED_ACTION_ALPHA = 0.38f
 
 /** Brighter than the default 0.15 hairlines, as on Apple Music's own card. */
 private const val TOP_RELEASE_EDGE_ALPHA = 0.10f
+
+/** The light hairline round those containers and buttons, added onto the page like the veil. */
+private fun Modifier.lightReleaseEdge(shape: Shape): Modifier =
+    vibrantBorder(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), shape)
 private const val TOP_RELEASE_COVER_EDGE_ALPHA = 0.215f
 
 @OptIn(ExperimentalFoundationApi::class)

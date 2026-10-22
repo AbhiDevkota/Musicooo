@@ -150,6 +150,8 @@ import com.music.bitchord.ui.theme.rememberArtworkTopBandLuminance
 import com.music.bitchord.ui.theme.topBandScrimAlpha
 import com.music.bitchord.ui.LyricsProviderState
 import com.music.bitchord.ui.components.optimizedHazeEffect
+import com.music.bitchord.ui.components.vibrancy
+import com.music.bitchord.ui.components.vibrantBackground
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
@@ -2498,7 +2500,7 @@ fun NowPlayingScreen(
                                 .graphicsLayer { alpha = spotifyChromeAlpha }
                                 .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                                .vibrantBackground(LocalPlayerTint.current.copy(alpha = 0.70f)),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
@@ -3116,6 +3118,7 @@ fun NowPlayingScreen(
                                         tint = Color.White.copy(alpha = 0.35f),
                                         modifier = Modifier
                                             .size(40.dp)
+                                            .vibrancy()
                                             .graphicsLayer {
                                                 val scale = 1f - 0.5f * p()
                                                 scaleX = scale

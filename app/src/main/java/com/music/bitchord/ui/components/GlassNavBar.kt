@@ -230,7 +230,7 @@ fun GlassNavBar(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp),
+                            modifier = Modifier.size(25.dp).vibrancy(tint),
                         )
                     },
                     onClick = onClick,
@@ -243,7 +243,7 @@ fun GlassNavBar(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp),
+                            modifier = Modifier.size(25.dp).vibrancy(tint),
                         )
                     },
                     title = {
@@ -256,7 +256,7 @@ fun GlassNavBar(
                             // The library's Tab stacks the glyph and the label
                             // with nothing between them; the plain bar spaces
                             // them, and this is where that gap goes.
-                            modifier = Modifier.padding(top = TAB_ICON_LABEL_GAP),
+                            modifier = Modifier.padding(top = TAB_ICON_LABEL_GAP).vibrancy(tint),
                         )
                     },
                     onClick = onClick,
@@ -430,6 +430,7 @@ private fun GlassNowPlaying(
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.vibrancy(contentColor),
                     )
                 }
             }
