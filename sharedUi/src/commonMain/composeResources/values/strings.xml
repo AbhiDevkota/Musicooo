@@ -271,4 +271,6 @@
     <string name="mood_wellbeing_line">Calm music for mindfulness and yoga.</string>
     <string name="mood_work">Work</string>
     <string name="mood_work_line">Steady instrumentals to get things done.</string>
+    <string name="video_quality">Video quality</string>
+    <string name="video_quality_auto">Auto</string>
 </resources>

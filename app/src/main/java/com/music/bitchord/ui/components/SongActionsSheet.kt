@@ -172,13 +172,17 @@ fun SongActionsSheet(
     upgradeQualityInProgress: Boolean = false,
     /**
      * Switches the playing track between its video and audio-only cuts. Null
-     * hides the row — offered only from the player, and only once an
-     * alternate cut is known to exist. See
+     * hides the row — offered for the playing track only. See
      * [com.music.bitchord.playback.PlaybackService.smoothSwapCurrentTrackVersion].
      */
     onToggleAudioVersion: (() -> Unit)? = null,
     /** Which cut is playing now, so the row can offer the other one. */
     isAudioVersion: Boolean = false,
+    /**
+     * A switch already looked for the other cut and found none: the row says
+     * so, greyed out, rather than offering the same dead end again.
+     */
+    audioVersionMissing: Boolean = false,
     onShare: (() -> Unit)? = null,
     /**
      * Copies what the app logged while starting this track. Null everywhere
@@ -265,9 +269,15 @@ fun SongActionsSheet(
                 ActionRow(
                     icon = if (isAudioVersion) Icons.Rounded.Videocam else BitChordIcons.MusicNote,
                     label = stringResource(
-                        if (isAudioVersion) R.string.convert_to_video else R.string.convert_to_audio,
+                        when {
+                            audioVersionMissing && isAudioVersion -> R.string.no_video_version
+                            audioVersionMissing -> R.string.no_audio_version
+                            isAudioVersion -> R.string.convert_to_video
+                            else -> R.string.convert_to_audio
+                        },
                     ),
                     accent = palette.accent,
+                    enabled = !audioVersionMissing,
                     onClick = it,
                 )
             }
