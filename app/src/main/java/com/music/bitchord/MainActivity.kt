@@ -2253,9 +2253,9 @@ private fun BitChordApp(
     // to read the same source the page does or the bars stay the YouTube photo's
     // colour while the page beneath them has moved on.
     val appleArtVersion by AppleArtistArtRepository.updates.collectAsStateWithLifecycle()
-    val detailApple = remember(topDetail?.title, topDetail?.type, appleArtVersion) {
+    val detailApple = remember(topDetail?.browseId, topDetail?.type, appleArtVersion) {
         topDetail?.takeIf { it.type == BrowseType.ARTIST }
-            ?.let { AppleArtistArtRepository.cached(it.title) }
+            ?.let { AppleArtistArtRepository.cached(it.browseId) }
     }
     val detailPalette = rememberArtworkPalette(
         imageUrl = detailApple?.heroUrl ?: topDetail?.thumbnailUrl,

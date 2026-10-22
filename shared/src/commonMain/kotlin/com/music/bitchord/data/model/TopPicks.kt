@@ -129,6 +129,11 @@ data class TopPick(
     /** The artist a card is billed under — "Featuring …", "… & Similar Artists". */
     val artistName: String? = null,
     /**
+     * [artistName]'s YouTube channel, on the artist cards — what their Apple
+     * Music clip is looked up and proved against.
+     */
+    val artistBrowseId: String? = null,
+    /**
      * Pictures for the artwork. The release cover or the artist photo first;
      * an artist-and-similar card follows it with up to two related artists.
      */

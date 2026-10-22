@@ -37,7 +37,12 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.music.bitchord.data.canvas.CanvasArtwork
+import com.music.bitchord.ui.AppUi
+import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -275,12 +280,21 @@ private fun TopPickCard(
             }
             TopPickKind.ARTIST_AND_SIMILAR -> {
                 val palette = collagePalette(pick.artistName.orEmpty())
-                ArtistCollageArt(pick.images, palette, Modifier.fillMaxSize())
+                ArtistCollageArt(pick.images, palette, Modifier.fillMaxSize(), motion = pick.artistMotion())
                 eyebrowColor = palette.eyebrow
                 branded = true
             }
             TopPickKind.LATEST_RELEASE, TopPickKind.NEW_RELEASE_MIX -> {
-                ReleaseArt(pick.images.firstOrNull(), Modifier.fillMaxSize())
+                ReleaseArt(
+                    pick.images.firstOrNull(),
+                    Modifier.fillMaxSize(),
+                    // A New Release Mix is a playlist; only a real release has a sleeve that moves.
+                    motion = pick.takeIf { it.kind == TopPickKind.LATEST_RELEASE }?.let { release ->
+                        CardMotionSource(release.browseId ?: release.title) {
+                            AppUi.host.releaseMotion(release.title, release.artistName.orEmpty())
+                        }
+                    },
+                )
                 eyebrowColor = PhotoEyebrow
                 branded = false
             }
@@ -291,6 +305,7 @@ private fun TopPickCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+                CardMotion(pick.artistMotion(), Modifier.fillMaxSize())
                 // The caption sits on the picture's own darkened foot, as on
                 // Apple's photo cards, rather than on a band of flat black.
                 Box(
@@ -373,9 +388,16 @@ private val PhotoEyebrow = Color.White.copy(alpha = 0.62f)
  * small copy of the cover once, as it loads, and the image cache keeps the
  * result. A live blur — RenderEffect, Haze — would be re-run on every frame
  * the page draws, and this row's animated cards draw every frame.
+ *
+ * With a [motion] source, the release's motion cover plays over the square
+ * once found, dissolving into the blur the same way the still does.
  */
 @Composable
-private fun ReleaseArt(url: String?, modifier: Modifier) {
+private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSource? = null) {
+    // How much of the still the clip has covered. Two faded layers stacked
+    // would leave the still showing through the clip's own fade, so the still
+    // steps out as the clip comes in.
+    var covered by remember { mutableFloatStateOf(0f) }
     Box(modifier.background(Color.Black)) {
         AsyncImage(
             model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
@@ -409,7 +431,10 @@ private fun ReleaseArt(url: String?, modifier: Modifier) {
                 // blur under it instead of ending on a hard line. Offscreen so
                 // the mask cuts the cover alone; the cover never animates, so
                 // the layer is drawn once and reused while it scrolls.
-                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                .graphicsLayer {
+                    compositingStrategy = CompositingStrategy.Offscreen
+                    alpha = 1f - covered
+                }
                 .drawWithContent {
                     drawContent()
                     drawRect(
@@ -418,7 +443,55 @@ private fun ReleaseArt(url: String?, modifier: Modifier) {
                     )
                 },
         )
+        CardMotion(
+            motion,
+            Modifier.fillMaxWidth().aspectRatio(1f),
+            bottomFade = 0.22f,
+            onCover = { covered = it },
+        )
     }
+}
+
+/**
+ * Where a card's Apple Music clip comes from: [lookup], asked once per [key]
+ * while the card is on screen.
+ */
+private class CardMotionSource(val key: Any, val lookup: suspend () -> CanvasArtwork?)
+
+/** The artist's own looping clip, for the cards that show their face. */
+private fun TopPick.artistMotion(): CardMotionSource? {
+    val channel = artistBrowseId ?: return null
+    val name = artistName ?: return null
+    return CardMotionSource(channel) { AppUi.host.artistMotion(channel, name) }
+}
+
+/**
+ * A card's clip over the still it sits on. The still stays underneath until
+ * the clip's first frame has faded in, and for good where there is no clip —
+ * which is most cards, and every card with animated artwork off.
+ *
+ * Held back with the pictures ([LocalArtworkImages]) so a cold start's feed
+ * doesn't wait on it, and paused with the rest of the row's motion
+ * ([LocalArtworkMotion]) while Home isn't being looked at.
+ */
+@Composable
+private fun CardMotion(
+    source: CardMotionSource?,
+    modifier: Modifier,
+    bottomFade: Float = 0f,
+    onCover: (Float) -> Unit = {},
+) {
+    if (source == null || !LocalArtworkImages.current) return
+    val clip by produceState<CanvasArtwork?>(null, source.key) { value = source.lookup() }
+    val canvas = clip ?: return
+    CanvasArtworkPlayer(
+        canvas = canvas,
+        isPlaying = true,
+        modifier = modifier,
+        bottomFade = bottomFade,
+        onCoverChanged = onCover,
+        pausedForTransition = !LocalArtworkMotion.current,
+    )
 }
 
 /** The cover size the backdrop is cut from: it ends up 48px wide, so a small copy is plenty. */
@@ -1399,10 +1472,16 @@ private fun collagePalette(name: String): CollagePalette = CollagePalettes[abs(n
 
 /**
  * The artist in a large circle, with up to two related artists in smaller
- * ones beneath it, on a colour that brightens toward the caption.
+ * ones beneath it, on a colour that brightens toward the caption. The large
+ * circle plays the artist's [motion] clip when Apple has one.
  */
 @Composable
-private fun ArtistCollageArt(images: List<String>, palette: CollagePalette, modifier: Modifier) {
+private fun ArtistCollageArt(
+    images: List<String>,
+    palette: CollagePalette,
+    modifier: Modifier,
+    motion: CardMotionSource? = null,
+) {
     BoxWithConstraints(
         modifier.background(Brush.verticalGradient(listOf(palette.top, palette.bottom))),
     ) {
@@ -1415,19 +1494,20 @@ private fun ArtistCollageArt(images: List<String>, palette: CollagePalette, modi
             2 -> listOf(Triple(0.40f, 0.28f, 0.60f), Triple(0.72f, 0.52f, 0.36f))
             else -> listOf(Triple(0.37f, 0.257f, 0.594f), Triple(0.76f, 0.48f, 0.333f), Triple(0.457f, 0.608f, 0.29f))
         }
-        slots.zip(images).forEach { (slot, url) ->
+        slots.zip(images).forEachIndexed { index, (slot, url) ->
             val (cx, cy, d) = slot
             val diameter = w * d
+            val circle = Modifier
+                .offset(x = w * cx - diameter / 2, y = h * cy - diameter / 2)
+                .size(diameter)
+                .clip(CircleShape)
             AsyncImage(
                 model = url.croppedAt(if (d > 0.5f) HEADER_ART_PX else CARD_ART_PX).whenArtworkReady(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .offset(x = w * cx - diameter / 2, y = h * cy - diameter / 2)
-                    .size(diameter)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.18f)),
+                modifier = circle.background(Color.Black.copy(alpha = 0.18f)),
             )
+            if (index == 0) CardMotion(motion, circle)
         }
     }
 }

@@ -22,9 +22,10 @@ import java.util.concurrent.TimeUnit
  *
  * Two public, unauthenticated requests, both small:
  *  - the iTunes search API turns the name into the artist's Apple Music
- *    page, taken only when the name it gives back is the name asked for (a
- *    search happily returns somebody else; of several exact matches the first
- *    is the best known, and the one meant);
+ *    page, taken only when the name it gives back is the name asked for *and*
+ *    that Apple artist shares a song or release title with the YouTube
+ *    artist's own page ([AppleCatalogue]) — a name alone has put another
+ *    "Krsna"'s face on KR$NA;
  *  - that page's `og:image`, read off the first few kilobytes of the page —
  *    the tag sits near the top of a document that runs to most of a megabyte,
  *    so the rest is never downloaded.
@@ -42,8 +43,17 @@ object AppleArtistPhotos {
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"
 
-    /** Normalised name → photo, or "" for an artist Apple has no photo of. */
+    /**
+     * [KEY_PREFIX] + normalised name → photo, or "" for an artist Apple has no
+     * (proven) photo of.
+     */
     private val known = ConcurrentHashMap<String, String>()
+
+    /**
+     * Marks answers made with the catalogue check. Answers stored before it
+     * were matched on name alone, so [seed] drops anything without it.
+     */
+    private const val KEY_PREFIX = "v2|"
 
     private val client by lazy {
         Http.client.newBuilder()
@@ -58,19 +68,30 @@ object AppleArtistPhotos {
 
     /** Answers from an earlier process. */
     fun seed(photos: Map<String, String>) {
-        photos.forEach { (key, url) -> if (url.isEmpty() || isArtistPhoto(url)) known.putIfAbsent(key, url) }
+        photos.forEach { (key, url) ->
+            if (key.startsWith(KEY_PREFIX) && (url.isEmpty() || isArtistPhoto(url))) known.putIfAbsent(key, url)
+        }
     }
 
     /** Everything known now, misses included, for [seed] next time. */
     fun snapshot(): Map<String, String> = HashMap(known)
 
-    /** [artistName]'s Apple Music photo, or null when Apple has none. Never throws. */
-    suspend fun photoFor(artistName: String): String? {
-        val key = artistName.matchKey()
-        if (key.isEmpty()) return null
+    /**
+     * [artistName]'s Apple Music photo, or null when Apple has none that
+     * provably is them. [catalogue] is the YouTube artist's own song and
+     * release titles ([AppleCatalogue.titlesOf]); it is only asked for on a
+     * cache miss, since it may cost a page fetch. With no titles nothing can be
+     * proved, and nothing is asked or remembered. Never throws.
+     */
+    suspend fun photoFor(artistName: String, catalogue: suspend () -> Collection<String>): String? {
+        val name = artistName.matchKey()
+        if (name.isEmpty()) return null
+        val key = KEY_PREFIX + name
         known[key]?.let { return it.ifEmpty { null } }
+        val titles = AppleCatalogue.keys(runCatching { catalogue() }.getOrDefault(emptyList()))
+        if (titles.isEmpty()) return null
         val found = withContext(Dispatchers.IO) {
-            runCatching { lookup(artistName, key) }
+            runCatching { lookup(artistName, name, titles) }
                 .onFailure { Log.d(TAG, "lookup failed for $artistName: $it") }
                 .getOrElse { return@withContext null } // a network miss: not remembered
                 ?: ""
@@ -88,9 +109,11 @@ object AppleArtistPhotos {
      *
      * Apple can list the same artist twice, and the lesser entry often has no
      * photo, only one of their record covers. So a match whose page has no
-     * real photo passes the turn to the next one with the same name.
+     * real photo passes the turn to the next one with the same name. Every
+     * candidate must first share a title with [titles]; one that doesn't is
+     * somebody else and is never counted against [MATCHES_TRIED].
      */
-    private fun lookup(artistName: String, key: String): String? {
+    private fun lookup(artistName: String, key: String, titles: Set<String>): String? {
         val url = "https://itunes.apple.com/search?term=${URLEncoder.encode(artistName, "UTF-8")}" +
             "&entity=musicArtist&limit=5"
         val body = client.newCall(Request.Builder().url(url).header("User-Agent", USER_AGENT).build())
@@ -99,18 +122,21 @@ object AppleArtistPhotos {
         return results.asSequence()
             .map { it.jsonObject }
             .filter { it.string("artistName").orEmpty().matchKey() == key }
+            .filter { it.string("artistLinkUrl").orEmpty().startsWith("https://music.apple.com/") }
+            .filter { result ->
+                val id = result.string("artistId")?.toLongOrNull() ?: return@filter false
+                AppleCatalogue.sharesTitles(id, titles).also { shares ->
+                    if (!shares) Log.d(TAG, "$artistName: Apple ${result.string("artistName")} ($id) shares no titles, skipped")
+                }
+            }
             .mapNotNull { it.string("artistLinkUrl")?.substringBefore('?') }
-            .filter { it.startsWith("https://music.apple.com/") }
             .take(MATCHES_TRIED)
             .firstNotNullOfOrNull(::ogImage)
     }
 
     private const val MATCHES_TRIED = 2
 
-    /** Case, accents and punctuation are not what makes two names different. */
-    private fun String.matchKey(): String =
-        java.text.Normalizer.normalize(lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD)
-            .filter { it.isLetterOrDigit() }
+    private fun String.matchKey(): String = AppleCatalogue.matchKey(this)
 
     /** The page's `og:image`, read off its head and the download dropped as soon as it's found. */
     private fun ogImage(pageUrl: String): String? =

@@ -964,6 +964,7 @@ class PlaybackService : MediaLibraryService() {
         ) {
             val exoPlayer = player ?: return
             if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                lastSeekAt = SystemClock.elapsedRealtime()
                 if (exoPlayer.isPlaying) pushDiscordPresence(exoPlayer)
                 updateLyricSubtitle()
                 // The watch extrapolates its progress ring from the last
@@ -1364,6 +1365,9 @@ class PlaybackService : MediaLibraryService() {
             // because these carry no `v` parameter and would otherwise fall
             // straight through unresolved.
             if (dataSpec.uri.authority == "source") {
+                // Direct Source Stream: an addon row is held until it is about
+                // to play, the same as a YouTube one — see [DirectSourceGate].
+                mediaIdIn(dataSpec.uri)?.let { id -> runBlocking(about) { DirectSourceGate.awaitOpen(id) } }
                 val directYouTube =
                     dataSpec.uri.getQueryParameter(DIRECT_YOUTUBE_PARAMETER) == "1"
                 val stream = runBlocking(about) {
@@ -1406,6 +1410,15 @@ class PlaybackService : MediaLibraryService() {
             }
             val videoId = dataSpec.uri.getQueryParameter("v")
                 ?: return@Resolver dataSpec
+            // Direct Source Stream holds every playback open of a track that
+            // is neither playing nor next inside the window: read-ahead and
+            // ExoPlayer's own early preparation of the next item alike. Not
+            // Automix's Opus reads, which measure the next track ahead of time
+            // on purpose and never touch an addon.
+            val analysisRead = AutomixAnalysisSource.requestsYouTubeOpus(
+                dataSpec.uri.getQueryParameter(AutomixAnalysisSource.OPUS_QUERY_PARAMETER),
+            )
+            if (!analysisRead) runBlocking(about) { DirectSourceGate.awaitOpen(videoId) }
             // An explicit rollback is not a preference for a different
             // candidate: it means this exact YouTube rendition, immediately.
             // Answer it before StreamChoice, the module race and a pending
@@ -1432,10 +1445,7 @@ class PlaybackService : MediaLibraryService() {
             // Automix owns a base-cache Opus rendition. It must bypass the
             // playback race winner (JioSaavn, a module, or a lossless upgrade)
             // and resolve directly to YouTube for this analysis-only request.
-            if (AutomixAnalysisSource.requestsYouTubeOpus(
-                    dataSpec.uri.getQueryParameter(AutomixAnalysisSource.OPUS_QUERY_PARAMETER),
-                )
-            ) {
+            if (analysisRead) {
                 NerdStats.recordSource(videoId, "YouTube")
                 val streamUrl = try {
                     runBlocking(about) {
@@ -1533,7 +1543,10 @@ class PlaybackService : MediaLibraryService() {
                 // Only substituted, non-lossless choices need this. A pinned
                 // YouTube URL has no source result to promote, and a lossless
                 // module result already satisfies the request.
-                if (StreamChoice.isSubstitute(videoId) &&
+                // Direct Source Stream plays the addon's answer as final: no
+                // second look, no mid-song swap.
+                if (!DirectSourceGate.isActive() &&
+                    StreamChoice.isSubstitute(videoId) &&
                     serving.format.isLossless != true &&
                     QualityUpgrade.couldStillUpgrade(videoId, dataSpec.uri)
                 ) {
@@ -1758,6 +1771,7 @@ class PlaybackService : MediaLibraryService() {
         exoPlayer.addAnalyticsListener(formatListener)
 
         reportProgress()
+        watchDirectWindow()
 
         val controller = createCrossfadeController()
         crossfade = controller
@@ -1798,7 +1812,8 @@ class PlaybackService : MediaLibraryService() {
     private suspend fun resolveForCast(item: MediaItem): CastStream? = withContext(Dispatchers.IO) {
         val uri = item.localConfiguration?.uri ?: return@withContext null
         val resolver = streamResolver ?: return@withContext null
-        val resolved = resolver.resolveDataSpec(DataSpec(uri)).uri
+        // Ungated: the receiver plays items this player is not on.
+        val resolved = DirectSourceGate.ungated { resolver.resolveDataSpec(DataSpec(uri)) }.uri
         if (resolved.scheme != "http" && resolved.scheme != "https") {
             null
         } else {
@@ -1864,6 +1879,11 @@ class PlaybackService : MediaLibraryService() {
                 }
             },
             versionSwapActive = { versionSwapJob?.isActive == true },
+            // Direct Source Stream fetches the next track only in the last
+            // seconds before the blend, so the marker waits for its audio:
+            // a window shown over a track that may still fall back to YouTube
+            // promises a blend that could start late or not at all.
+            nextStreamReady = { item -> !DirectSourceGate.isActive() || DirectSourceGate.isStreamReady(item) },
         )
 
     /**
@@ -5205,6 +5225,7 @@ class PlaybackService : MediaLibraryService() {
         if (StreamChoice.substitutesRefused(videoId)) {
             return Resolved.YouTube(StreamResolver.resolve(videoId))
         }
+        if (DirectSourceGate.isActive()) return resolveDirect(videoId, target)
         NerdStats.onLosslessRaceStart(videoId)
         // Both legs are parented to the service's scope rather than to the
         // caller, so neither inherits whose track this is — see
@@ -5329,6 +5350,31 @@ class PlaybackService : MediaLibraryService() {
         )
         if (!pending) NerdStats.onLosslessRaceEnd(videoId)
         return Resolved.YouTube(url)
+    }
+
+    /**
+     * Direct Source Stream's resolve: the addons first and alone, YouTube only
+     * when none of them has the track — see [DirectSourceGate].
+     *
+     * Nothing races and nothing is handed to [QualityUpgrade]. Whatever plays
+     * here plays to the end, which is the point: one search and one stream per
+     * track, not a YouTube start followed by a swap.
+     *
+     * A manifest answer goes out as it is. It fails its first read and
+     * [replayAsManifest] re-prepares it with the type declared, which is a
+     * short cut before the first note rather than a YouTube start and a seam.
+     */
+    private suspend fun resolveDirect(videoId: String, target: TrackMatcher.Target): Resolved {
+        val direct = runCatching { DirectSourceGate.lookup(videoId, target) }
+            .onFailure { if (it is CancellationException) throw it }
+            .getOrNull()
+        if (direct != null) return Resolved.Module(direct)
+        TrackLog.d(
+            "BitChord",
+            "no addon served '${target.title}' directly; playing it from YouTube",
+            about = videoId,
+        )
+        return Resolved.YouTube(StreamResolver.resolve(videoId))
     }
 
     /**
@@ -5996,6 +6042,14 @@ class PlaybackService : MediaLibraryService() {
      * tracks is more than it does anything with, but it decides that, not this.
      */
     private fun prefetchAround(player: ExoPlayer) {
+        // Direct Source Stream reads ahead from its own window instead — see
+        // [driveDirectWindow]. Anything the ordinary read-ahead had running
+        // for the old queue is dropped with it.
+        if (DirectSourceGate.isActive()) {
+            driveDirectWindow()
+            if (preferredPrefetchRequest != null) cancelPrefetch()
+            return
+        }
         val nextIndex = player.nextMediaItemIndex
         val upcomingSongs = if (nextIndex != C.INDEX_UNSET) {
             val end = (nextIndex + AudioCache.QUEUE_DEPTH - 1).coerceAtMost(player.mediaItemCount - 1)
@@ -6025,6 +6079,62 @@ class PlaybackService : MediaLibraryService() {
         }
 
         warm(upcomingSongs)
+    }
+
+    /** When the listener last seeked, so [driveDirectWindow] can tell a scrub from playback. */
+    private var lastSeekAt = 0L
+
+    /** Ticks [driveDirectWindow] for as long as the service runs. */
+    private fun watchDirectWindow() {
+        scope.launch {
+            while (isActive) {
+                driveDirectWindow()
+                delay(DIRECT_WINDOW_STEP_MS)
+            }
+        }
+    }
+
+    /**
+     * Direct Source Stream's read-ahead, and the only one it has.
+     *
+     * Tells [DirectSourceGate] what is audible, then opens the next track once
+     * the playing one is within [DirectSourceGate.WINDOW_MS] of its transition.
+     * That is the crossfade or Automix start when one is planned, otherwise the
+     * end of the file. Opening it releases ExoPlayer's own preparation of the
+     * next item and starts [AudioCache.prefetchDirect].
+     *
+     * Only while playing, and only once the playhead has run on its own for
+     * [SEEK_SETTLE_MS] since the last seek, so scrubbing toward the end of a
+     * track or skipping through a queue never fetches anything ahead.
+     */
+    private fun driveDirectWindow() {
+        val exoPlayer = player ?: return
+        val audible = buildSet {
+            exoPlayer.currentMediaItem?.mediaId?.let(::add)
+            if (crossfade?.isTransitioning() == true) spare?.currentMediaItem?.mediaId?.let(::add)
+        }
+        if (DirectSourceGate.onPlaying(audible)) AudioCache.cancelDirect()
+        if (!DirectSourceGate.isActive() || !exoPlayer.isPlaying) return
+        if (SystemClock.elapsedRealtime() - lastSeekAt < SEEK_SETTLE_MS) return
+        val current = exoPlayer.currentMediaItem ?: return
+        val nextIndex = exoPlayer.nextMediaItemIndex
+        if (nextIndex == C.INDEX_UNSET) return
+        val next = exoPlayer.getMediaItemAt(nextIndex)
+        val duration = exoPlayer.duration
+        if (duration == C.TIME_UNSET || duration <= 0L) return
+        val boundary = crossfade?.plannedTransitionFor(current.mediaId) ?: duration
+        val speed = exoPlayer.playbackParameters.speed.coerceAtLeast(MIN_WINDOW_SPEED)
+        val remaining = ((boundary - exoPlayer.currentPosition) / speed).toLong()
+        if (remaining > DirectSourceGate.WINDOW_MS) return
+        if (!DirectSourceGate.openNext(next.mediaId)) return
+        TrackLog.d(
+            "BitChord",
+            "direct window open: ${next.mediaId} with ${remaining}ms to the transition",
+            about = next.mediaId,
+        )
+        val song = next.toSong()
+        AudioCache.noteSongs(listOf(song))
+        AudioCache.prefetchDirect(AudioCache.Upcoming(song.videoId, TrackMatcher.targetOf(song)))
     }
 
     /** Stops both rendition selection and byte read-ahead, and makes resume retry. */
@@ -8697,6 +8807,19 @@ class PlaybackService : MediaLibraryService() {
 
         /** How often played-seconds are sampled off the player. */
         const val PROGRESS_SAMPLE_MS = 5_000L
+
+        /** How often [driveDirectWindow] checks whether the next track's window has opened. */
+        const val DIRECT_WINDOW_STEP_MS = 500L
+
+        /**
+         * How long the playhead has to run on its own after a seek before the
+         * direct window may open. Long enough that a scrub, which is a burst
+         * of seeks, never counts as having reached the end of a track.
+         */
+        const val SEEK_SETTLE_MS = 2_000L
+
+        /** Floor on the speed the window divides by, so a near-zero speed cannot stretch it to forever. */
+        const val MIN_WINDOW_SPEED = 0.25f
 
         /** Bounds on a track's normalization gain, in millibels: the range the platform LoudnessEnhancer this replaced accepted. */
         const val MIN_LOUDNESS_GAIN_MB = -1500

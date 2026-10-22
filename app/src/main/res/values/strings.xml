@@ -108,6 +108,7 @@
         <item quantity="other">Downloading %1$d songs</item>
     </plurals>
     <string name="source">Sources</string>
+    <string name="direct_source_stream">Direct Source Stream</string>
     <string name="lossless_audio">Lossless audio</string>
     <string name="prefer_lossless">Prefer lossless</string>
     <string name="lossless_source_subtitle">FLAC and ALAC straight from the source</string>

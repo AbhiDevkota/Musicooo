@@ -91,7 +91,7 @@ object TopPicks {
         // Every artist face on the row is Apple Music's photo of them, not
         // YouTube's channel art: the artists themselves, and the people their
         // fans also play. Looked up together, a few at a time.
-        val photos = applePhotos(artists.flatMap { listOf(it.name) + it.relatedNames })
+        val photos = applePhotos(artists)
         val mixes = mixesAsync.await()
         Log.d(TAG, "topPicks: history=${history.size} artists=${artists.map { it.name }} mixes=${mixes.keys}")
 
@@ -215,27 +215,44 @@ object TopPicks {
          * there — and without repeats. A few more than a card shows, so an
          * artist Apple has no photo of can be passed over.
          */
-        val relatedNames: List<String> by lazy {
+        val relatedNames: List<String> get() = related.keys.toList()
+
+        /** [relatedNames] → each one's channel, which their Apple photo is checked against. */
+        val related: Map<String, String> by lazy {
             val own = normalizedArtistName(name)
             page.sections
                 .firstOrNull { shelf -> shelf.items.isNotEmpty() && shelf.items.all { it.browseId?.startsWith("UC") == true } }
                 ?.items.orEmpty()
                 .filter { it.browseId != browseId }
-                .map { it.title }
-                .filter { normalizedArtistName(it).let { key -> key.isNotEmpty() && key != own } }
-                .distinctBy { normalizedArtistName(it) }
+                .filter { normalizedArtistName(it.title).let { key -> key.isNotEmpty() && key != own } }
+                .distinctBy { normalizedArtistName(it.title) }
                 .take(RELATED_CANDIDATES)
+                .associate { it.title to it.browseId!! }
         }
     }
 
     private const val RELATED_CANDIDATES = 4
     private const val PHOTO_LOOKUPS_AT_ONCE = 4
 
-    /** Apple Music photos for [names], by name; an artist Apple has none of is left out. */
-    private suspend fun applePhotos(names: List<String>): Map<String, String> = coroutineScope {
+    /**
+     * Apple Music photos for [artists] and the people their fans also play, by
+     * name; an artist Apple has none of (or none provably theirs) is left out.
+     * A card's own artist is checked against the page already in hand; a
+     * related one's page is fetched only if their photo isn't known yet.
+     */
+    private suspend fun applePhotos(artists: List<ArtistCard>): Map<String, String> = coroutineScope {
+        val catalogues = LinkedHashMap<String, suspend () -> Collection<String>>()
+        artists.forEach { artist -> catalogues.putIfAbsent(artist.name) { AppleCatalogue.titlesOf(artist.page) } }
+        artists.forEach { artist ->
+            artist.related.forEach { (name, channel) ->
+                catalogues.putIfAbsent(name) {
+                    YtMusicRepository.artistLanding(channel).getOrNull()?.let(AppleCatalogue::titlesOf).orEmpty()
+                }
+            }
+        }
         val limiter = Semaphore(PHOTO_LOOKUPS_AT_ONCE)
-        names.distinct().map { name ->
-            async { limiter.withPermit { AppleArtistPhotos.photoFor(name)?.let { name to it } } }
+        catalogues.map { (name, catalogue) ->
+            async { limiter.withPermit { AppleArtistPhotos.photoFor(name, catalogue)?.let { name to it } } }
         }.awaitAll().filterNotNull().toMap()
     }
 
@@ -298,6 +315,7 @@ object TopPicks {
             kind = TopPickKind.ARTIST_AND_SIMILAR,
             title = artist.name,
             artistName = artist.name,
+            artistBrowseId = artist.browseId,
             images = listOf(face) + related,
             watch = radio,
         )
@@ -311,6 +329,7 @@ object TopPicks {
             title = artist.name,
             subtitle = artist.page.monthlyListenerCount ?: artist.page.subscriberCountText.orEmpty(),
             artistName = artist.name,
+            artistBrowseId = artist.browseId,
             images = listOf(face),
             watch = shuffle,
         )

@@ -204,6 +204,7 @@ fun SettingsScreen(
     val automixPerformance by AppSettings.automixPerformanceMode.collectAsStateWithLifecycle()
     val skipSilence by AppSettings.skipSilence.collectAsStateWithLifecycle()
     val dolbyAtmos by AppSettings.dolbyAtmos.collectAsStateWithLifecycle()
+    val directSourceStream by AppSettings.directSourceStream.collectAsStateWithLifecycle()
     // A property of the hardware, so it is read once rather than remembered
     // against a key that can never change — see [DeviceCodecs.playsDolbyAtmos],
     // which caches the codec-list walk for the life of the process.
@@ -453,6 +454,17 @@ fun SettingsScreen(
                     title = sourceTitle,
                     subtitle = sourceSubtitle,
                     onClick = onSources,
+                )
+            }
+            // One line on purpose: it qualifies the row above rather than
+            // being a setting of its own, so it reads as part of Sources.
+            val directSourceTitle = stringResource(R.string.direct_source_stream)
+            // Drawn like the animated-cover cellular line: no icon, no divider.
+            row(directSourceTitle, "addon", "direct", "prefetch", "read-ahead", divided = false) {
+                SettingsSubRow(
+                    title = directSourceTitle,
+                    checked = directSourceStream,
+                    onCheckedChange = AppSettings::setDirectSourceStream,
                 )
             }
             val onWifiTitle = stringResource(R.string.on_wifi)
