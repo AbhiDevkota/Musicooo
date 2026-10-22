@@ -361,7 +361,7 @@ fun ArtworkMeshBackdrop(
         }
         incoming = next
         fade.snapTo(0f)
-        fade.animateTo(1f, tween(MESH_FADE_MS, easing = FastOutSlowInEasing))
+        fade.animateTo(1f, tween(if (flat) FLAT_FADE_MS else MESH_FADE_MS, easing = FastOutSlowInEasing))
         shown = next
         incoming = null
     }
@@ -489,6 +489,13 @@ private fun easedRamp(color: Color, maxAlpha: Float, startY: Float, endY: Float)
         startY = startY,
         endY = endY,
     )
+
+/**
+ * How long the flat backdrop takes to change colour on a skip. The colours are
+ * read in tens of milliseconds once the cover has arrived, so most of what
+ * reads as the backdrop being slow is this crossfade, not the work behind it.
+ */
+private const val FLAT_FADE_MS = 350
 
 /** Where the flat backdrop's darkening begins (fraction of the seam) and how dark it ends. */
 private const val FLAT_DARKEN_START = 0.5f
