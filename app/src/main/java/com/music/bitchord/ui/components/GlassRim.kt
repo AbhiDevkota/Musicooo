@@ -56,6 +56,11 @@ internal fun Modifier.glassRim(shape: Shape, alpha: () -> Float = { 1f }): Modif
         val body = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
         val rim = rims(body, (GLASS_OUTLINE_WIDTH + GLASS_RIM_DEPTH).toPx())
         val glow = rims(body, GLASS_GLOW_DEPTH.toPx())
+        val rimPaint = Paint().apply {
+            color = Color.White
+            blendMode = BlendMode.Plus
+            asFrameworkPaint().maskFilter = BlurMaskFilter(GLASS_RIM_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
+        }
         val glowPaint = Paint().apply {
             color = Color.White
             blendMode = BlendMode.Plus
@@ -78,7 +83,8 @@ internal fun Modifier.glassRim(shape: Shape, alpha: () -> Float = { 1f }): Modif
             clipPath(body) {
                 glowPaint.alpha = GLASS_GLOW_ALPHA * strength
                 drawIntoCanvas { it.drawPath(glow, glowPaint) }
-                drawPath(rim, Color.White, alpha = GLASS_RIM_ALPHA * strength, blendMode = BlendMode.Plus)
+                rimPaint.alpha = GLASS_RIM_ALPHA * strength
+                drawIntoCanvas { it.drawPath(rim, rimPaint) }
                 // Last, so it is the outermost band: over the rim's own edge.
                 drawPath(body, outlineBrush, alpha = strength, style = outline)
             }
@@ -99,8 +105,11 @@ private const val GLASS_OUTLINE_ALPHA = 0.6f
 private const val GLASS_OUTLINE_MIDDLE_ALPHA = 0.2f
 
 /** How deep the bright rim shows inside the outline, at the middle of a flat edge. */
-private val GLASS_RIM_DEPTH = 0.75.dp
+private val GLASS_RIM_DEPTH = 0.42.dp
 private const val GLASS_RIM_ALPHA = 0.19f
+
+/** Just enough to take the hard edge off the rim — a pixel or two. */
+private val GLASS_RIM_BLUR = 0.5.dp
 
 /** The glow: a deeper copy of the rim, blurred, and a fraction as bright. */
 private val GLASS_GLOW_DEPTH = 4.dp
