@@ -140,7 +140,7 @@ private const val GLASS_OUTLINE_ALPHA = 0.5f
  * How deep the bright rim shows inside the outline, at the middle of a flat
  * edge; how far it multiplies the colour beneath; and the white added after.
  */
-private val GLASS_RIM_DEPTH = 0.25.dp
+private val GLASS_RIM_DEPTH = 0.16.dp
 private const val GLASS_RIM_GAIN = 2.4f
 private const val GLASS_RIM_ALPHA = 0.07f
 
