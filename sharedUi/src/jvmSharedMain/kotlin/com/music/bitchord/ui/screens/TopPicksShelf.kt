@@ -286,7 +286,7 @@ private fun TopPickCard(
             }
             TopPickKind.FEATURED_ARTIST -> {
                 AsyncImage(
-                    model = pick.images.firstOrNull().croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX),
+                    model = pick.images.firstOrNull().croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX).whenArtworkReady(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -378,7 +378,7 @@ private val PhotoEyebrow = Color.White.copy(alpha = 0.62f)
 private fun ReleaseArt(url: String?, modifier: Modifier) {
     Box(modifier.background(Color.Black)) {
         AsyncImage(
-            model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX)),
+            model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
@@ -399,7 +399,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier) {
                 ),
         )
         AsyncImage(
-            model = url.croppedAt(HEADER_ART_PX),
+            model = url.croppedAt(HEADER_ART_PX).whenArtworkReady(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -434,6 +434,19 @@ private const val BACKDROP_SOURCE_PX = 160
  * frame and picks up again when the page is back.
  */
 val LocalArtworkMotion = compositionLocalOf { true }
+
+/**
+ * Whether Top Picks may load its pictures yet. Off while Home is still
+ * fetching its own feed: a cold start measured a third of a second slower to
+ * Recents with the row's covers and photos decoding alongside it, so the
+ * cards paint their colours and captions at once and their pictures follow
+ * once the page they sit on has what it needs.
+ */
+val LocalArtworkImages = compositionLocalOf { true }
+
+/** This image, or nothing yet while [LocalArtworkImages] is holding pictures back. */
+@Composable
+private fun String?.whenArtworkReady(): String? = if (LocalArtworkImages.current) this else null
 
 /** One full breath of the stations' motion. Slow on purpose: it is a cover, not a spinner. */
 private const val STATION_PERIOD_MS = 9_000
@@ -1406,7 +1419,7 @@ private fun ArtistCollageArt(images: List<String>, palette: CollagePalette, modi
             val (cx, cy, d) = slot
             val diameter = w * d
             AsyncImage(
-                model = url.croppedAt(if (d > 0.5f) HEADER_ART_PX else CARD_ART_PX),
+                model = url.croppedAt(if (d > 0.5f) HEADER_ART_PX else CARD_ART_PX).whenArtworkReady(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

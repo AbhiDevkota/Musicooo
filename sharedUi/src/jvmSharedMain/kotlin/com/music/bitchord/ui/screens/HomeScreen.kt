@@ -163,7 +163,12 @@ fun HomeScreen(
     /** Whether the Top Picks and mood artwork may animate — see [LocalArtworkMotion]. */
     artworkMotion: Boolean = true,
 ) {
-    CompositionLocalProvider(LocalArtworkMotion provides artworkMotion) {
+    // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
+    val feedReady = state !is UiState.Loading
+    CompositionLocalProvider(
+        LocalArtworkMotion provides (artworkMotion && feedReady),
+        LocalArtworkImages provides feedReady,
+    ) {
 
     PullToRefresh(
         refreshing = refreshing,

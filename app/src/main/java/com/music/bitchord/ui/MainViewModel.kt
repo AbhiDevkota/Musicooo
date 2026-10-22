@@ -1456,7 +1456,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         startSuggestPipeline()
         startTypeaheadMediaPipeline()
         loadHome()
-        loadExplore()
+        // Explore waits for its tab (see [onExploreShown]): its category list
+        // and the dozen-odd artwork browses after it went out at launch with
+        // Home's own requests, to the same host, for a page not yet opened.
         if (_signedIn.value) {
             loadLibrary()
             loadAccount()
@@ -1592,8 +1594,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadExplore() {
+        exploreRequested = true
         _explore.value = UiState.Loading
         viewModelScope.launch { fetchExplore() }
+    }
+
+    private var exploreRequested = false
+
+    /** Call when the Explore tab becomes visible; loads it the first time. */
+    fun onExploreShown() {
+        if (!exploreRequested) loadExplore()
     }
 
     private suspend fun fetchExplore() {
