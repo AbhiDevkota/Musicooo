@@ -32,9 +32,6 @@ import com.music.bitchord.ui.components.backdrop.drawBackdrop
 import com.music.bitchord.ui.components.backdrop.effects.blur
 import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import com.music.bitchord.ui.components.backdrop.effects.lens
-import com.music.bitchord.ui.components.backdrop.highlight.Highlight
-import com.music.bitchord.ui.components.backdrop.highlight.HighlightElement
-import com.music.bitchord.ui.components.backdrop.internal.ShapeProvider
 import com.music.bitchord.ui.components.backdrop.shadow.Shadow
 import androidx.compose.ui.unit.dp
 
@@ -86,7 +83,9 @@ private const val GLASS_RESOLUTION_SCALE = 0.33f
  *
  * A surface filled with the theme's own `surface` colour has no edge of its own
  * against a dark page — it is the same near-black the page is. The glass gets
- * its edge from [Highlight], and this is that edge for everything that does not.
+ * its edge from [glassRim], and this is that edge for everything that does not.
+ * Never both: a light hairline over the rim's dark outline is a second edge
+ * Apple's glass does not have.
  */
 internal val GLASS_EDGE_WIDTH = 0.5.dp
 internal val GLASS_EDGE_COLOR = Color.White.copy(alpha = 0.10f)
@@ -122,64 +121,55 @@ fun glassIndicatorColor(): Color =
 /** The selected tab's pill in dark theme, a step whiter than the bar. */
 private const val DARK_INDICATOR_OPACITY = 0.14f
 
+/** Whether liquid glass is drawn here: switched on, and supported by the device. */
+@Composable
+fun isLiquidGlassActive(): Boolean = LocalLiquidGlassEnabled.current && isGlassSupported()
+
 /**
  * A lightweight visual match for liquid glass over a stable background.
  *
- * This keeps the same translucent tint, directional highlight and hairline as
+ * This keeps the same continuous shape, translucent tint and [glassRim] as
  * [liquidGlass], but intentionally performs no backdrop capture, blur, lens
  * refraction or shadow rendering. When Liquid Glass is disabled or unsupported,
- * [fallbackColor] preserves the control's existing filled appearance.
+ * [fallbackColor] and the hairline preserve the control's existing filled
+ * appearance.
  */
 @Composable
 fun Modifier.lightweightLiquidGlass(
     shape: CornerBasedShape,
     fallbackColor: Color,
 ): Modifier {
-    val useGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    if (!isLiquidGlassActive()) {
+        return clip(shape)
+            .background(fallbackColor, shape)
+            .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
+    }
+    val glassShape = remember(shape) { shape.continuous() }
     val glassTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
         Color(0xFFFAFAFA)
     } else {
         Color(0xFF121212)
     }
-    val shapeProvider = ShapeProvider { shape }
-
-    return clip(shape)
-        .background(
-            color = if (useGlass) glassTint.copy(alpha = SURFACE_OPACITY) else fallbackColor,
-            shape = shape,
-        )
-        .then(
-            if (useGlass) {
-                HighlightElement(
-                    shapeProvider = shapeProvider,
-                    highlight = { Highlight.Default },
-                )
-            } else {
-                Modifier
-            },
-        )
-        .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
+    return clip(glassShape)
+        .background(glassTint.copy(alpha = SURFACE_OPACITY), glassShape)
+        .glassRim(glassShape)
 }
 
 /**
- * Just the rim of liquid glass — the directional [Highlight] that catches the
- * light along a glass edge — for a control that keeps its own fill.
+ * Just the rim of liquid glass — [glassRim]'s outline, rim and glow — for a
+ * control that keeps its own fill.
  *
  * Over a flat, stable page the blur and lens of [liquidGlass] would sample a
  * single colour and change nothing a reader could see; the rim is the part
- * that reads as glass. No backdrop capture, so it costs a stroke. Nothing at
- * all while Liquid Glass is off or unsupported.
+ * that reads as glass. No backdrop capture, so it costs a few path fills.
+ * Nothing at all while Liquid Glass is off or unsupported — a caller with an
+ * edge of its own for that case keeps it behind [isLiquidGlassActive].
  */
 @Composable
 fun Modifier.liquidGlassRim(shape: CornerBasedShape): Modifier {
-    if (!LocalLiquidGlassEnabled.current || !isGlassSupported()) return this
-    val shapeProvider = remember(shape) { ShapeProvider { shape } }
-    return then(
-        HighlightElement(
-            shapeProvider = shapeProvider,
-            highlight = { Highlight.Default },
-        ),
-    )
+    if (!isLiquidGlassActive()) return this
+    val glassShape = remember(shape) { shape.continuous() }
+    return glassRim(glassShape)
 }
 
 /**
@@ -196,7 +186,10 @@ fun Modifier.liquidGlassRim(shape: CornerBasedShape): Modifier {
  * sample would be sampling a layer nothing is drawing into.
  *
  * [shape] is restricted to [CornerBasedShape] because the backdrop's lens effect
- * throws for any other shape type.
+ * throws for any other shape type. Its corners are drawn continuous — see
+ * [ContinuousCornerShape] — which never reaches past the plain shape, so a
+ * caller's own clip to [shape] is still safe. The edge is [glassRim], not the
+ * backdrop library's diagonal highlight.
  */
 @Composable
 fun Modifier.liquidGlass(
@@ -210,6 +203,7 @@ fun Modifier.liquidGlass(
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
     }
+    val glassShape = remember(shape) { shape.continuous() }
     val backdrop = LocalAppBackdrop.current
     val exportedBackdrop = LocalGlassExport.current
     val density = LocalDensity.current
@@ -223,9 +217,10 @@ fun Modifier.liquidGlass(
     }
     val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = SURFACE_OPACITY)
 
-    return drawBackdrop(
+    // The rim ahead of the backdrop, so it draws over the glass it edges.
+    return glassRim(glassShape).drawBackdrop(
         backdrop = backdrop,
-        shape = { shape },
+        shape = { glassShape },
         effects = {
             colorControls(saturation = 1f + 0.5f * VIBRANCY)
             blur(blurPx)
@@ -238,7 +233,7 @@ fun Modifier.liquidGlass(
                 )
             }
         },
-        highlight = { Highlight.Default },
+        highlight = null,
         shadow = { Shadow.Default },
         onDrawSurface = {
             drawRect(color = surfaceTintColor, size = size)

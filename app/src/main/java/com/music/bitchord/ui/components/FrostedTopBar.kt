@@ -438,10 +438,12 @@ private fun artworkPageSurface(
                 )
             },
         )
-        // Keep the same explicit hairline as FloatingBottomBar. Liquid glass
-        // also has its refractive highlight, but the navbar retains this edge
-        // so these surfaces do as well.
-        .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
+        // The same explicit hairline as FloatingBottomBar, and dropped with it
+        // under liquid glass: that brings its own edge, and the bars do not
+        // wear both.
+        .then(
+            if (useLiquidGlass && !reduceDynamicBlur) Modifier else Modifier.border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape),
+        )
 }
 
 /**
