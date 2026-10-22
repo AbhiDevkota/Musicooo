@@ -2179,6 +2179,7 @@ fun NowPlayingScreen(
                     ArtworkMeshBackdrop(
                         mesh = artMesh,
                         seam = if (canvasFirstPortrait) renderedCanvasBottom else if (heroMode) heroHeight else 0.dp,
+                        flat = heroMode && !canvasFirstPortrait,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
                     )
                 }
@@ -2285,11 +2286,12 @@ fun NowPlayingScreen(
                 }
                 // Painted by the handle strip rather than laid out here — see there.
 
-                if (heroMode && !spotifyCanvasPresentation && heroHeight > 0.dp) {
-                    // The banner — still cover, square clip or portrait clip — is
-                    // blurred progressively from under the credits down, so the
-                    // controls sit on the cover's own colours dissolving rather
-                    // than on a flat dark gradient.
+                if (canvasFirstPortrait && canvasRendered) {
+                    // A portrait clip is blurred progressively from under the
+                    // credits down, so the controls sit on the clip's own colours
+                    // dissolving rather than on a flat dark gradient. Square
+                    // covers don't take this: they fade into their own darkened
+                    // bottom colour instead, see the mesh backdrop's `flat`.
                     val reduceDynamicBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
                     if (!reduceDynamicBlur && renderEffectBlurSupported) {
                         Box(
@@ -3041,9 +3043,16 @@ fun NowPlayingScreen(
                                     drawContent()
                                     val shown = sleeveShown()
                                     if (shown > 0f) {
+                                        // Eased (smoothstep) rather than linear: a linear
+                                        // fade has a visible corner where it starts and
+                                        // where it ends.
                                         drawRect(
                                             brush = Brush.verticalGradient(
-                                                colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - shown)),
+                                                0.00f to Color.Black,
+                                                0.25f to Color.Black.copy(alpha = 1f - shown * 0.156f),
+                                                0.50f to Color.Black.copy(alpha = 1f - shown * 0.5f),
+                                                0.75f to Color.Black.copy(alpha = 1f - shown * 0.844f),
+                                                1.00f to Color.Black.copy(alpha = 1f - shown),
                                                 startY = size.height * (1f - HERO_FADE_FRACTION),
                                                 endY = size.height,
                                             ),
