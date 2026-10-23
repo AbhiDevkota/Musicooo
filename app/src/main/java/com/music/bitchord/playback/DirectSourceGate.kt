@@ -53,13 +53,14 @@ object DirectSourceGate {
     private const val TAG = "BitChord"
 
     /** How far ahead of a transition the next track may be resolved and read ahead. */
-    const val WINDOW_MS = 15_000L
+    const val WINDOW_MS = 25_000L
 
     /**
      * How long playback waits for the addons before falling back to YouTube.
      *
-     * Same as [WINDOW_MS], so a lookup started when the window opens is
-     * either answered or given up by the time the transition arrives.
+     * Shorter than [WINDOW_MS] on purpose: a lookup started when the window
+     * opens is answered or given up with ten seconds still to go, which is
+     * time for the YouTube fallback to resolve and buffer before the blend.
      */
     const val LOOKUP_TIMEOUT_MS = 15_000L
 
