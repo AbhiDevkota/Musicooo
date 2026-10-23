@@ -159,7 +159,9 @@ fun GlassNavBar(
                     onBlockedControl = onBlockedControl,
                     dock = dock,
                     pull = pull,
-                    modifier = accessoryModifier.then(glassSurface()),
+                    // Glass first: the slot's modifier ends in a clip, which
+                    // would cut away the outline the glass draws outside its edge.
+                    modifier = glassSurface().then(accessoryModifier),
                 )
             }
         },
@@ -178,7 +180,7 @@ fun GlassNavBar(
                     onBlockedControl = onBlockedControl,
                     dock = dock,
                     pull = pull,
-                    modifier = accessoryModifier.fillMaxWidth().then(glassSurface()),
+                    modifier = glassSurface().then(accessoryModifier).fillMaxWidth(),
                 )
             }
         },

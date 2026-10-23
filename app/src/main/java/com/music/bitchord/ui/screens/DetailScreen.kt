@@ -1612,15 +1612,16 @@ private fun ActionPill(
     Row(
         modifier = modifier
             .height(size)
-            .clip(CircleShape)
             .glassArea(area)
             .then(
                 if (filled) {
-                    Modifier.background(Color.White)
+                    Modifier.background(Color.White, CircleShape)
                 } else {
                     Modifier.detailGlass(CircleShape)
                 },
             )
+            // After the surface: glass draws its outline just outside its edge.
+            .clip(CircleShape)
             .clickable {
                 haptics.play(Haptic.Resume)
                 onClick()
@@ -1722,9 +1723,10 @@ private fun CircleIconButton(
         modifier = Modifier
             .size(size)
             .alpha(if (enabled) 1f else DISABLED_ACTION_ALPHA)
-            .clip(CircleShape)
             .glassArea(area)
             .detailGlass(CircleShape)
+            // After the surface: glass draws its outline just outside its edge.
+            .clip(CircleShape)
             .clickable(enabled = enabled) {
                 haptics.play(haptic)
                 onClick()
@@ -1782,7 +1784,6 @@ private fun StatChip(icon: ImageVector, text: String, palette: ArtworkPalette) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(CircleShape)
             .then(
                 if (pageSamplesGlass()) {
                     Modifier.liquidGlass(CircleShape)
@@ -1792,6 +1793,7 @@ private fun StatChip(icon: ImageVector, text: String, palette: ArtworkPalette) {
                         .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, CircleShape)
                 },
             )
+            .clip(CircleShape)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Icon(

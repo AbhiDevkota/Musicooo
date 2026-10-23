@@ -443,12 +443,13 @@ private fun artworkPageSurface(
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
 
     return Modifier
-        .clip(shape)
         .then(
             when {
-                useLiquidGlass -> Modifier.liquidGlass(shape)
-                reduceDynamicBlur || hazeState == null -> Modifier.background(container)
-                else -> Modifier.optimizedHazeEffect(
+                // Clipped after the glass, not before: it draws its outline just
+                // outside its edge.
+                useLiquidGlass -> Modifier.liquidGlass(shape).clip(shape)
+                reduceDynamicBlur || hazeState == null -> Modifier.clip(shape).background(container)
+                else -> Modifier.clip(shape).optimizedHazeEffect(
                     state = hazeState,
                     style = HazeMaterials.regular(container),
                 )
