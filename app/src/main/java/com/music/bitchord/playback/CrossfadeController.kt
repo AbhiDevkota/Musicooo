@@ -452,6 +452,15 @@ class CrossfadeController(
         val swapAtF = swapAt.toFloat()
 
         /**
+         * Where a held outgoing fader starts to fall: no later than the
+         * midpoint, and at least a bar before the end, so no fall is ever
+         * steeper than one bar. A fader held at full to the swap and then
+         * dropped in the beats left was heard as the song cutting out.
+         */
+        val fallFrom = minOf(swapAtF, 0.5f, if (grid > 0) (1.0 - 4.0 / grid).toFloat() else 0.5f)
+            .coerceAtLeast(0f)
+
+        /**
          * Where the session moves to the incoming track. Advanced: when it
          * actually takes over — the bass swap in a blend.
          */
@@ -2481,12 +2490,7 @@ class CrossfadeController(
             glide(ENTRY_HIGH_PASS_HZ, VOCAL_SAFE_ENTRY_HIGH_PASS_HZ, render.clash),
             render.vocalEntryOpenBy,
         )
-        if (!render.advanced) {
-            tracks.outgoing(cutoff.toFloat(), TransitionFilterProcessor.OFF_HZ)
-            tracks.incoming(TransitionFilterProcessor.OPEN_HZ, entryCorner)
-            return
-        }
-        // Two tempi that don't match are two kicks that flam, and the 300Hz bed
+        // Classic and advanced alike: two tempi that don't match are two kicks that flam, and the 300Hz bed
         // keeps the outgoing kick whole. So the low end still changes hands
         // once, on a beat — only one kick is ever playing.
         val handover = ((progress - (render.filterSwapAt - render.swapWidth)) / render.swapWidth).coerceIn(0.0, 1.0)
@@ -2675,11 +2679,10 @@ class CrossfadeController(
         val styled = when (render.style) {
             TransitionStyle.DJ_BLEND ->
                 if (render.bassSwap) held(riseGain(progress), riseGain(progress / render.swapAtF)) else riseGain(progress)
-            TransitionStyle.DJ_FILTER -> when (render.filterVariant) {
-                FilterTransitionVariant.BASS_HANDOFF -> riseGain(progress / render.filterSwapAtF)
-                FilterTransitionVariant.ECHO_RIDE -> riseGain(progress.pow(ECHO_RIDE_RISE_SHAPE))
-                FilterTransitionVariant.SWEEP -> riseGain(progress.pow(FILTER_RISE_SHAPE))
-            }
+            // One smooth pair for every filter gesture: the filters are what
+            // tell the variants apart, and the low end changes hands on a beat
+            // in all of them, so no fader needs to sit at full to make room.
+            TransitionStyle.DJ_FILTER -> riseGain(progress.pow(FILTER_RISE_SHAPE))
             else -> riseGain(progress)
         }
         val vocalSafe = riseGain(progress.pow(VOCAL_SAFE_RISE_SHAPE))
@@ -2687,9 +2690,10 @@ class CrossfadeController(
     }
 
     /**
-     * The outgoing fader, [mixRise]'s partner: held at full until the bass
-     * swap in a blend and pulled after it, held longer in a filter ride where
-     * the closing low-pass is already taking it away.
+     * The outgoing fader, [mixRise]'s partner: held at full in a blend until
+     * [Render.fallFrom] — the swap, but never past the midpoint or within a
+     * bar of the end — and a smooth fall in a filter ride, where the closing
+     * low-pass is already taking it away.
      */
     private fun mixFall(progress: Float): Float {
         if (!render.advanced) return fallGain(progress)
@@ -2701,18 +2705,11 @@ class CrossfadeController(
                 if (!render.bassSwap) {
                     fallGain(progress)
                 } else {
-                    val swap = render.swapAtF
-                    held(fallGain(progress), if (progress <= swap) 1f else fallGain((progress - swap) / (1f - swap)))
+                    val from = render.fallFrom
+                    held(fallGain(progress), if (progress <= from) 1f else fallGain((progress - from) / (1f - from)))
                 }
             }
-            TransitionStyle.DJ_FILTER -> when (render.filterVariant) {
-                FilterTransitionVariant.BASS_HANDOFF -> {
-                    val swap = render.filterSwapAtF
-                    if (progress <= swap) 1f else fallGain((progress - swap) / (1f - swap))
-                }
-                FilterTransitionVariant.ECHO_RIDE -> fallGain(progress.pow(ECHO_RIDE_FALL_SHAPE))
-                FilterTransitionVariant.SWEEP -> fallGain(progress.pow(FILTER_FALL_SHAPE))
-            }
+            TransitionStyle.DJ_FILTER -> fallGain(progress.pow(FILTER_FALL_SHAPE))
             else -> fallGain(progress)
         }
         val vocalSafe = fallGain(progress.pow(VOCAL_SAFE_FALL_SHAPE))
@@ -3165,15 +3162,12 @@ class CrossfadeController(
         const val VOCAL_SAFE_RISE_SHAPE = 1.65f
         const val VOCAL_SAFE_FALL_SHAPE = 0.65f
 
-        /** Echo personality keeps both decks recognisable until its decisive fader pull. */
-        const val ECHO_RIDE_RISE_SHAPE = 0.7f
-        const val ECHO_RIDE_FALL_SHAPE = 1.35f
-
         /**
-         * An echo out's dry signal is killed over this much of a beat: short
-         * enough to read as the fader being pulled, long enough not to click.
+         * An echo out's dry signal fades over this many beats. It was a quarter
+         * beat, which over a few repeats at half level was heard as the song
+         * cutting out rather than trailing off.
          */
-        const val ECHO_KILL_BEATS = 0.25
+        const val ECHO_KILL_BEATS = 4.0
 
         /**
          * The echo's first repeat against the dry level, and what each repeat
