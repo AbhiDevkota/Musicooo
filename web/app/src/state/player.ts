@@ -725,7 +725,12 @@ let autoplaySeed: string | null = null;
 /** Seeds that gave nothing new, so the same empty radio isn't asked for again. */
 const exhaustedSeeds = new Set<string>();
 
-function refillAutoplay(force = false): Promise<void> {
+/**
+ * [anySeed]: when the playing track's radio has nothing new left, seed from
+ * the latest earlier track in the queue whose radio still might (the empty
+ * queue watchdog, ensureAutoplay).
+ */
+function refillAutoplay(force = false, anySeed = false): Promise<void> {
   const { autoplay, repeat, queue, index } = usePlayer.getState();
   if (!autoplay || repeat !== 'off' || index < 0) return Promise.resolve();
   // A party's AutoPlay goes through the server (party/partySync.ts), never straight onto this queue.
@@ -733,8 +738,15 @@ function refillAutoplay(force = false): Promise<void> {
   const needed = MAX_QUEUED_AUTOPLAY - queue.slice(index + 1).filter((e) => e.tier === 'autoplay').length;
   if (needed <= 0) return Promise.resolve();
   // Seeded from the playing track (loadAutoplayForCurrentTrack), not the queue's tail.
-  const seed = queue[index]?.track;
-  if (!seed || exhaustedSeeds.has(seed.videoId)) return Promise.resolve();
+  const playing = queue[index]?.track;
+  let seed = playing;
+  if (seed && exhaustedSeeds.has(seed.videoId) && anySeed) {
+    seed = queue
+      .slice(0, index)
+      .reverse()
+      .find((e) => !exhaustedSeeds.has(e.track.videoId))?.track;
+  }
+  if (!playing || !seed || exhaustedSeeds.has(seed.videoId)) return Promise.resolve();
   if (!force && autoplaySeed === seed.videoId) return Promise.resolve();
   autoplaySeed = seed.videoId;
   refilling ??= (async () => {
@@ -754,7 +766,7 @@ function refillAutoplay(force = false): Promise<void> {
       }
       const source: QueueSource = { title: `${seed.title} Radio`, type: 'radio', id: `RDAMVM${seed.videoId}` };
       // Still on the same track? One that moved on gets its own top-up.
-      if (current.queue[current.index]?.track.videoId !== seed.videoId || !current.autoplay) {
+      if (current.queue[current.index]?.track.videoId !== playing.videoId || !current.autoplay) {
         autoplaySeed = null;
         return;
       }
@@ -768,6 +780,28 @@ function refillAutoplay(force = false): Promise<void> {
     }
   })();
   return refilling;
+}
+
+/** How often an empty AutoPlay is asked for again while a track plays. */
+const EMPTY_RETRY_MS = 15_000;
+let lastEmptyRetry = 0;
+
+/**
+ * The watchdog for an AutoPlay that is on but has nothing after the playing
+ * track. A top-up runs only when a track starts, so a radio that failed to
+ * load (a network blip, the extension not ready yet), one dropped because the
+ * track changed while it loaded, or a seed whose radio had nothing new left
+ * the queue empty until the music stopped. Called as the track plays.
+ */
+function ensureAutoplay() {
+  const { autoplay, repeat, queue, index, status } = usePlayer.getState();
+  if (!autoplay || repeat !== 'off' || index < 0 || status !== 'playing' || partyHooks?.inParty()) return;
+  if (index + 1 < queue.length || refilling) return;
+  const now = Date.now();
+  if (now - lastEmptyRetry < EMPTY_RETRY_MS) return;
+  lastEmptyRetry = now;
+  trackLog.i('AutoPlay is on but nothing is queued; asking for the radio again', queue[index]?.track.videoId ?? null);
+  void refillAutoplay(true, true);
 }
 
 // ---- Crossfade ----------------------------------------------------------------------
@@ -917,7 +951,9 @@ function bindElement(deck: Deck, n: number) {
     void advance(true).then(intent);
   });
   element.addEventListener('timeupdate', () => {
-    if (inFront()) maybeCrossfade();
+    if (!inFront()) return;
+    maybeCrossfade();
+    ensureAutoplay();
   });
   for (const event of ['durationchange', 'ratechange', 'seeked'] as const) {
     element.addEventListener(event, () => {
