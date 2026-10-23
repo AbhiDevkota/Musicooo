@@ -11,6 +11,7 @@ package com.music.bitchord.ui.components.backdrop
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
@@ -207,6 +208,7 @@ private class DrawBackdropElement(
         node.onDrawFront = onDrawFront
         node.backdropScale = backdropScale
         node.invalidateDrawCache()
+        node.redraw()
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -290,6 +292,25 @@ private class DrawBackdropNode(
     private var layoutCoordinates: LayoutCoordinates? by mutableStateOf(null, neverEqualPolicy())
 
     private var padding by mutableFloatStateOf(0f)
+
+    /**
+     * Vendored addition, bumped by [redraw] and read in [draw].
+     *
+     * An update hands the node a new backdrop or new drawing, but did not get it
+     * drawn: the automatic invalidation, and an explicit `invalidateDraw()`, both
+     * missed the layer this node draws into — it places its own content in a
+     * layer of its own, so it is both the layout and the draw at that point in
+     * the chain. A surface over a [LayerBackdrop] is redrawn anyway, by the
+     * coordinates it reads as it draws; one over a flat backdrop reads nothing
+     * and kept the picture it was first drawn with, so a theme change left a
+     * segmented control's glass in the old theme. A state read in [draw] is
+     * observed in exactly the layer it was read in.
+     */
+    private var drawVersion by mutableIntStateOf(0)
+
+    fun redraw() {
+        drawVersion++
+    }
 
     private val recordBackdropBlock: (DrawScope.() -> Unit) = {
         val canvas = drawContext.canvas
@@ -375,6 +396,8 @@ private class DrawBackdropNode(
     }
 
     override fun ContentDrawScope.draw() {
+        // Read so that [redraw] invalidates the layer this is drawn into.
+        drawVersion
         if (effectScope.update(this, backdropScale)) {
             updateEffects()
         }

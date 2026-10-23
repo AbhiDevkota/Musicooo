@@ -17,6 +17,7 @@ import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import com.music.bitchord.ui.components.isLiquidGlassActive
 import com.music.bitchord.ui.components.LocalAppBackdrop
 import com.music.bitchord.ui.components.LocalBackdropLuminance
+import com.music.bitchord.ui.components.LocalGlassFloor
 import com.music.bitchord.ui.components.GlassArea
 import com.music.bitchord.ui.components.glassArea
 import com.music.bitchord.ui.components.glassContentColor
@@ -544,6 +545,7 @@ fun DetailScreen(
             val pageLuminance = pageGlass?.let { rememberBackdropLuminance(it) }
             CompositionLocalProvider(
                 LocalAppBackdrop provides (pageGlass ?: LocalAppBackdrop.current),
+                LocalGlassFloor provides (pageGlass ?: LocalGlassFloor.current),
                 LocalBackdropLuminance provides (pageLuminance ?: LocalBackdropLuminance.current),
             ) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
