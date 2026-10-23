@@ -29,8 +29,8 @@ that folder's `NOTICE.md`.
    - a high-shelf cross over the whole blend.
 
    A pair that can't be beatmatched (no grid on the incoming song, or tempos
-   too far apart: a slower incoming song is sped up by at most 10%, a
-   faster one slowed down by at most 25%) gets the phone's filter mix instead, still on the
+   too far apart: the next song is slowed down by at most 10% and sped up
+   by at most 25%) gets the phone's filter mix instead, still on the
    outgoing song's phrase. Only an outgoing song with no grid at its end
    gets a plain 12 s equal-power crossfade.
    **The loop mix** is what a pair with usable beat grids gets now:

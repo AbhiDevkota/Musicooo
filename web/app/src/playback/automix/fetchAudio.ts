@@ -3,6 +3,18 @@ import { ytAuthSnapshot } from '@/extension/useYtAuth';
 import { getInnertube, getSignedInnertube } from '@/playback/youtube/innertube';
 import { resolvePlayer, UnplayableError, usesWebPo } from '@/playback/youtube/resolver';
 
+/**
+ * A picture wider than this is a music video; a square one is YouTube's art
+ * track for a song (the player's own rule, YouTubeEngine.MIN_VIDEO_ASPECT).
+ */
+const MIN_VIDEO_ASPECT = 1.2;
+
+/** The track's audio, and whether YouTube serves it as a music video rather than a song. */
+export interface TrackAudio {
+  bytes: ArrayBuffer;
+  musicVideo: boolean;
+}
+
 /** googlevideo serves a direct URL in ranges; Android (vivi/InnerTubeX) asks for 512 KiB–1 MiB at a time. */
 const CHUNK_BYTES = 1024 * 1024;
 const MAX_BYTES = 40 * 1024 * 1024;
@@ -13,7 +25,7 @@ const MAX_BYTES = 40 * 1024 * 1024;
  * browser that runs the app decodes it in decodeAudioData), else AAC.
  * Throws when the track only streams over SABR, which has no file to fetch.
  */
-export async function fetchTrackAudio(videoId: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+export async function fetchTrackAudio(videoId: string, signal?: AbortSignal): Promise<TrackAudio> {
   let source = await resolveAudioUrl(videoId);
   const parts: Uint8Array[] = [];
   let at = 0;
@@ -43,13 +55,13 @@ export async function fetchTrackAudio(videoId: string, signal?: AbortSignal): Pr
     out.set(part, offset);
     offset += part.byteLength;
   }
-  return out.buffer;
+  return { bytes: out.buffer, musicVideo: source.musicVideo };
 }
 
 const MAX_REFUSALS = 2;
 
 /** A deciphered direct URL for the track's best audio (or the same itag, when resuming). */
-async function resolveAudioUrl(videoId: string, itag?: number): Promise<{ url: URL; total: number; itag: number }> {
+async function resolveAudioUrl(videoId: string, itag?: number): Promise<{ url: URL; total: number; itag: number; musicVideo: boolean }> {
   const { info, client, yt } = await resolveAsPlayerWould(videoId);
   const audio = (info.streaming_data?.adaptive_formats ?? []).filter(
     (f) => f.has_audio && !f.has_video && (f.url || f.signature_cipher || f.cipher) && !f.is_drc,
@@ -65,7 +77,10 @@ async function resolveAudioUrl(videoId: string, itag?: number): Promise<{ url: U
     const pot = await botguard.mint(videoId);
     if (pot) url.searchParams.set('pot', pot);
   }
-  return { url, total: format.content_length ?? 0, itag: format.itag };
+  const pictures = (info.streaming_data?.adaptive_formats ?? []).filter((f) => f.has_video && f.width && f.height);
+  const widest = pictures.sort((a, b) => b.width! * b.height! - a.width! * a.height!)[0];
+  const musicVideo = !!widest && widest.width! / widest.height! >= MIN_VIDEO_ASPECT;
+  return { url, total: format.content_length ?? 0, itag: format.itag, musicVideo };
 }
 
 /**

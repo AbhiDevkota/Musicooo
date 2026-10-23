@@ -106,8 +106,9 @@ export function scheduleTransition(req: TransitionRequest): TransitionPlan {
   const rate = [rawRate, rawRate / 2, rawRate * 2].reduce((best, r) =>
     Math.abs(r - 1) < Math.abs(best - 1) ? r : best,
   );
-  // tempo gap too wide to beatmatch musically. BitChord: up to 10% faster or
-  // 25% slower (stretchAllowed) rather than AutoMix's 8%; past it, a filter mix.
+  // tempo gap too wide to beatmatch musically. BitChord: the next song slowed
+  // at most 10% or sped up at most 25% (stretchAllowed) rather than AutoMix's
+  // 8%; past it, a filter mix.
   if (!stretchAllowed(rate)) {
     return scheduleFilterMix(req, earliest, fromGrid, toGrid, `tempos ${Math.round(Math.abs(rate - 1) * 100)}% apart`);
   }
@@ -201,15 +202,15 @@ export function plannedBars(
  * BitChord: how far the element blend may stretch the incoming song (the
  * user's call, 2026-10-23; the phone's STRETCH_WINDOW is 0.9..1.1). [rate] is
  * the incoming song's playback rate, outgoing BPM over incoming BPM:
- * - above 1, the incoming song is slower and is sped up: at most 10%;
- * - below 1, the incoming song is faster and is slowed down: at most 25%.
+ * - below 1, the incoming song is slowed down: at most 10%;
+ * - above 1, it is sped up: at most 25%.
  * The loop mix ramps any gap; this is for the blend it falls back on.
  */
 export function stretchAllowed(rate: number): boolean {
   return rate >= 1 ? rate - 1 <= MAX_SPEED_UP : 1 - rate <= MAX_SLOW_DOWN;
 }
-const MAX_SPEED_UP = 0.1;
-const MAX_SLOW_DOWN = 0.25;
+const MAX_SLOW_DOWN = 0.1;
+const MAX_SPEED_UP = 0.25;
 /** BitChord: a filter mix is at most this many outgoing bars (the phone's DJ_FILTER length). */
 const FILTER_MAX_BARS = 8;
 

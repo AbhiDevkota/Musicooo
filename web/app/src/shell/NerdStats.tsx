@@ -58,9 +58,10 @@ function AutomixLine({ videoId }: { videoId: string }) {
       if (a) {
         const g = outgoing && a.tailGrid !== undefined ? a.tailGrid : a.bpm ? { bpm: a.bpm, gridConfidence: a.gridConfidence } : null;
         const key = a.camelot ? ` ${a.camelot.num}${a.camelot.letter}` : '';
-        if (!g) return `analysed (no beat${key})`;
+        const video = a.musicVideo ? ', music video: no loop' : '';
+        if (!g) return `analysed (no beat${key}${video})`;
         const grid = g.gridConfidence >= 0.2 ? `grid ${g.gridConfidence.toFixed(2)}` : `weak grid ${g.gridConfidence.toFixed(2)}`;
-        return `analysed (${Math.round(g.bpm)} BPM${key}, ${grid})`;
+        return `analysed (${Math.round(g.bpm)} BPM${key}, ${grid}${video})`;
       }
       const status = analyzer.statusOf(id);
       return status === 'analyzing' ? 'analysing…' : status === 'error' ? 'failed' : 'waiting';
@@ -72,15 +73,15 @@ function AutomixLine({ videoId }: { videoId: string }) {
   return <span className="truncate text-tertiary">{text}</span>;
 }
 
-/** "4-bar loops · 111 → 169 BPM over 24 bars · both instrumental". */
+/** "out 4-bar loop, clear by lyrics · in 2-bar, clear by mask · 111 → 85 BPM over 11 bars". */
 function describeLoop(state: AutoDJSnapshot): string {
   const l = state.loop!;
   const from = Math.round(l.out.bpm);
   const to = Math.round(l.in.bpm / l.fold);
   const tempo = from === to ? `${from} BPM` : `${from} → ${to} BPM over ${l.rampBars} bars`;
-  const clean = (v: number | null) => (v === null ? '?' : v <= 0.3 ? 'instrumental' : `vocal ${v.toFixed(2)}`);
   const fold = l.fold === 1 ? '' : l.fold > 1 ? ' (next in double time)' : ' (next in half time)';
-  return `${4}-bar loops · ${tempo}${fold} · out ${clean(l.out.vocal)}, in ${clean(l.in.vocal)}`;
+  const side = (p: typeof l.out) => `${p.bars}-bar, clear by ${p.checkedBy}`;
+  return `out ${side(l.out)} · in ${side(l.in)} · ${tempo}${fold}`;
 }
 
 function describeBlend(state: AutoDJSnapshot): string {

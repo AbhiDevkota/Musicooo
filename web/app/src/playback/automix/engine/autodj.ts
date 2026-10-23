@@ -25,6 +25,7 @@ import {
   scheduleLoopMix,
   type LoopMixPlan,
   type LoopMixTimes,
+  type SungSpans,
 } from './loopMix';
 
 export type AutoDJState = 'idle' | 'playing' | 'scheduled';
@@ -53,6 +54,12 @@ export interface AutomixHost {
   finished(): void;
   /** BitChord: the two stretch decks the loop mix plays on (built on first use). */
   loopDecks(): Promise<[LoopDeck, LoopDeck]>;
+  /**
+   * BitChord: where [videoId] is sung, from its synced lyrics; null when it
+   * has none. The loop mix never loops a sung word, and these are its truest
+   * answer (the vocal mask is the fallback).
+   */
+  sungSpans(videoId: string): Promise<SungSpans | null>;
   /**
    * BitChord: while a loop mix runs, the elements are paused and started by
    * the mix, not the user; the player must not read that as a pause or an end.
@@ -450,11 +457,16 @@ export class AutoDJ {
       if (outGrid.gridConfidence < MIN_GRID_CONFIDENCE || next.gridConfidence < MIN_GRID_CONFIDENCE) return;
       this.loopDecks ??= await this.host.loopDecks();
       const ctx = this.host.ctx;
-      const [outBytes, inBytes] = await Promise.all([analyzer.audioBytes(cur.fileKey), analyzer.audioBytes(next.fileKey)]);
+      const [outBytes, inBytes, outSung, inSung] = await Promise.all([
+        analyzer.audioBytes(cur.fileKey),
+        analyzer.audioBytes(next.fileKey),
+        this.host.sungSpans(cur.fileKey).catch(() => null),
+        this.host.sungSpans(next.fileKey).catch(() => null),
+      ]);
       const [outBuffer, inBuffer] = await Promise.all([ctx.decodeAudioData(outBytes.slice(0)), ctx.decodeAudioData(inBytes.slice(0))]);
       if (!stillWanted()) return;
       const pos = this.host.front().expectedTrackTime ?? 0;
-      const plan = planLoopMix(outGrid, outBuffer, next, inBuffer, pos + LOOP_SETUP_SEC);
+      const plan = planLoopMix(outGrid, outBuffer, next, inBuffer, pos + LOOP_SETUP_SEC, { out: outSung, in: inSung });
       if (!plan) return;
       const [outDeck, inDeck] = this.loopDecks;
       await outDeck.load(cur.fileKey, outBuffer, Math.max(0, cur.durationSec - OUT_REGION_SEC), cur.durationSec);

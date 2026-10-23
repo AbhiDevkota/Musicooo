@@ -12,9 +12,9 @@ export interface TrackTags {
   album?: string;
 }
 
-// BitChord: 6 adds Beat This! (re-exported), 5 the vocal mask; 3 since the gap-tolerant fitGrid (beatgrid.ts) and the head/tail
+// BitChord: 8 records music videos, 7 widens the vocal mask to the loop searches, 6 adds Beat This! (re-exported), 5 the vocal mask; 3 since the gap-tolerant fitGrid (beatgrid.ts) and the head/tail
 // grids; AutoMix's whole-track grids were mostly unusable on real songs.
-export const ANALYSIS_VERSION = 6;
+export const ANALYSIS_VERSION = 8;
 
 /** BitChord: Beat This!'s beats and downbeats over one window, on the track's timeline. */
 export interface BeatSide {
@@ -71,6 +71,12 @@ export interface TrackAnalysis {
   /** BitChord: Beat This! over the opening (where it's mixed in) and the end (where it's mixed out). */
   headBeats?: BeatSide | null;
   tailBeats?: BeatSide | null;
+  /**
+   * BitChord: YouTube serves this as a music video, not the song. Its audio
+   * often differs from the album cut (a spoken intro, a longer outro), so its
+   * synced lyrics don't line up, and the loop mix leaves it alone.
+   */
+  musicVideo?: boolean;
   /** BitChord: vocal curves over the opening and the end; empty when the model couldn't run. */
   vocals?: VocalWindow[];
   analysisVersion: number;

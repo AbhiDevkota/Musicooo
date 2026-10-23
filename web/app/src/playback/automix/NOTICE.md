@@ -70,7 +70,7 @@ lyrics, video, Listen Together and Media Session code all read. So:
   used: the user asked for only the next song to be analysed.
 - `engine/transition-scheduler.ts` adds the phone's DJ_FILTER for a pair
   that can't be beatmatched (no incoming grid, or tempos too far apart:
-  a slower incoming song sped up past 10%, or a faster one slowed past 25%): phrase-aligned on the outgoing beat, a rising high-pass out, an
+  the next song slowed past 10% or sped up past 25%): phrase-aligned on the outgoing beat, a rising high-pass out, an
   opening low-pass in, the bass handed over at the midpoint. The plain
   crossfade is left for an outgoing song with no grid at its end. The
   outgoing deck is never rate-nudged; the incoming one follows its actual

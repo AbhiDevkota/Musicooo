@@ -277,6 +277,7 @@ function ensureAutomix(): Promise<AutomixGraph | null> {
           }
         },
         handoff: automixHandoff,
+        sungSpans,
         hold: (on) => {
           holding = on;
           usePlayer.setState(on ? { status: 'playing', mixing: true } : { mixing: false });
@@ -297,6 +298,39 @@ function ensureAutomix(): Promise<AutomixGraph | null> {
 
 function queued(entry: QueueEntry) {
   return { videoId: entry.track.videoId, title: entry.track.title, artist: artistNames(entry.track) };
+}
+
+/** How long the loop mix waits for a song's lyrics before planning from the vocal mask alone. */
+const LYRICS_WAIT_MS = 8000;
+
+/**
+ * Where a queued song is sung, from its synced lyrics (the same lookup, and
+ * cache, as the lyrics panel). Null when it has no synced lyrics or they
+ * don't arrive in time; the loop mix then falls back on the vocal mask.
+ */
+async function sungSpans(videoId: string) {
+  const { queue } = usePlayer.getState();
+  const track = queue.find((e) => e.track.videoId === videoId)?.track;
+  if (!track) return null;
+  const [{ lookupLyrics }, { endMs, hasKnownEnd, isGap }, { sungSpansFromLines }] = await Promise.all([
+    import('@/lyrics/repository'),
+    import('@/lyrics/model'),
+    import('@/playback/automix'),
+  ]);
+  const found = await Promise.race([
+    lookupLyrics({
+      videoId,
+      title: track.title,
+      artist: artistNames(track),
+      durationMs: Math.round((track.durationSec ?? 0) * 1000),
+      album: track.album?.name ?? null,
+    }).catch(() => null),
+    new Promise<null>((r) => setTimeout(() => r(null), LYRICS_WAIT_MS)),
+  ]);
+  if (!found?.synced) return null;
+  return sungSpansFromLines(
+    found.lines.map((l) => ({ timeMs: l.timeMs, endMs: hasKnownEnd(l) ? endMs(l) : null, blank: isGap(l) })),
+  );
 }
 
 /** The blend's midpoint: the incoming track is the one playing now, as far as everything else knows. */

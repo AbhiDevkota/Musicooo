@@ -5,7 +5,7 @@
 // kept in memory as well as IndexedDB so the mix loop can read them synchronously.
 import { trackLog } from '@/playback/trackLog';
 import { getAnalysis, putAnalysis } from '../db';
-import { fetchTrackAudio } from '../fetchAudio';
+import { fetchTrackAudio, type TrackAudio } from '../fetchAudio';
 import type { AnalyzeResponse } from './analysis.worker';
 import { BEAT_SR, VOCAL_WINDOW_SEC } from './models';
 import type { TrackAnalysis, TrackTags } from './types';
@@ -45,10 +45,14 @@ class Analyzer {
   private readonly listeners = new Set<() => void>();
   private readonly failedAt = new Map<string, number>();
   /** BitChord: each recent track's compressed audio (~5 MB), so a mix can decode the bars it loops. */
-  private readonly bytes = new Map<string, Promise<ArrayBuffer>>();
+  private readonly bytes = new Map<string, Promise<TrackAudio>>();
 
   /** The track's compressed audio: fetched once, kept for the last few tracks. */
   audioBytes(videoId: string): Promise<ArrayBuffer> {
+    return this.trackAudio(videoId).then((a) => a.bytes);
+  }
+
+  private trackAudio(videoId: string): Promise<TrackAudio> {
     let held = this.bytes.get(videoId);
     if (held) {
       this.bytes.delete(videoId);
@@ -156,7 +160,7 @@ class Analyzer {
   }
 
   private async analyzeOne(videoId: string, tags: TrackTags): Promise<TrackAnalysis> {
-    const arrayBuffer = await this.audioBytes(videoId);
+    const { bytes: arrayBuffer, musicVideo } = await this.trackAudio(videoId);
     const decodeCtx = new OfflineAudioContext({ numberOfChannels: 1, length: 1, sampleRate: ANALYSIS_SR });
     const buffer = await decodeCtx.decodeAudioData(arrayBuffer.slice(0));
     const mono = downmixToMono(buffer);
@@ -180,9 +184,12 @@ class Analyzer {
     if (USE_VOCAL_MODEL) {
       const left = buffer.getChannelData(0);
       const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
-      const vocalStarts = [0];
-      for (let end = durationSec; end - VOCAL_WINDOW_SEC > VOCAL_WINDOW_SEC && vocalStarts.length < 3; end -= VOCAL_WINDOW_SEC) {
-        vocalStarts.push(end - VOCAL_WINDOW_SEC);
+      // the opening the incoming loop is looked for in (45 s) and the end the
+      // outgoing one is (60 s): two windows and three, where the song is long enough
+      const vocalStarts = [0, VOCAL_WINDOW_SEC].filter((s) => s + VOCAL_WINDOW_SEC <= durationSec);
+      for (let k = 1; k <= 3; k++) {
+        const start = durationSec - k * VOCAL_WINDOW_SEC;
+        if (start >= 2 * VOCAL_WINDOW_SEC) vocalStarts.push(start);
       }
       for (const start of vocalStarts) {
         const a = Math.round(start * ANALYSIS_SR);
@@ -214,6 +221,7 @@ class Analyzer {
       tags,
       durationSec,
       ...response.result,
+      musicVideo,
       analysisVersion: ANALYSIS_VERSION,
     };
   }

@@ -5,7 +5,8 @@ import type { TransitionPlan } from './engine/transition-scheduler';
 
 export type { AutomixHost, AutoDJSnapshot, TransitionPlan };
 export type { MixWindow } from './engine/autodj';
-export type { LoopMixPlan } from './engine/loopMix';
+export type { LoopMixPlan, SungSpans } from './engine/loopMix';
+export { sungSpansFromLines } from './engine/loopMix';
 export { analyzer } from './analysis/analyzer';
 
 export { AUTOMIX_BARS } from './choices';
