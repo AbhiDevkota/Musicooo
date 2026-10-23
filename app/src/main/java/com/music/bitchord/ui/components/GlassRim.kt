@@ -174,7 +174,7 @@ private fun rims(body: Path, depth: Float): Path {
 /** The dark outline: a band just outside the shape (2.3px at 3x), at its darkest at the two ends. */
 private val GLASS_OUTLINE_WIDTH = 0.77.dp
 private const val GLASS_OUTLINE_ALPHA = 0.35f
-private const val GLASS_OUTLINE_MIDDLE_ALPHA = 0.19f
+private const val GLASS_OUTLINE_MIDDLE_ALPHA = 0.1f
 
 /** How far across an end cap the outline takes to fall to its middle opacity. */
 private const val GLASS_OUTLINE_REACH = 0.6f
