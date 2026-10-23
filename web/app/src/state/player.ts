@@ -22,7 +22,7 @@ import {
 } from '@/playback/queue/timeline';
 import { trackLog } from '@/playback/trackLog';
 import type { LoadedTrack, StreamStats, YouTubeEngine } from '@/playback/youtube/engine';
-import type { AutomixGraph, AutoDJSnapshot, EnergyDirection } from '@/playback/automix';
+import type { AutomixGraph, AutoDJSnapshot } from '@/playback/automix';
 
 export interface NowPlaying {
   videoId: string;
@@ -55,8 +55,6 @@ interface Settings {
   automix: boolean;
   /** AutoMix's blend length, in bars: a maximum, shortened for weak beat grids. */
   automixBars: number;
-  /** Which way AutoMix steers the AutoPlay radio's energy: down, steady or up. */
-  automixEnergy: EnergyDirection;
   /** Stats for nerds: the stream's codec, bitrate and sample rate, and what Automix is doing, under the artist. */
   showNerdStats: boolean;
 }
@@ -101,7 +99,6 @@ interface PlayerState extends Settings {
   setCrossfade: (seconds: number) => void;
   setAutomix: (on: boolean) => void;
   setAutomixBars: (bars: number) => void;
-  setAutomixEnergy: (direction: EnergyDirection) => void;
   setShowNerdStats: (on: boolean) => void;
 }
 
@@ -117,7 +114,6 @@ const DEFAULT_SETTINGS: Settings = {
   crossfadeSec: 0,
   automix: false,
   automixBars: 16,
-  automixEnergy: 0,
   showNerdStats: false,
 };
 
@@ -130,10 +126,10 @@ function loadSettings(): Settings {
 }
 
 function saveSettings(state: Settings) {
-  const { shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, automixEnergy, showNerdStats } = state;
+  const { shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, showNerdStats } = state;
   localStorage.setItem(
     SETTINGS_KEY,
-    JSON.stringify({ shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, automixEnergy, showNerdStats }),
+    JSON.stringify({ shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, showNerdStats }),
   );
 }
 
@@ -242,8 +238,6 @@ function ensureAutomix(): Promise<AutomixGraph | null> {
           const plan = planNext(true);
           return plan?.kind === 'index' ? queued(plan.queue[plan.index]!) : null;
         },
-        autoplayCandidates,
-        promote: promoteAutoplay,
         loadBack: async (videoId) => {
           const back = all[1 - active]!;
           back.gain = 1;
@@ -282,28 +276,6 @@ function queued(entry: QueueEntry) {
   return { videoId: entry.track.videoId, title: entry.track.title, artist: artistNames(entry.track) };
 }
 
-/** The AutoPlay run that comes next, when the next track is AutoPlay's (nobody chose it by hand). */
-function autoplayCandidates() {
-  const { queue } = usePlayer.getState();
-  const plan = planNext(true);
-  if (plan?.kind !== 'index' || plan.queue !== queue || queue[plan.index]?.tier !== 'autoplay') return [];
-  const run: QueueEntry[] = [];
-  for (let i = plan.index; i < queue.length && queue[i]!.tier === 'autoplay'; i++) run.push(queue[i]!);
-  return run.map(queued);
-}
-
-function promoteAutoplay(videoId: string) {
-  const { queue, index } = usePlayer.getState();
-  const from = queue.findIndex((e, i) => i > index && e.tier === 'autoplay' && e.track.videoId === videoId);
-  const to = index + 1;
-  if (from <= to) return;
-  const next = [...queue];
-  const [entry] = next.splice(from, 1);
-  next.splice(to, 0, entry!);
-  usePlayer.setState({ queue: next });
-  trackLog.i('automix moved this AutoPlay track up: the best harmonic match', videoId);
-}
-
 /** The blend's midpoint: the incoming track is the one playing now, as far as everything else knows. */
 function automixHandoff() {
   if (!decks) return;
@@ -330,11 +302,10 @@ function syncAutomix() {
     return;
   }
   void ensureAutomix().then((g) => {
-    const { automix, automixBars, automixEnergy } = usePlayer.getState();
+    const { automix, automixBars } = usePlayer.getState();
     if (!g || !automix) return;
     void g.ctx.resume();
     g.dj.transitionBars = automixBars;
-    g.dj.energyDirection = automixEnergy;
     g.dj.start();
   });
 }
@@ -602,11 +573,6 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     if (graph) graph.dj.transitionBars = automixBars;
   },
 
-  setAutomixEnergy(automixEnergy) {
-    set({ automixEnergy });
-    saveSettings(get());
-    if (graph) graph.dj.energyDirection = automixEnergy;
-  },
 
   setShowNerdStats(showNerdStats) {
     set({ showNerdStats });

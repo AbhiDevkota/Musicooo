@@ -2,8 +2,8 @@
 // Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.md.
 //
 // BitChord: AutoMix picks every next track from a local library. Here the
-// queue decides what comes next, as on the phone; AutoMix's selector only
-// reorders the AutoPlay radio (see AutomixHost.autoplayCandidates). Tracks
+// queue decides what comes next, as on the phone, and only the playing and
+// the next song are analysed, so AutoMix's selector isn't used. Tracks
 // are analyzed from YouTube on the way (analysis/analyzer.ts); a track whose
 // analysis isn't ready in time mixes through AutoMix's own fallback, a plain
 // 12-second equal-power crossfade. The handoff to the incoming track happens
@@ -11,7 +11,7 @@
 import type { TrackAnalysis } from '../analysis/types';
 import { analyzer } from '../analysis/analyzer';
 import type { Deck } from './deck';
-import { rankCandidates, type Candidate, type EnergyDirection } from './selector';
+import type { Candidate } from './selector';
 import { scheduleTransition, plannedBars, MIN_GRID_CONFIDENCE, type TransitionPlan } from './transition-scheduler';
 import { asOutgoing, gridOf, phraseAtOrBefore } from './grid';
 import type { LoopDeck } from './loopDeck';
@@ -43,10 +43,6 @@ export interface AutomixHost {
   current(): QueuedTrack | null;
   /** What the queue plays next on its own (repeat and AutoPlay applied), or null at the end. */
   next(): QueuedTrack | null;
-  /** The AutoPlay tracks that could come next, in queue order; empty when the next one was chosen by hand. */
-  autoplayCandidates(): QueuedTrack[];
-  /** Moves an AutoPlay track to the front of what's next. */
-  promote(videoId: string): void;
   /** Loads [videoId] onto the back deck, paused. Resolves false if it can't play. */
   loadBack(videoId: string): Promise<boolean>;
   /** The blend's midpoint: the incoming track becomes the one playing, as far as the app knows. */
@@ -99,10 +95,6 @@ const LOOP_PREPARE_SEC = OUT_SEARCH_SEC + 40;
 const LOOP_SETUP_SEC = 15;
 const SCHEDULE_WINDOW_SEC = 12;
 const EMERGENCY_REMAINING_SEC = 10;
-/** How many AutoPlay tracks are analyzed ahead to choose the harmonic next one. */
-const SELECTOR_LOOKAHEAD = 4;
-/** Start analyzing the AutoPlay candidates this long before the mix-out. */
-const SELECT_WINDOW_SEC = PRELOAD_WINDOW_SEC + 60;
 
 /**
  * The auto-mix loop: preload the queue's next track into the idle deck as
@@ -112,7 +104,6 @@ const SELECT_WINDOW_SEC = PRELOAD_WINDOW_SEC + 60;
  */
 export class AutoDJ {
   transitionBars = 16;
-  energyDirection: EnergyDirection = 0;
 
   private state: AutoDJState = 'idle';
   private history: string[] = [];
@@ -120,7 +111,6 @@ export class AutoDJ {
   private nextKey: string | null = null;
   private nextLoadedKey: string | null = null;
   private candidates: Candidate[] = [];
-  private selectedFor: string | null = null;
   private plan: TransitionPlan | null = null;
   private blend: { from: Deck; to: Deck; handedOff: boolean } | null = null;
   /** The deck a finished blend left gliding back to rate 1. */
@@ -225,7 +215,7 @@ export class AutoDJ {
     this.nextKey = null;
     this.nextLoadedKey = null;
     this.candidates = [];
-    this.selectedFor = null;
+
     if (this.state === 'scheduled') this.state = 'playing';
     this.push();
   }
@@ -267,7 +257,7 @@ export class AutoDJ {
         this.currentKey = playing.videoId;
         this.nextKey = null;
         this.nextLoadedKey = null;
-        this.selectedFor = null;
+
         this.candidates = [];
         this.window = null;
         this.loopPlan = null;
@@ -322,35 +312,6 @@ export class AutoDJ {
       this.push();
     } finally {
       this.ticking = false;
-    }
-  }
-
-  /**
-   * AutoMix's selector over the AutoPlay radio: once the candidates are
-   * analyzed, the best harmonic, tempo- and energy-compatible one moves to
-   * the head of what's next. Hand-queued tracks are never reordered.
-   */
-  private selectHarmonicNext(cur: TrackAnalysis) {
-    if (!cur.bpm || this.selectedFor === cur.fileKey) return;
-    const pool = this.host.autoplayCandidates().slice(0, SELECTOR_LOOKAHEAD);
-    if (pool.length < 2) return;
-    for (const t of pool) analyzer.request(t.videoId, tags(t));
-    const analyzed = pool.map((t) => analyzer.get(t.videoId)).filter((a): a is TrackAnalysis => a !== null);
-    const settled = pool.every((t) => analyzer.statusOf(t.videoId) === 'done' || analyzer.statusOf(t.videoId) === 'error');
-    if (!settled) return;
-    this.selectedFor = cur.fileKey;
-    if (analyzed.length < 2) return;
-    this.candidates = rankCandidates(cur, analyzed, {
-      energyDirection: this.energyDirection,
-      // the whole radio is a handful of tracks: keep the repeat guard to what played
-      recentFileKeys: this.history,
-    });
-    const best = this.candidates[0]?.analysis.fileKey;
-    if (best && best !== this.nextKey) {
-      this.host.promote(best);
-      this.nextKey = best;
-      this.nextLoadedKey = null;
-      this.loadToken++;
     }
   }
 
@@ -552,7 +513,7 @@ export class AutoDJ {
     this.blend = null;
     this.window = null;
     this.candidates = [];
-    this.selectedFor = null;
+
     this.state = 'playing';
   }
 

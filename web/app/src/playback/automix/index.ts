@@ -2,9 +2,8 @@ import { AutoDJ, type AutomixHost, type AutoDJSnapshot } from './engine/autodj';
 import { Deck } from './engine/deck';
 import { LoopDeck } from './engine/loopDeck';
 import type { TransitionPlan } from './engine/transition-scheduler';
-import type { EnergyDirection } from './engine/selector';
 
-export type { AutomixHost, AutoDJSnapshot, EnergyDirection, TransitionPlan };
+export type { AutomixHost, AutoDJSnapshot, TransitionPlan };
 export type { MixWindow } from './engine/autodj';
 export type { LoopMixPlan } from './engine/loopMix';
 export { analyzer } from './analysis/analyzer';
