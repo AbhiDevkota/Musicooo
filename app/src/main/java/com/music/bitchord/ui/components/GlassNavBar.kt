@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -332,6 +333,7 @@ private fun GlassNowPlaying(
 
     val titleStyle = MaterialTheme.typography.titleMedium.copy(
         fontSize = ACCESSORY_TITLE_SIZE,
+        fontWeight = ACCESSORY_TITLE_WEIGHT,
         letterSpacing = ACCESSORY_TITLE_TRACKING,
     )
     val artistStyle = MaterialTheme.typography.bodyMedium.copy(
@@ -511,6 +513,13 @@ private val INLINE_LIFT = 7.dp
  * sizes in SF Pro Text, which is spaced wider than the Display cut bundled here.
  */
 private val ACCESSORY_TITLE_SIZE = 13.sp
+
+/**
+ * W700, which in this app's family draws the Semibold cut (see SFProDisplay):
+ * Apple's accessory sets its title in Semibold, and the scale's W600 — the
+ * Medium cut — read thin at 13sp.
+ */
+private val ACCESSORY_TITLE_WEIGHT = FontWeight.W700
 private val ACCESSORY_TITLE_TRACKING = 0.4.sp
 private val ACCESSORY_ARTIST_SIZE = 12.sp
 private val ACCESSORY_ARTIST_TRACKING = 0.35.sp
