@@ -95,11 +95,40 @@ private val KEY_INDEX = mapOf(
     "A♭" to 8, "A" to 9, "A♯" to 10, "B♭" to 10, "B" to 11,
 )
 
-/** Anything matching this is spoken or already a performance; mixing it is never wanted. */
-private val BLOCKED_TEXT = Regex(
-    """\b(podcast|episode|audiobook|live|concert|performance)\b""",
+/** Spoken word, in any of a track's title, artist or album: mixing it is never wanted. */
+private val SPOKEN_TEXT = Regex(
+    """\b(podcast|episode|audiobook|concert)\b""",
     RegexOption.IGNORE_CASE,
 )
+
+/**
+ * A live recording, read off a title or album. Only the way a release *labels*
+ * one counts — "(Live)", "[Live at Wembley]", "Song - Live", an album called
+ * "Live at …" or "Live: …" — because the bare word was matching ordinary song
+ * titles: "Live It Up", "Live Your Life", "Live While We're Young" were all
+ * refused a mix, and a refused pair gets no seek-bar marker either.
+ */
+private val LIVE_TEXT = Regex(
+    // A bracketed tag: "(Live)", "(Acoustic Live)", "[Live at Wembley]", "(Live Version)".
+    """[(\[]\s*(?:[^)\]]*\s)?live(?:\s+(?:at|from|in|on|version|session|recording|performance|edit)\b[^)\]]*)?\s*[)\]]""" +
+        // A dash suffix: "Song - Live", "Song – Live from the Garden".
+        """|[-–—]\s*live(?:\s+(?:at|from|in|on|version|session|recording|performance|edit)\b.*)?\s*$""" +
+        // A live album: "Live at Wembley", "Live: At The Hall".
+        """|^\s*live\s*(?::|\s(?:at|from|in|on)\b)""",
+    RegexOption.IGNORE_CASE,
+)
+
+/** Whether [track] is spoken word or a live recording, which a transition leaves alone. */
+private fun isSpokenOrLive(track: TransitionTrackInfo?): Boolean {
+    if (track == null) return false
+    if (SPOKEN_TEXT.containsMatchIn(itemText(track))) return true
+    // Not the artist: there is a band called Live.
+    return LIVE_TEXT.containsMatchIn(track.title) || LIVE_TEXT.containsMatchIn(track.album)
+}
+
+/** For tests: whether a pair would be refused as spoken word or live. */
+internal fun isSpokenOrLiveForTest(title: String, artist: String = "", album: String = ""): Boolean =
+    isSpokenOrLive(TransitionTrackInfo(id = "t", durationMs = 0L, title = title, artist = artist, album = album))
 
 /** How the renderer should execute a planned transition. */
 enum class TransitionStyle {
@@ -1469,7 +1498,7 @@ private fun planTransitionInner(
         )
     }
 
-    if (BLOCKED_TEXT.containsMatchIn("${itemText(currentTrack)} ${itemText(nextTrack)}")) {
+    if (isSpokenOrLive(currentTrack) || isSpokenOrLive(nextTrack)) {
         return blocked("blocked-speech-or-live")
     }
 

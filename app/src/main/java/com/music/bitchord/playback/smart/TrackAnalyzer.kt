@@ -27,6 +27,7 @@ import android.content.Context
 import android.media.MediaDataSource
 import android.net.Uri
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.util.UnstableApi
 import com.music.bitchord.data.YtMusicRepository
@@ -1268,6 +1269,41 @@ class TrackAnalyzer(private val context: Context, private val cache: AudioCache)
         trackId = trackId,
         duration = durationSeconds,
     )
+
+    /**
+     * A three-band waveform of [fromSeconds]..[toSeconds] of [trackId], for the
+     * Automix popup, read off the same copy analysis measured; null when there
+     * is no such copy to read. Blocking — call it off the main thread.
+     */
+    fun mixWaveform(
+        trackId: String,
+        uri: Uri,
+        durationSeconds: Double,
+        fromSeconds: Double,
+        toSeconds: Double,
+        bins: Int,
+    ): MixWaveform.Bands? {
+        // Not [analysisUriFor]: that starts a catalogue search, and this only
+        // wants whatever analysis already settled on.
+        val analysisUri = if (uri.getQueryParameter("v") != null || uri.authority != "source") {
+            uri
+        } else {
+            sourceAnalysisUris[trackId] ?: return null
+        }
+        val began = SystemClock.elapsedRealtime()
+        val copy = runCatching { copyToRead(trackId, analysisUri, durationSeconds) }.getOrNull() ?: return null
+        val chosen = SystemClock.elapsedRealtime()
+        val bands = copy.open()?.use { source ->
+            MixWaveform.build(source, fromSeconds, toSeconds, bins) { stopped }
+        }
+        Log.d(
+            TAG,
+            "Mix waveform $trackId: copy ${chosen - began}ms, decode ${SystemClock.elapsedRealtime() - chosen}ms, " +
+                "asked ${"%.1f".format(Locale.ROOT, fromSeconds)}s, decoder started " +
+                "${bands?.decodedFrom?.let { "%.1f".format(Locale.ROOT, it) } ?: "-"}s",
+        )
+        return bands
+    }
 
     fun release() {
         executor.shutdownNow()

@@ -1884,6 +1884,11 @@ class PlaybackService : MediaLibraryService() {
             // a window shown over a track that may still fall back to YouTube
             // promises a blend that could start late or not at all.
             nextStreamReady = { item -> !DirectSourceGate.isActive() || DirectSourceGate.isStreamReady(item) },
+            mixWaveform = { item, durationMs, from, to, bins ->
+                item.localConfiguration?.uri?.let { uri ->
+                    trackAnalyzer.mixWaveform(item.mediaId, uri, durationMs / 1000.0, from, to, bins)
+                }
+            },
         )
 
     /**
