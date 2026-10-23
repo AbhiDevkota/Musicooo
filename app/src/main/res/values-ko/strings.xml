@@ -30,6 +30,8 @@
     <string name="downloaded_songs">다운로드한 곡</string>
     <string name="local_music">로컬 음악</string>
     <string name="search_source_youtube" translatable="false">YouTube</string>
+    <string name="search_source_addons">애드온</string>
+    <string name="search_addons_none">켜진 애드온이 없습니다. 설정 → 소스에서 하나 켜세요.</string>
     <string name="audio_files_on_device">기기의 오디오 파일</string>
     <string name="on_device">기기 내</string>
     <string name="playlists">재생목록</string>
@@ -117,9 +119,9 @@
     <string name="connected">연결됨</string>
     <string name="account_integrations">계정 및 연동</string>
     <string name="spotify">Spotify</string>
-    <string name="spotify_connect_subtitle">로그인하여 재생목록을 불러오세요. 재생에는 YouTube
-        Music을 사용합니다.</string>
+    <string name="spotify_connect_subtitle">로그인하여 재생목록을 불러오세요. 재생에는 YouTube Music을 사용합니다.</string>
     <string name="spotify_sign_in">Spotify에 로그인</string>
+    <string name="spotify_use_spdc_token">sp_dc 토큰 사용</string>
     <string name="spotify_disconnect">연결 해제</string>
     <string name="spotify_empty_playlists">이 계정에 재생목록이 없습니다</string>
     <string name="spotify_empty_tracks">이 재생목록에 곡이 없습니다</string>
@@ -225,6 +227,8 @@
     <string name="japanese">일본어</string>
     <string name="russian">러시아어</string>
     <string name="chinese">중국어 (간체)</string>
+    <string name="chinese_simplified">중국어 (간체)</string>
+    <string name="chinese_traditional">중국어 (번체)</string>
     <string name="hebrew">히브리어</string>
     <string name="italian">이탈리아어</string>
     <string name="turkish">터키어</string>
@@ -262,8 +266,7 @@
     <string name="skip_silence_subtitle">1초보다 긴 공백 자르기</string>
     <string name="skip_silence_float_subtitle">32비트 부동소수점 출력에서는 이용 불가</string>
     <string name="prefer_music_only">음악 전용 버전 선호</string>
-    <string name="prefer_music_only_subtitle">뮤직 비디오의 경우, 카탈로그 내 오디오 버전을 찾아 불러오는 동안 해당 비디오의 상세 정보를
-        표시합니다</string>
+    <string name="prefer_music_only_subtitle">뮤직 비디오의 경우, 카탈로그 내 오디오 버전을 찾아 불러오는 동안 해당 비디오의 상세 정보를 표시합니다</string>
     <string name="smart_version_alignment">스마트 오디오 정렬</string>
     <string name="smart_version_alignment_subtitle">오디오 파형을 분석해 정확히 일치하는 재생 시점을 맞춥니다</string>
     <string name="equalizer">이퀄라이저</string>
@@ -311,6 +314,20 @@
     <string name="eq_preset_custom">맞춤</string>
     <string name="show_nerd_stats">전문가 통계 표시</string>
     <string name="show_nerd_stats_subtitle">플레이어에 코덱, 비트레이트, 샘플 레이트 표시</string>
+    <string name="app_icon">앱 아이콘</string>
+    <string name="app_icon_default">기본값</string>
+    <string name="app_icon_liquid_glass" translatable="false">Liquid Glass</string>
+    <string name="app_icon_liquid_glass_dark" translatable="false">Liquid Glass Dark</string>
+    <string name="app_icon_liquid_glass_clear" translatable="false">Liquid Glass Clear</string>
+    <string name="app_icon_liquid_glass_clear_dark" translatable="false">Liquid Glass Clear Dark</string>
+    <string name="app_icon_samsung_glass" translatable="false">Samsung Glass</string>
+    <string name="app_icon_samsung_glass_dark" translatable="false">Samsung Glass Dark</string>
+    <string name="app_icon_samsung_glass_clear" translatable="false">Samsung Glass Clear</string>
+    <string name="app_icon_samsung_glass_clear_dark" translatable="false">Samsung Glass Clear Dark</string>
+    <string name="app_icon_pixel_glass" translatable="false">Pixel Glass</string>
+    <string name="app_icon_pixel_glass_dark" translatable="false">Pixel Glass Dark</string>
+    <string name="app_icon_pixel_glass_clear" translatable="false">Pixel Glass Clear</string>
+    <string name="app_icon_pixel_glass_clear_dark" translatable="false">Pixel Glass Clear Dark</string>
     <string name="theme">테마</string>
     <string name="reduce_animation">애니메이션 줄이기</string>
     <string name="reduce_animation_subtitle">메인 플레이어의 그라데이션 움직임을 멈춥니다</string>
@@ -323,6 +340,12 @@
     <string name="legacy_mesh_gradient">구형 메시 그라데이션</string>
     <string name="legacy_mesh_gradient_subtitle">v1.5 버전의 플레이어 뒤에서 떠다니던 색상 거품을 다시 표시합니다</string>
     <string name="animated_cover_art">움직이는 커버 아트</string>
+    <string name="artist_signatures">아티스트 서명</string>
+    <string name="artist_signatures_subtitle">Apple Music에 타이틀 로고가 없으면 자필 서명을 표시합니다</string>
+    <string name="artist_signatures_url">서명 API URL</string>
+    <string name="artist_signatures_url_hint">https://signatures.example.com</string>
+    <string name="artist_signatures_unconfigured">설정하지 않음 — 눌러서 API URL을 설정하세요</string>
+    <string name="artist_signatures_test_failed">해당 URL로 API에 접근할 수 없습니다</string>
     <string name="synced_lyrics">싱크 가사</string>
     <string name="synced_lyrics_subtitle">지금 불리는 가사를 밝게 표시합니다</string>
     <string name="lyrics_sources">가사 소스</string>
@@ -337,8 +360,12 @@
     <string name="stop_music_on_close_subtitle">최근 앱 화면에서 민 경우 재생을 중지합니다</string>
     <string name="hide_volume_bar">음량 막대 숨김</string>
     <string name="hide_volume_bar_subtitle">메인 플레이어에서 음량 슬라이더를 제거합니다</string>
+    <string name="hide_status_bar_in_player">플레이어에서 상태 표시줄 숨기기</string>
+    <string name="hide_status_bar_in_player_subtitle">메인 플레이어를 열었을 때 시계, 배터리, 알림 아이콘을 숨깁니다</string>
     <string name="hide_song_status">음악 상태 숨김</string>
-    <string name="hide_song_status_subtitle">메인 플레이어에서 “Playing from”, “Played by” 등의 문구를 숨깁니다</string> //FIXME:
+    <string name="show_queue_history">대기열 기록 표시</string>
+    <string name="show_queue_history_subtitle">이전에 재생한 최대 25곡을 대기열의 지금 재생 중인 곡 위에 표시합니다</string>
+   <string name="hide_song_status_subtitle">메인 플레이어에서 “Playing from”, “Played by” 등의 문구를 숨깁니다</string> //FIXME:
     <string name="off">끔</string>
     <string name="low">낮음</string>
     <string name="medium">보통</string>
@@ -641,10 +668,8 @@
     <string name="seconds_short">%1$d초</string>
     <string name="spdc_token">sp_dc 토큰</string>
     <string name="spotify_canvas_setup">Spotify Canvas 설정</string>
-    <string name="spotify_canvas_setup_description">Spotify Canvas를 사용하려면, Spotify
-        sp_dc 쿠키를 제공해야 합니다.</string>
-    <string name="spotify_canvas_setup_steps">1. 브라우저에서 open.spotify.com에 로그인합니다.\n2. 개발자 도구를 열고, 애플리케이션, 쿠키에 들어갑니다.\n3. sp_dc 쿠키의 값을 복사합니다.\n4.
-        아래에 붙여넣습니다.</string>
+    <string name="spotify_canvas_setup_description">Spotify Canvas를 사용하려면, Spotify sp_dc 쿠키를 제공해야 합니다.</string>
+    <string name="spotify_canvas_setup_steps">1. 브라우저에서 open.spotify.com에 로그인합니다.\n2. 개발자 도구를 열고, 애플리케이션, 쿠키에 들어갑니다.\n3. sp_dc 쿠키의 값을 복사합니다.\n4. 아래에 붙여넣습니다.</string>
     <string name="spotify_canvas_auto_hide">플레이어 제어 버튼 자동 숨김</string>
     <string name="spotify_canvas_auto_hide_subtitle">Spotify Canvas를 재생할 때 5초 뒤 플레이어 절반 숨기기</string>
     <string name="prioritize_spotify_canvas">Spotify Canvas 우선</string>
@@ -697,6 +722,7 @@
     <string name="minutes_short">%1$d분</string>
     <string name="not_enough_listening">아직 충분히 듣지 않았습니다</string>
     <string name="not_enough_this_month">리플레이를 보려면 이달에 몇 곡을 더 들으세요.</string>
+    <string name="not_enough_this_week">리플레이를 보려면 이주에 몇 곡을 더 들으세요.</string>
     <string name="pinned">고정</string>
     <string name="replay_across"></string>
     <string name="replay_album_end">이 이목을 끌었어요.</string>
@@ -705,6 +731,7 @@
     <string name="replay_artist_end">을 꾸준히 들었어요.</string>
     <string name="replay_artist_focus">아티스트 1명</string>
     <string name="replay_artist_start">한 달 동안, </string>
+    <string name="replay_artist_start_week">이번 주에, </string>
     <string name="replay_empty_description">조금 더 감상하시면 BitChord에서 기록을 리플레이로 만들어 드립니다.</string>
     <string name="replay_genre_end">가 한데 모여, 취향을 다듬었어요.</string>
     <string name="replay_genre_focus">장르</string>
@@ -726,8 +753,10 @@
     <string name="replay_share_card_description">감상 기록의 하이라이트를 모아 잘 다듬은 카드입니다.</string>
     <string name="replay_share_summary_description">음악, 아티스트, 앨범, 장르, 습관을 모두 담은 사진입니다.</string>
     <string name="replay_songs_end">과 한 달을 함께 했어요.</string>
+    <string name="replay_songs_end_week">과 한 주를 함께 했어요.</string>
     <string name="replay_songs_start">총 </string>
     <string name="replay_summary_start">음악으로 표현한 내 </string>
+    <string name="replay_summary_end_week">한 주</string>
     <string name="saved">저장함</string>
     <string name="saved_bang">저장했습니다!</string>
     <string name="share_my_replay">리플레이 공유</string>
@@ -844,6 +873,7 @@
     <string name="play_your_replay">내 리플레이 재생</string>
     <string name="counted_on_device_with_bitchord">BitChord가 이 기기에서 집계</string>
     <string name="this_month">이번 달</string>
+    <string name="replay_this_week">이번 주</string>
     <string name="this_year">올해</string>
     <string name="all_time">전체</string>
     <string name="switch_account">계정 전환</string>
@@ -948,8 +978,7 @@
     <string name="listen_together_custom_server_switch_and_join">전환 및 참여</string>
     <string name="listen_together_official_server_dialog_title">공식 서버로 전환하시겠습니까?</string>
     <string name="listen_together_official_server_dialog_message">이 파티는 공식 BitChord 서버에서 호스팅합니다.\n\n공식 서버로 되돌아가고 %1$s 파티에 참여하시겠습니까?</string>
-    <string name="listen_together_switch_failed_stayed_in_party">파티 참여 불가: %1$s.
-        파티 %2$s에 남습니다.</string>
+    <string name="listen_together_switch_failed_stayed_in_party">파티 참여 불가: %1$s. 파티 %2$s에 남습니다.</string>
     <string name="listen_together_switch_failed">파티 참여 불가: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>
     <string name="listen_together_server_offline_dash">—</string>
@@ -1131,4 +1160,49 @@
     <string name="local_playlist_subtitle">%1$d곡 · 이 기기</string>
     <string name="spotify_import_empty_playlist">이 플레이리스트에는 곡이 없습니다</string>
     <string name="spotify_library_subtitle">내 Spotify 플레이리스트</string>
+    <string name="onboarding_title">수많은 곡들을, BitChord에서 스트리밍</string>
+    <string name="onboarding_name_prompt">어떻게 불러드릴까요?</string>
+    <string name="onboarding_name_hint">내 이름</string>
+    <string name="onboarding_name_footer">함께 듣기 시 친구들이 보게 될 이름입니다. 나중에 설정에서 바꿀 수 있습니다.</string>
+    <string name="onboarding_next">다음</string>
+    <string name="onboarding_connect_title">YouTube 계정 연결</string>
+    <string name="onboarding_connect_body">라이브러리, 재생목록, 믹스를 가져오고, 친구들과 함께 듣기 파티를 시작하세요.</string>
+    <string name="onboarding_sign_in_google">Google로 로그인</string>
+    <string name="onboarding_skip_sign_in">로그인 건너뛰기</string>
+    <string name="onboarding_back">뒤로</string>
+    <!-- Settings: BitChord for Wear OS -->
+    <string name="wear_os_section">Wear OS용 BitChord</string>
+    <string name="wear_os_page_title">Wear OS</string>
+    <string name="wear_os_your_watches">내 워치</string>
+    <string name="wear_os_value_none">워치 없음</string>
+    <string name="wear_os_value_not_installed">설치되지 않음</string>
+    <string name="wear_os_value_up_to_date">최신 버전</string>
+    <string name="wear_os_looking">워치 찾는 중…</string>
+    <string name="wear_os_no_watch">연결된 워치 없음</string>
+    <string name="wear_os_no_watch_subtitle">먼저 컴패니언 앱에서 이 폰과 Wear OS 워치를 페어링하세요.</string>
+    <string name="wear_os_checking">확인 중…</string>
+    <string name="wear_os_not_installed">BitChord가 이 시계에 없습니다</string>
+    <string name="wear_os_up_to_date">최신 버전 · %1$s</string>
+    <string name="wear_os_update_available">업데이트 가능</string>
+    <string name="wear_os_unknown">설치됨 · 버전 확인 불가</string>
+    <string name="wear_os_sending">워치로 전송 중…</string>
+    <string name="wear_os_sent">전송됨 — 필요한 경우 워치에서 마무리하세요</string>
+    <string name="wear_os_send_failed">업데이트 전송 불가 (%1$s)</string>
+    <string name="wear_os_install">설치</string>
+    <string name="wear_os_update">업데이트</string>
+    <string name="wear_os_install_title">내 워치에 설치</string>
+    <string name="wear_os_step_wifi">워치를 폰과 동일한 Wi-Fi에 연결하세요.</string>
+    <string name="wear_os_step_developer">워치에서 개발자 옵션을 켜세요. Galaxy Watch: 설정 → 워치 정보 → 소프트웨어 정보 → 소프트웨어 버전 5회 연타하기. Pixel Watch: 설정 → 시스템 → 정보 → 빌드 번호 7번 연타하기.</string>
+    <string name="wear_os_step_debugging">개발자 설정에서 ADB 디버깅과 무선 디버깅을 켜세요.</string>
+    <string name="wear_os_step_pair">새 기기 페어링을 누르고, 워치에서 표시하는 6자리 숫자를 누르세요.</string>
+    <string name="wear_os_searching">Wi-Fi에서 워치 찾는 중…</string>
+    <string name="wear_os_found">워치 찾음</string>
+    <string name="wear_os_pairing">페어링…</string>
+    <string name="wear_os_installing">워치에서 BitChord 설치 중…</string>
+    <string name="wear_os_installed">설치됨. 무선 디버깅을 다시 끄셔도 됩니다.</string>
+    <string name="wear_os_failed">실패 (%1$s). 코드를 확인하고 다시 시도하세요.</string>
+    <string name="wear_os_unsupported">워치에 설치하려면 폰의 Android 버전이 11 이상이어야 합니다.</string>
+    <string name="wear_os_code_hint">페어링 코드</string>
+    <string name="wear_os_done">완료</string>
+    <string name="signed_by">%1$s 서명</string>
 </resources>
