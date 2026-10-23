@@ -431,21 +431,22 @@ private fun GlassNowPlaying(
             }
             Spacer(Modifier.width(if (isInline) 8.dp else 9.dp))
             // Title and artist at both densities, as Apple Music has them, in its
-            // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]).
-            // The inline row shares its width with the tab pill and the Search
-            // circle, so both cut with an ellipsis.
+            // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]). The inline
+            // row shares its width with the tab pill and the Search circle, so
+            // a long line fades out at its end, as Apple's does.
             Column(Modifier.weight(1f)) {
+                val secondary = contentColor.copy(alpha = 0.7f)
                 ExplicitSongTitle(
                     song = song,
                     style = titleStyle,
                     color = contentColor,
+                    badgeColor = secondary,
+                    fadeOverflow = true,
                 )
-                Text(
+                FadingLine(
                     text = song.artist,
                     style = artistStyle,
-                    color = contentColor.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    color = secondary,
                     modifier = Modifier.vibrancy(contentColor),
                 )
             }

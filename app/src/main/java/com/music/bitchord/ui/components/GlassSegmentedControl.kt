@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -26,16 +25,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -52,8 +45,7 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.backdrop.Backdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberCanvasBackdrop
-import com.music.bitchord.ui.graphics.FADE_CURVE_STOPS
-import com.music.bitchord.ui.graphics.smootherStep
+import com.music.bitchord.ui.graphics.fadingEdges
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
@@ -165,7 +157,22 @@ fun GlassSegmentedControl(
         Box(
             Modifier
                 .fillMaxWidth()
-                .then(if (scrolls) Modifier.fadedEdges(scroll).horizontalScroll(scroll) else Modifier),
+                .then(
+                    if (scrolls) {
+                        // Out at whichever edge has more beyond it, deepening as
+                        // that edge's overflow grows to a fade's width.
+                        val fadePx = with(density) { EDGE_FADE.toPx() }
+                        Modifier
+                            .fadingEdges(
+                                EDGE_FADE,
+                                start = { scroll.value / fadePx },
+                                end = { (scroll.maxValue - scroll.value) / fadePx },
+                            )
+                            .horizontalScroll(scroll)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             Box(
                 Modifier
@@ -225,39 +232,6 @@ private fun Modifier.atX(x: Float): Modifier = layout { measurable, constraints 
     val placeable = measurable.measure(constraints)
     layout(placeable.width, placeable.height) { placeable.place(IntOffset(x.roundToInt(), 0)) }
 }
-
-/**
- * Fades the scrolled content out at either edge with more beyond it, along
- * [smootherStep], deepening as that edge's overflow grows to a fade's width.
- */
-private fun Modifier.fadedEdges(scroll: ScrollState): Modifier =
-    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithCache {
-            val width = EDGE_FADE.toPx().coerceAtMost(size.width / 2f)
-            val stops = (0..FADE_CURVE_STOPS).map { i ->
-                val t = i / FADE_CURVE_STOPS.toFloat()
-                t to Color.Black.copy(alpha = 1f - smootherStep(t))
-            }.toTypedArray()
-            val start = Brush.horizontalGradient(*stops, startX = 0f, endX = width)
-            val end = Brush.horizontalGradient(*stops, startX = size.width, endX = size.width - width)
-            onDrawWithContent {
-                drawContent()
-                val before = (scroll.value / width).coerceIn(0f, 1f)
-                val after = ((scroll.maxValue - scroll.value) / width).coerceIn(0f, 1f)
-                if (before > 0f) {
-                    drawRect(start, Offset.Zero, Size(width, size.height), alpha = before, blendMode = BlendMode.DstOut)
-                }
-                if (after > 0f) {
-                    drawRect(
-                        end,
-                        Offset(size.width - width, 0f),
-                        Size(width, size.height),
-                        alpha = after,
-                        blendMode = BlendMode.DstOut,
-                    )
-                }
-            }
-        }
 
 /**
  * The track's fill by default: Apple's tertiary fill, a grey at a quarter on

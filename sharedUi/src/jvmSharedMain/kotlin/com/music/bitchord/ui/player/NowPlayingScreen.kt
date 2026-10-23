@@ -3440,6 +3440,7 @@ fun NowPlayingScreen(
                                     label = "playerCredits",
                                 ) {
                                     val scrolling = scrolls()
+                                    val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                                     Column {
                                         MarqueeText(
                                             text = song.title,
@@ -3448,8 +3449,10 @@ fun NowPlayingScreen(
                                             ),
                                             color = Color.White,
                                             enabled = scrolling,
-                                            leading = if (song.isExplicit == true) {
-                                                { ExplicitBadge(color = Color.White) }
+                                            // After the title, in the artist line's
+                                            // colour and vibrancy, as Apple sets it.
+                                            trailing = if (song.isExplicit == true) {
+                                                { ExplicitBadge(color = artistColor, modifier = Modifier.vibrancy(artistColor)) }
                                             } else {
                                                 null
                                             },
@@ -3467,7 +3470,7 @@ fun NowPlayingScreen(
                                                 fontWeight = FontWeight.W500,
                                                 fontSize = 20.sp,
                                             ),
-                                            color = LocalPlayerTint.current.copy(alpha = 0.55f),
+                                            color = artistColor,
                                             enabled = scrolling,
                                             // A title that's also scrolling gets to go first —
                                             // starting together reads as clutter, so the artist
