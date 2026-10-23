@@ -141,8 +141,8 @@ fun GlassNavBar(
         scrollConnection = scrollConnection,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
-            .padding(horizontal = BAR_GUTTER)
-            .padding(bottom = 2.dp)
+            .padding(horizontal = NAV_BAR_GUTTER)
+            .padding(bottom = NAV_BAR_LIFT)
             .fillMaxWidth(),
         tabBarContentModifier = glassSurface,
         inlineAccessory = song?.let { current ->
@@ -203,7 +203,7 @@ fun GlassNavBar(
         ),
         // Expanded, this is meant to be the plain [FloatingBottomBar] with a
         // different material — same outer width, same pill inset, same tab
-        // padding, same 25dp glyph — so the two bars measure identically and the
+        // padding, same glyph — so the two bars measure identically and the
         // toggle changes the surface rather than the layout. The horizontal tab
         // padding is gone with it: the tabs divide the pill by weight now, the
         // way the plain bar's do, so a per-tab horizontal padding would only
@@ -211,6 +211,15 @@ fun GlassNavBar(
         sizes = FloatingTabBarDefaults.sizes(
             tabBarContentPadding = PaddingValues(PILL_INSET),
             tabExpandedContentPadding = PaddingValues(vertical = TAB_VERTICAL_PADDING),
+            // Collapsed, Apple's row is narrower and more spaced: 48pt circles
+            // 28pt in from the screen's sides, 14pt apart, centred on the line
+            // the expanded bar's middle runs along.
+            inlineComponentSpacing = INLINE_SPACING,
+            inlineBarPadding = PaddingValues(
+                start = INLINE_GUTTER - NAV_BAR_GUTTER,
+                end = INLINE_GUTTER - NAV_BAR_GUTTER,
+                bottom = INLINE_LIFT,
+            ),
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
@@ -234,7 +243,7 @@ fun GlassNavBar(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp).glassArea(area).vibrancy(tint),
+                            modifier = Modifier.size(TAB_ICON_SIZE).glassArea(area).vibrancy(tint),
                         )
                     },
                     onClick = onClick,
@@ -248,14 +257,14 @@ fun GlassNavBar(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp).glassArea(area).vibrancy(tint),
+                            modifier = Modifier.size(TAB_ICON_SIZE).glassArea(area).vibrancy(tint),
                         )
                     },
                     title = {
                         val tint = tabTint(area, isSelected)
                         Text(
                             text = tab.label,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = tabLabelStyle(),
                             color = tint,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -335,7 +344,7 @@ private fun GlassNowPlaying(
     Box(
         // Inline, the accessory is stretched to the row's height by the tab bar
         // (`fillMaxHeight` on a row measured at IntrinsicSize.Max), and this row
-        // is shorter than that — the tab pill beside it, with a 25dp glyph in
+        // is shorter than that — the tab pill beside it, with a 28dp glyph in
         // 10dp of padding, is the tallest thing in the row and sets the height.
         // A Box defaults to TopStart, so the artwork and the transport sat a
         // couple of dp above the pill's centre line. Expanded the Box wraps its
@@ -344,7 +353,7 @@ private fun GlassNowPlaying(
         // The gestures and the tap belong to the whole glass surface, not the
         // row centred in it. Inline, that row is shorter than the pill it sits
         // in, and a pull started in the strip above or below it went nowhere —
-        // on a bar only 45dp tall to begin with.
+        // on a bar only 48dp tall to begin with.
         modifier = Modifier
             // Outside the press scale, which it lifts along with everything else.
             .miniPlayerGestures(
@@ -484,6 +493,17 @@ private fun GlassNowPlaying(
         }
     }
 }
+
+/** The collapsed row's margin at either side of the screen, and its items' spacing. */
+private val INLINE_GUTTER = 28.dp
+private val INLINE_SPACING = 14.dp
+
+/**
+ * Half the difference between the expanded tab row, 62dp, and the collapsed
+ * one, 48 — a 28dp glyph in 10dp of padding — so the one folds onto the
+ * other's centre line.
+ */
+private val INLINE_LIFT = 7.dp
 
 /**
  * The accessory's type, measured off Apple's, collapsed and expanded alike:

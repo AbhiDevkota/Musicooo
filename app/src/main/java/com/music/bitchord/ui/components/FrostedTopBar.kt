@@ -312,8 +312,9 @@ fun FrostedTopBar(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .then(if (accessory != null) Modifier.fillMaxWidth().padding(start = edge) else Modifier)
-                    // Same outer edge as the navbar; PILL_INSET below is
-                    // internal padding around the icons, not extra margin.
+                    // The page's gutter (the navbar keeps Apple's wider one);
+                    // PILL_INSET below is internal padding around the icons,
+                    // not extra margin.
                     .padding(end = edge),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
