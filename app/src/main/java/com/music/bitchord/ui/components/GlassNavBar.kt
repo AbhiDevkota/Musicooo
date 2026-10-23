@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.R
 import com.music.bitchord.data.model.ROW_ART_PX
@@ -283,8 +284,9 @@ private fun tabTint(area: GlassArea, selected: Boolean): Color {
  *
  * Two densities of the same row rather than two components, so the shared
  * element carrying it between the bar's states has one thing to interpolate:
- * [isInline] narrows the artwork, drops the artist line and drops the skip
- * button, which is what makes it fit the collapsed row's height.
+ * [isInline] narrows the artwork and drops the skip button. The artist line
+ * stays, as it does in Apple Music's: title and artist together still clear
+ * the collapsed row's height.
  *
  * The content is [MiniPlayer]'s — same artwork, same transport, same haptics —
  * and not Echo's, which reaches into a player connection this app doesn't have.
@@ -319,13 +321,14 @@ private fun GlassNowPlaying(
     val glassArea = remember { GlassArea() }
     val contentColor = glassContentColor(glassArea)
 
-    val artSize = if (isInline) 32.dp else 40.dp
-    // Collapsed, the cover is a circle, as in the iOS 26 bar: it sits at the
-    // round end of a pill and echoes it. Expanded it keeps its rounded square.
-    // Half the size rather than a percent so the player, flying its artwork
-    // into this cover as it closes, can round off into the same radius it
-    // lands on — see [playerDockArt].
-    val artCorner = if (isInline) artSize / 2 else 8.dp
+    val artSize = if (isInline) INLINE_ART_SIZE else 40.dp
+    val artCorner = if (isInline) INLINE_ART_CORNER else 8.dp
+    val titleStyle = MaterialTheme.typography.titleMedium.let {
+        if (isInline) it.copy(fontSize = INLINE_TITLE_SIZE, letterSpacing = INLINE_TITLE_TRACKING) else it
+    }
+    val artistStyle = MaterialTheme.typography.bodyMedium.let {
+        if (isInline) it.copy(fontSize = INLINE_ARTIST_SIZE, letterSpacing = INLINE_ARTIST_TRACKING) else it
+    }
     val glyphSlot = if (isInline) 32.dp else 40.dp
     val glyphSize = if (isInline) 24.dp else 32.dp
 
@@ -374,8 +377,12 @@ private fun GlassNowPlaying(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal = if (isInline) 8.dp else 12.dp,
-                    vertical = if (isInline) 4.dp else 8.dp,
+                    // Inline the artwork sits in the end of a capsule, which
+                    // curves away from it; at 8dp its corner met the curve.
+                    start = if (isInline) 16.dp else 12.dp,
+                    end = if (isInline) 8.dp else 12.dp,
+                    top = if (isInline) 4.dp else 8.dp,
+                    bottom = if (isInline) 4.dp else 8.dp,
                 ),
         ) {
             // A music video plays in the cover's place at its own 16:9, as in
@@ -410,44 +417,24 @@ private fun GlassNowPlaying(
                 }
             }
             Spacer(Modifier.width(if (isInline) 8.dp else 10.dp))
-            if (isInline) {
-                Text(
-                    text = song.title,
-                    // The same size the expanded row sets it in. Collapsing the
-                    // bar drops the artist line and the skip button, not the
-                    // title's weight in the row — a title that shrank as well
-                    // would read as a different component rather than the same
-                    // one folded up, and the shared element carrying it between
-                    // the two states has one less thing to interpolate.
-                    //
-                    // It costs nothing in height: the row is stretched to the
-                    // tab pill's 45dp either way, and titleMedium's line box
-                    // still clears the 32dp artwork beside it.
-                    style = MaterialTheme.typography.titleMedium,
+            // Title and artist at both densities, as Apple Music has them; inline
+            // in its smaller, more openly spaced type (see [INLINE_TITLE_SIZE]).
+            // The inline row shares its width with the tab pill and the Search
+            // circle, so both cut with an ellipsis.
+            Column(Modifier.weight(1f)) {
+                ExplicitSongTitle(
+                    song = song,
+                    style = titleStyle,
                     color = contentColor,
-                    // The inline row shares its width with the tab pill and the
-                    // Search circle, so most titles will not fit at this size.
-                    // Cut with an ellipsis rather than wrapped or scaled.
+                )
+                Text(
+                    text = song.artist,
+                    style = artistStyle,
+                    color = contentColor.copy(alpha = 0.7f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.vibrancy(contentColor),
                 )
-            } else {
-                Column(Modifier.weight(1f)) {
-                    ExplicitSongTitle(
-                        song = song,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = contentColor,
-                    )
-                    Text(
-                        text = song.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.vibrancy(contentColor),
-                    )
-                }
             }
             if (isLoading) {
                 Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {
@@ -494,3 +481,17 @@ private fun GlassNowPlaying(
         }
     }
 }
+
+/**
+ * The collapsed row's type, measured off Apple Music's: 13pt over 12pt, set
+ * looser than the scale's 16 and 14 — Apple sets these sizes in SF Pro Text,
+ * which is spaced wider than the Display cut bundled here.
+ */
+private val INLINE_TITLE_SIZE = 13.sp
+private val INLINE_TITLE_TRACKING = 0.4.sp
+private val INLINE_ARTIST_SIZE = 12.sp
+private val INLINE_ARTIST_TRACKING = 0.35.sp
+
+/** The collapsed row's artwork, 0.95 of the 32dp it was, and its corner with it. */
+private val INLINE_ART_SIZE = 30.4.dp
+private val INLINE_ART_CORNER = 5.7.dp
