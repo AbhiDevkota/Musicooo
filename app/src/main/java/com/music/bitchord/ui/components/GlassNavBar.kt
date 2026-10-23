@@ -284,9 +284,9 @@ private fun tabTint(area: GlassArea, selected: Boolean): Color {
  *
  * Two densities of the same row rather than two components, so the shared
  * element carrying it between the bar's states has one thing to interpolate:
- * [isInline] narrows the artwork and drops the skip button. The artist line
- * stays, as it does in Apple Music's: title and artist together still clear
- * the collapsed row's height.
+ * [isInline] drops the skip button and draws the play button smaller. The
+ * artwork and the type are the same at both, as they are in Apple's accessory,
+ * which only changes width between its two placements.
  *
  * The content is [MiniPlayer]'s — same artwork, same transport, same haptics —
  * and not Echo's, which reaches into a player connection this app doesn't have.
@@ -321,16 +321,16 @@ private fun GlassNowPlaying(
     val glassArea = remember { GlassArea() }
     val contentColor = glassContentColor(glassArea)
 
-    val artSize = if (isInline) INLINE_ART_SIZE else 40.dp
-    val artCorner = if (isInline) INLINE_ART_CORNER else 8.dp
-    val titleStyle = MaterialTheme.typography.titleMedium.let {
-        if (isInline) it.copy(fontSize = INLINE_TITLE_SIZE, letterSpacing = INLINE_TITLE_TRACKING) else it
-    }
-    val artistStyle = MaterialTheme.typography.bodyMedium.let {
-        if (isInline) it.copy(fontSize = INLINE_ARTIST_SIZE, letterSpacing = INLINE_ARTIST_TRACKING) else it
-    }
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(
+        fontSize = ACCESSORY_TITLE_SIZE,
+        letterSpacing = ACCESSORY_TITLE_TRACKING,
+    )
+    val artistStyle = MaterialTheme.typography.bodyMedium.copy(
+        fontSize = ACCESSORY_ARTIST_SIZE,
+        letterSpacing = ACCESSORY_ARTIST_TRACKING,
+    )
     val glyphSlot = if (isInline) 32.dp else 40.dp
-    val glyphSize = if (isInline) 24.dp else 32.dp
+    val glyphSize = if (isInline) 24.dp else EXPANDED_GLYPH_SIZE
 
     Box(
         // Inline, the accessory is stretched to the row's height by the tab bar
@@ -377,27 +377,29 @@ private fun GlassNowPlaying(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    // Inline the artwork sits in the end of a capsule, which
-                    // curves away from it; at 8dp its corner met the curve.
-                    start = if (isInline) 16.dp else 12.dp,
+                    // The artwork sits in the end of a capsule, which curves
+                    // away from it; at 8dp its corner met the curve.
+                    start = 16.dp,
                     end = if (isInline) 8.dp else 12.dp,
-                    top = if (isInline) 4.dp else 8.dp,
-                    bottom = if (isInline) 4.dp else 8.dp,
+                    // Expanded, the 40dp play button and these come to the 48dp
+                    // Apple's accessory is.
+                    top = 4.dp,
+                    bottom = 4.dp,
                 ),
         ) {
             // A music video plays in the cover's place at its own 16:9, as in
             // the floating mini player; the full player takes it over when up.
             val artWidth by animateDpAsState(
-                targetValue = if (song.isVideo) artSize * (16f / 9f) else artSize,
+                targetValue = if (song.isVideo) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
                 label = "glassMiniArtWidth",
             )
             Box(
                 modifier = Modifier
-                    .size(width = artWidth, height = artSize)
+                    .size(width = artWidth, height = ACCESSORY_ART_SIZE)
                     // Whichever of the two densities is on screen is the one
                     // the player flies to: only one is composed at rest.
-                    .playerDockArt(dock, artCorner)
-                    .clip(RoundedCornerShape(artCorner))
+                    .playerDockArt(dock, ACCESSORY_ART_CORNER)
+                    .clip(RoundedCornerShape(ACCESSORY_ART_CORNER))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 AsyncImage(
@@ -416,9 +418,9 @@ private fun GlassNowPlaying(
                     )
                 }
             }
-            Spacer(Modifier.width(if (isInline) 8.dp else 10.dp))
-            // Title and artist at both densities, as Apple Music has them; inline
-            // in its smaller, more openly spaced type (see [INLINE_TITLE_SIZE]).
+            Spacer(Modifier.width(if (isInline) 8.dp else 9.dp))
+            // Title and artist at both densities, as Apple Music has them, in its
+            // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]).
             // The inline row shares its width with the tab pill and the Search
             // circle, so both cut with an ellipsis.
             Column(Modifier.weight(1f)) {
@@ -441,7 +443,7 @@ private fun GlassNowPlaying(
                     CircularProgressIndicator(
                         color = contentColor,
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(if (isInline) 18.dp else 22.dp),
+                        modifier = Modifier.size(if (isInline) 18.dp else 20.dp),
                     )
                 }
             } else {
@@ -464,7 +466,8 @@ private fun GlassNowPlaying(
             // tab pill and the Search circle, and the title is what has to
             // survive that, not a second transport button.
             if (!isInline) {
-                Spacer(Modifier.width(8.dp))
+                // Glyph centres 44dp apart, as Apple's are.
+                Spacer(Modifier.width(4.dp))
                 IconButton(
                     onClick = {
                         haptics.play(Haptic.SkipNext)
@@ -483,15 +486,18 @@ private fun GlassNowPlaying(
 }
 
 /**
- * The collapsed row's type, measured off Apple Music's: 13pt over 12pt, set
- * looser than the scale's 16 and 14 — Apple sets these sizes in SF Pro Text,
- * which is spaced wider than the Display cut bundled here.
+ * The accessory's type, measured off Apple's, collapsed and expanded alike:
+ * 13pt over 12pt, set looser than the scale's 16 and 14 — Apple sets these
+ * sizes in SF Pro Text, which is spaced wider than the Display cut bundled here.
  */
-private val INLINE_TITLE_SIZE = 13.sp
-private val INLINE_TITLE_TRACKING = 0.4.sp
-private val INLINE_ARTIST_SIZE = 12.sp
-private val INLINE_ARTIST_TRACKING = 0.35.sp
+private val ACCESSORY_TITLE_SIZE = 13.sp
+private val ACCESSORY_TITLE_TRACKING = 0.4.sp
+private val ACCESSORY_ARTIST_SIZE = 12.sp
+private val ACCESSORY_ARTIST_TRACKING = 0.35.sp
 
-/** The collapsed row's artwork, 0.95 of the 32dp it was, and its corner with it. */
-private val INLINE_ART_SIZE = 30.4.dp
-private val INLINE_ART_CORNER = 5.7.dp
+/** The accessory's artwork, about Apple's 30pt at both densities, and its corner. */
+private val ACCESSORY_ART_SIZE = 30.4.dp
+private val ACCESSORY_ART_CORNER = 5.7.dp
+
+/** The expanded play glyph: its triangle about Apple's 15pt tall. */
+private val EXPANDED_GLYPH_SIZE = 29.dp
