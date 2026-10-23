@@ -597,7 +597,6 @@ private fun BitChordApp(
     var confirmJioSaavn by remember { mutableStateOf(false) }
     var editingPartyServer by remember { mutableStateOf(false) }
     var editingSignatureApi by remember { mutableStateOf(false) }
-    var detailActiveShelf by remember { mutableStateOf<HomeShelf?>(null) }
     var librarySortMenuOpen by remember { mutableStateOf(false) }
     var showLyricsSources by remember { mutableStateOf(false) }
     var showAppLanguage by remember { mutableStateOf(false) }
@@ -720,7 +719,12 @@ private fun BitChordApp(
     // (the gesture or the bar's button alike) undoes exactly that.
     val navigator = viewModel.navigator
     val detailStack by viewModel.detailStack.collectAsStateWithLifecycle()
-    val visibleEntry = navigator.visibleEntry(detailStack.size)
+    val topEntry = navigator.visibleEntry(detailStack.size)
+    // An artist's open shelf is drawn by the artist page itself, so it is not a
+    // route the page area switches to — only the shelf the page is showing.
+    val artistShelfRoute = topEntry?.route as? AppRoute.ArtistShelf
+    val visibleEntry = topEntry?.takeIf { artistShelfRoute == null }
+    val detailActiveShelf = artistShelfRoute?.shelf
     /** The route on screen, or null when a release page or a tab is. */
     val route = visibleEntry?.route
     /**
@@ -862,8 +866,6 @@ private fun BitChordApp(
     val qualityUpgradesInFlight by NerdStats.racingLossless.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val playlistsLoading by viewModel.playlistsLoading.collectAsStateWithLifecycle()
-
-    LaunchedEffect(topDetail?.browseId) { detailActiveShelf = null }
 
     // The Downloads page is a snapshot of the folder, taken when it was opened.
     // Saving a track or deleting one while it is on screen changes what belongs
@@ -2601,9 +2603,6 @@ private fun BitChordApp(
         // and dialog further down registers its own handler as it opens, and
         // so outranks all of these while it is up.
         BackHandler(enabled = canGoBack, onBack = goBack)
-        // An artist page's shelf opened in place: back folds it before it
-        // leaves the page. Only while that page is the one on screen.
-        BackHandler(enabled = detail != null && detailActiveShelf != null) { detailActiveShelf = null }
         // Replay's stories and its share sheet are drawn over everything, and
         // unwind in the order they were opened. Only while there is a summary
         // to draw them from — otherwise back would spend a step closing
@@ -3013,7 +3012,10 @@ private fun BitChordApp(
                                 isPlaying = player.isPlaying,
                                 listState = pageDetailListState,
                                 activeShelf = detailActiveShelf,
-                                onActiveShelfChange = { detailActiveShelf = it },
+                                onActiveShelfChange = { shelf ->
+                                    if (shelf != null) navigator.push(AppRoute.ArtistShelf(page.browseId, shelf))
+                                    else navigator.pop()
+                                },
                                 // Album/playlist playback hands the page snapshot to
                                 // the service, which then owns continuation loading.
                                 onSongClick = ::playDetailSongs,
@@ -3492,6 +3494,7 @@ private fun BitChordApp(
                         AppRoute.Discord -> "Discord"
                         AppRoute.History -> stringResource(R.string.history)
                         is AppRoute.LibraryShowAll -> route.shelf.title
+                        is AppRoute.ArtistShelf -> route.shelf.title
                         AppRoute.Moods -> stringResource(R.string.find_your_mood)
                         AppRoute.AccountScrobbling -> stringResource(R.string.account_scrobbling)
                         AppRoute.Sources -> stringResource(R.string.sources)
@@ -3532,7 +3535,6 @@ private fun BitChordApp(
                     // The same step the back gesture takes — see [goBack] —
                     // offered on anything pushed over a tab.
                     onBack = when {
-                        detail != null && detailActiveShelf != null -> ({ detailActiveShelf = null })
                         route != null || detail != null || selectedMoodGenre != null -> goBack
                         else -> null
                     },
