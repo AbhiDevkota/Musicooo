@@ -161,6 +161,7 @@ fun FloatingBottomBar(
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val glassArea = remember { GlassArea() }
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     // The glass settle is exactly the motion "reduce animation" promises to
     // drop — snapping both the indicator's travel and the glyph's pop to
@@ -217,6 +218,7 @@ fun FloatingBottomBar(
             .padding(horizontal = BAR_GUTTER)
             .padding(bottom = 2.dp)
             .fillMaxWidth()
+            .glassArea(glassArea)
             .clip(pillShape)
             .then(
                 if (reduceDynamicBlur) {
@@ -299,11 +301,9 @@ fun FloatingBottomBar(
         ) {
             // A real glass pill samples whatever artwork is behind it, not the
             // theme's surface color, so a fixed onSurfaceVariant gray can lose
-            // contrast against it. Glass mode reads luminance off the surface
-            // color instead and picks pure black or white, same as the tint
-            // Echo's floating nav bar uses for its own liquid glass.
-            val glassTint = glassContentColor()
-            val adaptiveTint = if (useGlass) glassTint else null
+            // contrast against it. Glass mode picks pure black or white off what
+            // the pill is actually showing — see [glassContentColor].
+            val adaptiveTint = if (useGlass) glassContentColor(glassArea) else null
             tabs.forEachIndexed { index, tab ->
                 BottomBarItem(
                     tab = tab,

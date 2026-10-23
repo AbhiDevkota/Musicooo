@@ -344,8 +344,9 @@ private fun ArtworkPageBackButton(
     val shape = CircleShape
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val glassArea = remember { GlassArea() }
     val contentColor = if (useLiquidGlass && !reduceDynamicBlur) {
-        glassContentColor()
+        glassContentColor(glassArea)
     } else {
         MaterialTheme.colorScheme.onSurface
     }
@@ -354,6 +355,7 @@ private fun ArtworkPageBackButton(
         onClick = onClick,
         modifier = modifier
             .size(44.dp)
+            .glassArea(glassArea)
             .then(artworkPageSurface(shape = shape, hazeState = hazeState)),
     ) {
         Icon(
@@ -371,8 +373,12 @@ private fun ArtworkPageActions(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glass = LocalLiquidGlassEnabled.current && isGlassSupported() && !reduceDynamicBlur
+    val glassArea = remember { GlassArea() }
     Row(
         modifier = modifier
+            .glassArea(glassArea)
             .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState))
             // Keep the right edge fixed while a new action opens room to its
             // left. The surface itself therefore grows instead of jumping to
@@ -390,7 +396,17 @@ private fun ArtworkPageActions(
             .artworkActionEdgePadding(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        content()
+        if (glass) {
+            // The actions are set in the theme's onSurface and primary, each in
+            // its own place; on glass both follow what the pill is showing.
+            val glassContent = glassContentColor(glassArea)
+            MaterialTheme(
+                colorScheme = MaterialTheme.colorScheme.copy(onSurface = glassContent, primary = glassContent),
+                content = content,
+            )
+        } else {
+            content()
+        }
     }
 }
 

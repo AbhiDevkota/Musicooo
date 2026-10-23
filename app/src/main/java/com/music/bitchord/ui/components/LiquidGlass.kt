@@ -81,6 +81,17 @@ private const val SURFACE_OPACITY = 0.4f
 private val LIGHT_GLASS_TINT = Color(0xFFFAFAFA)
 private const val DARK_GLASS_LIFT = 0.08f
 
+/**
+ * How bright glass shows a backdrop of relative luminance [under]: dark glass
+ * adds [DARK_GLASS_LIFT] on top of it, light glass veils it in [LIGHT_GLASS_TINT].
+ */
+internal fun glassLuminanceOver(under: Float, light: Boolean): Float =
+    if (light) {
+        under * (1f - SURFACE_OPACITY) + LIGHT_GLASS_TINT.luminance() * SURFACE_OPACITY
+    } else {
+        under + DARK_GLASS_LIFT
+    }
+
 private fun DrawScope.drawGlassFill(light: Boolean, shape: Shape) {
     val outline = shape.createOutline(size, layoutDirection, this)
     if (light) {
@@ -117,24 +128,12 @@ internal val GLASS_EDGE_WIDTH = 0.5.dp
 internal val GLASS_EDGE_COLOR = Color.White.copy(alpha = 0.10f)
 
 /**
- * Icon and label colour for content sitting on a glass surface.
- *
- * Glass shows whatever is behind it rather than the theme's surface colour, so
- * the usual onSurface greys have nothing dependable to sit against. Pure black
- * or white off the theme's luminance is the only tint that holds against
- * arbitrary artwork, and it is what Echo's own glass nav bar uses.
- */
-@Composable
-fun glassContentColor(): Color =
-    if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White
-
-/**
  * Selected-tab indicator colour for a glass surface: white in both themes.
  *
- * In light theme that is the inverse of [glassContentColor], a bright lift
- * behind a dark glyph. In dark theme it is a faint white lift over the bar's
- * dark glass rather than a black scrim pressed into it — the selected tab is
- * raised out of the bar, as on iOS, not sunk.
+ * In light theme that is the inverse of the glass's dark content colour, a
+ * bright lift behind a dark glyph. In dark theme it is a faint white lift over
+ * the bar's dark glass rather than a black scrim pressed into it — the selected
+ * tab is raised out of the bar, as on iOS, not sunk.
  */
 @Composable
 fun glassIndicatorColor(): Color =

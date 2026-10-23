@@ -111,9 +111,11 @@ fun GlassNavBar(
     // this shape, and a fresh RoundedCornerShape each pass means a fresh factory
     // lambda, which the tab bar sees as a changed argument and recomposes on.
     val pillShape = remember { RoundedCornerShape(percent = 50) }
-    val contentColor = glassContentColor()
-    val selectedColor = contentColor
-    val unselectedColor = contentColor.copy(alpha = 0.65f)
+    // Each tab reads what the glass shows behind its own glyph, and the mini
+    // player and the Search circle read their own surfaces. One reading over
+    // the whole bar averaged a bright cover under one tab in with the dark page
+    // under the rest, and rarely turned anything dark.
+    val tabAreas = remember(tabs.size) { List(tabs.size) { GlassArea() } }
     val haptics = rememberHaptics()
 
     // The tab content lambdas below are captured once per contentKey and held
@@ -149,7 +151,6 @@ fun GlassNavBar(
                     isInline = true,
                     isPlaying = isPlaying,
                     isLoading = isLoading,
-                    contentColor = contentColor,
                     onPlayPause = onPlayPause,
                     onNext = onNext,
                     onPrevious = onPrevious,
@@ -169,7 +170,6 @@ fun GlassNavBar(
                     isInline = false,
                     isPlaying = isPlaying,
                     isLoading = isLoading,
-                    contentColor = contentColor,
                     onPlayPause = onPlayPause,
                     onNext = onNext,
                     onPrevious = onPrevious,
@@ -211,13 +211,13 @@ fun GlassNavBar(
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
-        contentKey = remember(selectedIndex, tabs, contentColor) {
-            listOf(selectedIndex, tabs, contentColor)
+        contentKey = remember(selectedIndex, tabs) {
+            listOf(selectedIndex, tabs)
         },
     ) {
         tabs.forEachIndexed { index, tab ->
             val isSelected = index == selectedIndex
-            val tint = if (isSelected) selectedColor else unselectedColor
+            val area = tabAreas[index]
             val onClick = {
                 if (!isSelected) haptics.play(Haptic.Select)
                 currentOnTabSelected(index)
@@ -226,11 +226,12 @@ fun GlassNavBar(
                 standaloneTab(
                     key = index,
                     icon = {
+                        val tint = tabTint(area, isSelected)
                         Icon(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp).vibrancy(tint),
+                            modifier = Modifier.size(25.dp).glassArea(area).vibrancy(tint),
                         )
                     },
                     onClick = onClick,
@@ -239,14 +240,16 @@ fun GlassNavBar(
                 tab(
                     key = index,
                     icon = {
+                        val tint = tabTint(area, isSelected)
                         Icon(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
                             tint = tint,
-                            modifier = Modifier.size(25.dp).vibrancy(tint),
+                            modifier = Modifier.size(25.dp).glassArea(area).vibrancy(tint),
                         )
                     },
                     title = {
+                        val tint = tabTint(area, isSelected)
                         Text(
                             text = tab.label,
                             style = MaterialTheme.typography.labelSmall,
@@ -264,6 +267,13 @@ fun GlassNavBar(
             }
         }
     }
+}
+
+/** A tab's glyph and label colour, read off what the glass shows behind its icon. */
+@Composable
+private fun tabTint(area: GlassArea, selected: Boolean): Color {
+    val content = glassContentColor(area)
+    return if (selected) content else content.copy(alpha = 0.65f)
 }
 
 /**
@@ -285,7 +295,6 @@ private fun GlassNowPlaying(
     isInline: Boolean,
     isPlaying: Boolean,
     isLoading: Boolean,
-    contentColor: Color,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -304,6 +313,9 @@ private fun GlassNowPlaying(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "accessoryPressScale",
     )
+
+    val glassArea = remember { GlassArea() }
+    val contentColor = glassContentColor(glassArea)
 
     val artSize = if (isInline) 32.dp else 40.dp
     // Collapsed, the cover is a circle, as in the iOS 26 bar: it sits at the
@@ -348,6 +360,7 @@ private fun GlassNowPlaying(
                 scaleY = pressScale
             }
             .then(modifier)
+            .glassArea(glassArea)
             .clickable(
                 interactionSource = pressSource,
                 indication = null,
