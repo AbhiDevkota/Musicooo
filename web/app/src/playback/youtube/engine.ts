@@ -29,7 +29,21 @@ export interface LoadedTrack {
   client: PlayerClientName;
   /** The audio format actually selected, e.g. "251 opus 140kbps". */
   format: string;
+  /** The same, field by field, for stats for nerds. */
+  stream: StreamStats;
   loudnessDb: number | null;
+}
+
+/** What stats for nerds shows about the audio stream (the phone's NerdStats.Snapshot). */
+export interface StreamStats {
+  /** "Opus", "AAC". */
+  codec: string | null;
+  itag: string | null;
+  bitrateKbps: number | null;
+  sampleRateHz: number | null;
+  channels: number | null;
+  /** "direct" (googlevideo URLs, by range) or "SABR". */
+  mode: 'direct' | 'SABR';
 }
 
 /** A music video's picture: a video-only DASH manifest over the same response's direct URLs. */
@@ -224,7 +238,8 @@ export class YouTubeEngine {
       player.load(`data:application/dash+xml;base64,${btoa(manifest)}`, startSec, 'application/dash+xml'),
     );
     this.checkCurrent(generation);
-    const format = `${this.selectAudio(player)} ${mode}`;
+    const selected = this.selectAudio(player);
+    const format = `${selected.label} ${mode}`;
     if (direct) this.direct = resolved;
 
     if (autoplay) {
@@ -249,6 +264,7 @@ export class YouTubeEngine {
         .sort((a, b) => b.width - a.width),
       client,
       format,
+      stream: { ...selected.stats, mode },
       loudnessDb: info.player_config?.audio_config?.loudness_db ?? null,
     };
   }
@@ -375,8 +391,15 @@ export class YouTubeEngine {
   }
 
   /** Picks Opus 251 (else AAC 140): the preferred codec's highest bitrate, avoiding DRC renditions. */
-  private selectAudio(player: shaka.Player): string {
+  private selectAudio(player: shaka.Player): { label: string; stats: Omit<StreamStats, 'mode'> } {
     const tracks = player.getVariantTracks().filter((t) => !/drc/i.test(t.originalAudioId ?? ''));
+    const statsOf = (t: shaka.extern.Track) => ({
+      codec: codecName(t.audioCodec),
+      itag: (t.originalAudioId ?? '').split('-')[0] || null,
+      bitrateKbps: Math.round((t.audioBandwidth ?? t.bandwidth) / 1000) || null,
+      sampleRateHz: t.audioSamplingRate,
+      channels: t.channelsCount,
+    });
     for (const codec of this.preferredCodecs) {
       const best = tracks
         .filter((t) => t.audioCodec?.startsWith(codec))
@@ -384,11 +407,13 @@ export class YouTubeEngine {
       if (best) {
         if (!best.active) player.selectVariantTrack(best, true);
         const itag = (best.originalAudioId ?? '').split('-')[0];
-        return `${itag} ${codec} ${Math.round((best.audioBandwidth ?? best.bandwidth) / 1000)}kbps`;
+        return { label: `${itag} ${codec} ${Math.round((best.audioBandwidth ?? best.bandwidth) / 1000)}kbps`, stats: statsOf(best) };
       }
     }
     const active = player.getVariantTracks().find((t) => t.active);
-    return active ? `${active.originalAudioId} ${active.audioCodec}` : 'unknown';
+    return active
+      ? { label: `${active.originalAudioId} ${active.audioCodec}`, stats: statsOf(active) }
+      : { label: 'unknown', stats: { codec: null, itag: null, bitrateKbps: null, sampleRateHz: null, channels: null } };
   }
 
   /** Resolves once the element has data to play, or rejects after the timeout. */
@@ -447,6 +472,16 @@ export class YouTubeEngine {
     this.adapter?.dispose();
     this.adapter = null;
   }
+}
+
+/** The codec under its usual name rather than its RFC 6381 string (the phone's codecLabel). */
+function codecName(codec: string | null): string | null {
+  if (!codec) return null;
+  if (codec.startsWith('opus')) return 'Opus';
+  if (codec.startsWith('mp4a')) return 'AAC';
+  if (codec.startsWith('ec-3')) return 'E-AC-3';
+  if (codec.startsWith('ac-3')) return 'AC-3';
+  return codec.toUpperCase();
 }
 
 /** Whether the response carries audio URLs to fetch directly (VISIONOS does; the web clients only offer SABR). */

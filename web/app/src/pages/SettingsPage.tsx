@@ -9,6 +9,7 @@ import { useExtension } from '@/extension/useExtension';
 import { useYtAuth } from '@/extension/useYtAuth';
 import { useParty } from '@/party/useParty';
 import { useHistorySettings } from '@/playback/historyReporting';
+import { AUTOMIX_BARS } from '@/playback/automix/choices';
 import { CROSSFADE_CHOICES, usePlayer } from '@/state/player';
 import { AppleMusicIntegration, AppleMusicToggles, CanvasToggle, DiscordIntegration, LyricSourcesAccess, SpotifyIntegration, Toggle } from './IntegrationSettings';
 import { settingsUi } from './settingsStyles';
@@ -58,9 +59,13 @@ export default function SettingsPage() {
   const party = useParty();
   const autoplay = usePlayer((s) => s.autoplay);
   const crossfadeSec = usePlayer((s) => s.crossfadeSec);
+  const automix = usePlayer((s) => s.automix);
+  const automixBars = usePlayer((s) => s.automixBars);
+  const automixEnergy = usePlayer((s) => s.automixEnergy);
+  const showNerdStats = usePlayer((s) => s.showNerdStats);
   const shareHistory = useHistorySettings((s) => s.share);
   const setShareHistory = useHistorySettings((s) => s.setShare);
-  const { setAutoplay, setCrossfade } = usePlayer.getState();
+  const { setAutoplay, setCrossfade, setAutomix, setAutomixBars, setAutomixEnergy, setShowNerdStats } = usePlayer.getState();
   const [lyrics, setLyrics] = useState(false);
   const present = extension.state === 'present';
   const discordText =
@@ -143,15 +148,63 @@ export default function SettingsPage() {
           />
           <label className={settingsUi.controlRow}>
             <span>Crossfade</span>
-            <select className={settingsUi.select} value={crossfadeSec} onChange={(e) => setCrossfade(Number(e.currentTarget.value))}>
+            <select
+              className={settingsUi.select}
+              value={automix ? 'automix' : crossfadeSec}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                if (value === 'automix') setAutomix(true);
+                else setCrossfade(Number(value));
+              }}
+            >
               {CROSSFADE_CHOICES.map((seconds) => (
                 <option key={seconds} value={seconds}>
                   {seconds === 0 ? 'Off' : `${seconds} seconds`}
                 </option>
               ))}
+              <option value="automix">Automix</option>
             </select>
           </label>
+          {automix && (
+            <>
+              <label className={settingsUi.controlRow}>
+                <span>Blend Length</span>
+                <select className={settingsUi.select} value={automixBars} onChange={(e) => setAutomixBars(Number(e.currentTarget.value))}>
+                  {AUTOMIX_BARS.map((bars) => (
+                    <option key={bars} value={bars}>
+                      Up to {bars} bars
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={settingsUi.controlRow}>
+                <span>AutoPlay Energy</span>
+                <select
+                  className={settingsUi.select}
+                  value={automixEnergy}
+                  onChange={(e) => setAutomixEnergy(Number(e.currentTarget.value) as -1 | 0 | 1)}
+                >
+                  <option value={1}>Build up</option>
+                  <option value={0}>Keep steady</option>
+                  <option value={-1}>Wind down</option>
+                </select>
+              </label>
+            </>
+          )}
+          <Toggle
+            label="Show Stats for Nerds"
+            detail="Codec, bitrate and sample rate under the artist in the full-screen player, and what Automix is doing."
+            checked={showNerdStats}
+            onChange={setShowNerdStats}
+          />
         </section>
+        {automix && (
+          <p className={settingsUi.footer}>
+            Automix finds each song’s tempo, key and phrases, then blends on the beat: the next song is time-stretched to match, and
+            the bass swaps over halfway. It picks the AutoPlay song that fits best. Songs it can’t read in time get a plain
+            12-second crossfade. Based on AutoMix by David Finnegan (AGPL-3.0).
+          </p>
+        )}
 
         <h2 className={settingsUi.sectionHeader}>Lyrics</h2>
         <section className={settingsUi.group}>

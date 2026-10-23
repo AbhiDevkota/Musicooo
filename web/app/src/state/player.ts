@@ -21,7 +21,8 @@ import {
   type QueueSource,
 } from '@/playback/queue/timeline';
 import { trackLog } from '@/playback/trackLog';
-import type { LoadedTrack, YouTubeEngine } from '@/playback/youtube/engine';
+import type { LoadedTrack, StreamStats, YouTubeEngine } from '@/playback/youtube/engine';
+import type { AutomixGraph, AutoDJSnapshot, EnergyDirection } from '@/playback/automix';
 
 export interface NowPlaying {
   videoId: string;
@@ -32,6 +33,8 @@ export interface NowPlaying {
   durationSec: number;
   /** "251 opus 140kbps via VISIONOS", once known; for the debug panel. */
   streamInfo: string | null;
+  /** The audio stream field by field, once known; for stats for nerds. */
+  stream: (StreamStats & { client: string }) | null;
 }
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'buffering' | 'error';
@@ -48,6 +51,14 @@ interface Settings {
   volume: number;
   muted: boolean;
   crossfadeSec: number;
+  /** AutoMix: beat-matched, phrase-aligned DJ blends between tracks (playback/automix). Overrides crossfadeSec. */
+  automix: boolean;
+  /** AutoMix's blend length, in bars: a maximum, shortened for weak beat grids. */
+  automixBars: number;
+  /** Which way AutoMix steers the AutoPlay radio's energy: down, steady or up. */
+  automixEnergy: EnergyDirection;
+  /** Stats for nerds: the stream's codec, bitrate and sample rate, and what Automix is doing, under the artist. */
+  showNerdStats: boolean;
 }
 
 interface PlayerState extends Settings {
@@ -60,6 +71,8 @@ interface PlayerState extends Settings {
   error: string | null;
   /** Bumped whenever the audio element in front changes (crossfade swaps them). */
   deck: number;
+  /** AutoMix's loop, while it runs: what it plans and when. */
+  automixState: AutoDJSnapshot | null;
 
   /** Plays [tracks] as the context (an album, a playlist), from [startIndex]. */
   playTracks: (tracks: Track[], startIndex: number, source: QueueSource) => void;
@@ -86,12 +99,27 @@ interface PlayerState extends Settings {
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   setCrossfade: (seconds: number) => void;
+  setAutomix: (on: boolean) => void;
+  setAutomixBars: (bars: number) => void;
+  setAutomixEnergy: (direction: EnergyDirection) => void;
+  setShowNerdStats: (on: boolean) => void;
 }
 
 // ---- Settings, kept across visits ---------------------------------------------------
 
 const SETTINGS_KEY = 'bitchord:player';
-const DEFAULT_SETTINGS: Settings = { shuffle: false, repeat: 'off', autoplay: true, volume: 1, muted: false, crossfadeSec: 0 };
+const DEFAULT_SETTINGS: Settings = {
+  shuffle: false,
+  repeat: 'off',
+  autoplay: true,
+  volume: 1,
+  muted: false,
+  crossfadeSec: 0,
+  automix: false,
+  automixBars: 16,
+  automixEnergy: 0,
+  showNerdStats: false,
+};
 
 function loadSettings(): Settings {
   try {
@@ -102,8 +130,11 @@ function loadSettings(): Settings {
 }
 
 function saveSettings(state: Settings) {
-  const { shuffle, repeat, autoplay, volume, muted, crossfadeSec } = state;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ shuffle, repeat, autoplay, volume, muted, crossfadeSec }));
+  const { shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, automixEnergy, showNerdStats } = state;
+  localStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({ shuffle, repeat, autoplay, volume, muted, crossfadeSec, automix, automixBars, automixEnergy, showNerdStats }),
+  );
 }
 
 // ---- Decks: two engines, so a crossfade can play the next track under this one ------------
@@ -163,7 +194,149 @@ function getDecks(): Promise<Deck[]> {
 
 function applyVolumes() {
   const { volume, muted } = usePlayer.getState();
-  for (const deck of decks ?? []) deck.audio.volume = muted ? 0 : Math.min(1, Math.max(0, volume * deck.gain));
+  const level = muted ? 0 : Math.min(1, Math.max(0, volume));
+  if (graph) {
+    // Routed through Web Audio: the elements stay at 1 and the graph carries volume and the fade.
+    const now = graph.ctx.currentTime;
+    graph.master.gain.setTargetAtTime(level, now, 0.015);
+    (decks ?? []).forEach((deck, n) => {
+      deck.audio.volume = 1;
+      graph!.decks[n]!.fader.gain.setTargetAtTime(deck.gain, now, 0.015);
+    });
+    return;
+  }
+  for (const deck of decks ?? []) deck.audio.volume = level * deck.gain;
+}
+
+// ---- AutoMix (playback/automix): the two decks routed through Web Audio, mixed like a DJ ----
+
+let graph: AutomixGraph | null = null;
+let graphPromise: Promise<AutomixGraph | null> | null = null;
+/** The track AutoMix loaded on the back deck, for the handoff. */
+let mixLoaded: { videoId: string; track: LoadedTrack } | null = null;
+/**
+ * A loop mix is running: the decks carry the sound and both elements are
+ * paused or started by the mix, so their pause, waiting and ended events
+ * aren't the user's and mustn't move the player.
+ */
+let holding = false;
+
+/** Builds the Web Audio graph and the mix loop over the decks, once. */
+function ensureAutomix(): Promise<AutomixGraph | null> {
+  const all = decks;
+  if (!all) return Promise.resolve(null);
+  graphPromise ??= import('@/playback/automix').then(({ createAutomixGraph, analyzer }) => {
+    const built = createAutomixGraph(
+      all.map((d) => d.audio),
+      (routed) => ({
+        front: () => routed[active]!,
+        back: () => routed[1 - active]!,
+        current: () => {
+          // A party doesn't mix: every member would blend on their own clock (the phone stops too).
+          if (partyHooks?.inParty()) return null;
+          const { queue, index, status } = usePlayer.getState();
+          const entry = queue[index];
+          return entry && status === 'playing' ? queued(entry) : null;
+        },
+        next: () => {
+          const plan = planNext(true);
+          return plan?.kind === 'index' ? queued(plan.queue[plan.index]!) : null;
+        },
+        autoplayCandidates,
+        promote: promoteAutoplay,
+        loadBack: async (videoId) => {
+          const back = all[1 - active]!;
+          back.gain = 1;
+          applyVolumes();
+          try {
+            const track = await back.engine.load(videoId, { autoplay: false });
+            mixLoaded = { videoId, track };
+            return true;
+          } catch (error) {
+            if (!(error instanceof Error && error.name === 'SupersededError')) {
+              trackLog.w(`automix couldn't load the next track: ${String(error)}`, videoId);
+            }
+            return false;
+          }
+        },
+        handoff: automixHandoff,
+        hold: (on) => {
+          holding = on;
+          if (on) usePlayer.setState({ status: 'playing' });
+        },
+        finished: () => {
+          void all[1 - active]!.engine.stop().catch(() => {});
+        },
+      }),
+      (snap) => usePlayer.setState({ automixState: snap }),
+    );
+    graph = built;
+    applyVolumes();
+    if (import.meta.env.DEV) Object.assign(window, { __bcAutomix: built, __bcAnalyzer: analyzer });
+    return built;
+  });
+  return graphPromise;
+}
+
+function queued(entry: QueueEntry) {
+  return { videoId: entry.track.videoId, title: entry.track.title, artist: artistNames(entry.track) };
+}
+
+/** The AutoPlay run that comes next, when the next track is AutoPlay's (nobody chose it by hand). */
+function autoplayCandidates() {
+  const { queue } = usePlayer.getState();
+  const plan = planNext(true);
+  if (plan?.kind !== 'index' || plan.queue !== queue || queue[plan.index]?.tier !== 'autoplay') return [];
+  const run: QueueEntry[] = [];
+  for (let i = plan.index; i < queue.length && queue[i]!.tier === 'autoplay'; i++) run.push(queue[i]!);
+  return run.map(queued);
+}
+
+function promoteAutoplay(videoId: string) {
+  const { queue, index } = usePlayer.getState();
+  const from = queue.findIndex((e, i) => i > index && e.tier === 'autoplay' && e.track.videoId === videoId);
+  const to = index + 1;
+  if (from <= to) return;
+  const next = [...queue];
+  const [entry] = next.splice(from, 1);
+  next.splice(to, 0, entry!);
+  usePlayer.setState({ queue: next });
+  trackLog.i('automix moved this AutoPlay track up: the best harmonic match', videoId);
+}
+
+/** The blend's midpoint: the incoming track is the one playing now, as far as everything else knows. */
+function automixHandoff() {
+  if (!decks) return;
+  const loaded = mixLoaded;
+  mixLoaded = null;
+  const plan = planNext(true);
+  const entry = plan?.kind === 'index' ? plan.queue[plan.index] : undefined;
+  if (!plan || plan.kind !== 'index' || !entry || !loaded || entry.track.videoId !== loaded.videoId) {
+    trackLog.w('automix handoff found the queue moved; playing on', loaded?.videoId ?? null);
+    graph?.dj.cancel();
+    return;
+  }
+  active = 1 - active;
+  usePlayer.setState((s) => ({ queue: plan.queue, index: plan.index, deck: s.deck + 1, status: 'playing' }));
+  applyTrack(loaded.track, entry.track);
+  afterTrackStarted();
+  intent();
+}
+
+/** Starts or stops the mix loop to match the setting; the first start builds the graph. */
+function syncAutomix() {
+  if (!usePlayer.getState().automix) {
+    graph?.dj.stop();
+    return;
+  }
+  void ensureAutomix().then((g) => {
+    const { automix, automixBars, automixEnergy } = usePlayer.getState();
+    if (!g || !automix) return;
+    void g.ctx.resume();
+    g.dj.transitionBars = automixBars;
+    g.dj.energyDirection = automixEnergy;
+    g.dj.start();
+  });
 }
 
 function extensionReady(): boolean {
@@ -181,6 +354,7 @@ function hintOf(track: Track): NowPlaying {
     artworkUrl: track.thumbnail,
     durationSec: track.durationSec ?? 0,
     streamInfo: null,
+    stream: null,
   };
 }
 
@@ -223,6 +397,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   status: 'idle',
   error: null,
   deck: 0,
+  automixState: null,
 
   playTracks(tracks, startIndex, source) {
     if (!tracks.length) return;
@@ -325,10 +500,14 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   },
 
   togglePlay() {
+    // A loop mix holds both elements paused: settle it onto a playing song first.
+    if (graph?.dj.loopMixing) cancelCrossfade();
     const audio = getAudio();
     const { nowPlaying, status, index } = get();
     if (!nowPlaying) return;
     const resuming = !audio || audio.paused || status === 'error';
+    // A routed graph left suspended (no gesture when it was built) would play silence.
+    if (resuming) void graph?.ctx.resume();
     // A listener in a party the host has locked: the press moves this device alone.
     if (partyHooks?.onLockedTransport(resuming)) return;
     if (!audio || status === 'error') {
@@ -406,13 +585,43 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   },
 
   setCrossfade(crossfadeSec) {
-    set({ crossfadeSec });
+    set({ crossfadeSec, automix: false });
+    saveSettings(get());
+    syncAutomix();
+  },
+
+  setAutomix(automix) {
+    set({ automix, automixState: automix ? get().automixState : null });
+    saveSettings(get());
+    syncAutomix();
+  },
+
+  setAutomixBars(automixBars) {
+    set({ automixBars });
+    saveSettings(get());
+    if (graph) graph.dj.transitionBars = automixBars;
+  },
+
+  setAutomixEnergy(automixEnergy) {
+    set({ automixEnergy });
+    saveSettings(get());
+    if (graph) graph.dj.energyDirection = automixEnergy;
+  },
+
+  setShowNerdStats(showNerdStats) {
+    set({ showNerdStats });
     saveSettings(get());
   },
 }));
 
 // For browser-driven tests, next to __bcAudio.
-if (import.meta.env.DEV) Object.assign(window, { __bcPlayer: usePlayer });
+if (import.meta.env.DEV) {
+  Object.assign(window, {
+    __bcPlayer: usePlayer,
+    // AutoMix's analysis self-test: expect BPM ≈ 123.93 and Camelot 8A.
+    __automixSelfTest: () => import('@/playback/automix/analysis/selftest').then((m) => m.analysisSelfTest()),
+  });
+}
 
 function positions(queue: readonly QueueEntry[]): Map<string, number> {
   return new Map(queue.map((e, i) => [e.entryId, i]));
@@ -464,6 +673,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
     applyTrack(track, entry.track);
     if (!autoplay) usePlayer.setState({ status: 'paused' });
     afterTrackStarted();
+    syncAutomix();
   } catch (error) {
     if (token !== loadToken || (error instanceof Error && error.name === 'SupersededError')) return;
     const message = error instanceof Error ? error.message : String(error);
@@ -609,6 +819,12 @@ const FADE_STEP_MS = 40;
 let fade: { token: number; frame: number; pending: boolean } | null = null;
 
 function cancelCrossfade() {
+  // AutoMix's blend or preloaded next track goes the same way as a fade: the deck in front plays on.
+  if (graph && (graph.dj.mixing || mixLoaded)) {
+    mixLoaded = null;
+    graph.dj.cancel();
+    if (decks) void decks[1 - active]!.engine.stop().catch(() => {});
+  } else graph?.dj.cancel();
   if (!fade) return;
   clearTimeout(fade.frame);
   const wasPending = fade.pending;
@@ -624,7 +840,7 @@ function cancelCrossfade() {
 /** Called as the track in front plays: within the crossfade length of its end, start the next one underneath. */
 function maybeCrossfade() {
   const state = usePlayer.getState();
-  if (!decks || fade || !state.crossfadeSec || state.status !== 'playing') return;
+  if (!decks || fade || state.automix || !state.crossfadeSec || state.status !== 'playing') return;
   const front = decks[active]!;
   const remaining = front.audio.duration - front.audio.currentTime;
   if (!Number.isFinite(remaining) || remaining > state.crossfadeSec || remaining < 1) return;
@@ -694,6 +910,7 @@ function applyTrack(track: LoadedTrack, from?: Track) {
     artworkUrl: from?.thumbnail ?? track.thumbnails[0]?.url ?? null,
     durationSec: track.durationSec || from?.durationSec || 0,
     streamInfo: `${track.format} via ${track.client}`,
+    stream: { ...track.stream, client: track.client },
   };
   usePlayer.setState({ nowPlaying, error: null });
   updateMediaSession(nowPlaying);
@@ -712,7 +929,7 @@ function bindElement(deck: Deck, n: number) {
   const element = deck.audio;
   const inFront = () => active === n;
   const set = (status: PlayerStatus) => {
-    if (!inFront()) return;
+    if (!inFront() || holding) return;
     if (usePlayer.getState().status === 'error' && status !== 'playing') return;
     usePlayer.setState({ status });
   };
@@ -722,12 +939,14 @@ function bindElement(deck: Deck, n: number) {
   });
   element.addEventListener('waiting', () => set('buffering'));
   element.addEventListener('ended', () => {
-    if (!inFront()) return;
+    if (!inFront() || holding) return;
     // The track ran out before the crossfade's next one could start: give up
     // on the fade and play the next track here. Waiting on it was silence for
     // as long as that load took, which on a slow or failing load (each client
     // gets 15 s for first audio) came to half a minute.
     if (fade?.pending) cancelCrossfade();
+    // AutoMix's outgoing track ran out before the blend's midpoint (a stall): the incoming one is already playing.
+    if (graph?.dj.forceHandoff()) return;
     // The queue moving on by itself is the user's intent, as far as a party is concerned.
     void advance(true).then(intent);
   });
@@ -777,8 +996,10 @@ function updateMediaSession(track: NowPlaying | null) {
   };
   const player = () => usePlayer.getState();
   // Through the store, so a party hears about them like any other press.
-  handle('play', () => getAudio()?.paused && player().togglePlay());
-  handle('pause', () => getAudio()?.paused === false && player().togglePlay());
+  // A loop mix holds the elements paused while it plays: that's playing, for the keys.
+  const sounding = () => graph?.dj.loopMixing || getAudio()?.paused === false;
+  handle('play', () => !sounding() && player().togglePlay());
+  handle('pause', () => sounding() && player().togglePlay());
   handle('seekto', (details) => {
     if (details.seekTime !== undefined) player().seek(details.seekTime);
   });
