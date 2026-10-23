@@ -121,13 +121,12 @@ function useAnalyzer(): typeof Analyzer | null {
  * The stretch of the seek bar the next Automix blend covers (the phone's
  * transitionWindow): brighter than the unplayed track, under the played
  * fill, feathered at both ends because a blend has no hard edge in time.
- * While the blend runs it pulses on the beat. Place it inside the bar's
- * track, before the fill.
+ * Once the blend runs it steps aside for the fill's own beat pulse
+ * (useScrubber). Place it inside the bar's track, before the fill.
  */
 export function MixWindowHighlight() {
   const mix = usePlayer((s) => s.automixState?.window ?? null);
   const startsIn = usePlayer((s) => s.automixState?.startsInSec ?? null);
-  const beatSec = usePlayer((s) => s.automixState?.beatSec ?? null);
   const videoId = usePlayer((s) => s.nowPlaying?.videoId);
   const duration = usePlayer((s) => s.nowPlaying?.durationSec ?? 0);
   const automix = usePlayer((s) => s.automix);
@@ -141,18 +140,18 @@ export function MixWindowHighlight() {
   if (!w || duration <= 0) return null;
   const left = Math.max(0, Math.min(1, w.startSec / duration));
   const right = Math.max(left, Math.min(1, w.endSec / duration));
-  const blending = visible && startsIn !== null && startsIn <= 0 && beatSec !== null;
+  // once the blend runs, the bar's own fill covers it and breathes on the beat (useScrubber)
+  const blending = startsIn !== null && startsIn <= 0;
   return (
     <div
       className="pointer-events-none absolute inset-y-0 transition-opacity duration-500"
-      style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%`, opacity: visible ? 1 : 0 }}
+      style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%`, opacity: visible && !blending ? 1 : 0 }}
       aria-hidden="true"
     >
       <div
         className="size-full bg-tertiary"
         style={{
           maskImage: 'linear-gradient(to right, transparent, #000 30%, #000 70%, transparent)',
-          animation: blending ? `mix-beat ${beatSec}s ease-out infinite` : undefined,
         }}
       />
     </div>

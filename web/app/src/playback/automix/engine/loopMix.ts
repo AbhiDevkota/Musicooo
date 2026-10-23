@@ -310,3 +310,34 @@ export function scheduleLoopMix(plan: LoopMixPlan, outDeck: LoopDeck, inDeck: Lo
 export function deckTrackTime(deck: LoopDeck): number {
   return deck.inputTime;
 }
+
+/**
+ * Where a song is in its own seconds at AudioContext time [t] during the
+ * loop mix, worked out from the same beat clock the decks were scheduled on
+ * (so it loops and follows the tempo ramp exactly). Null where that side
+ * isn't sounding from a deck: the outgoing song before t0 and after its loop
+ * stops; the incoming song before t0.
+ */
+export function mixPositionAt(plan: LoopMixPlan, times: LoopMixTimes, side: 'out' | 'in', t: number): number | null {
+  const bt = times.beatTimes;
+  if (t < times.t0) return null;
+  const beats = plan.totalBars * 4;
+  const loopBeats = LOOP_BARS * 4;
+  if (side === 'in' && t >= times.releaseAt) return plan.in.loop[1] + (t - times.releaseAt);
+  if (side === 'out' && t >= times.releaseAt) return null;
+  let k = 0;
+  while (k + 1 < bt.length && bt[k + 1]! <= t) k++;
+  const frac = Math.min(1, (t - bt[k]!) / (bt[k + 1]! - bt[k]!));
+  if (k >= beats) return null;
+  if (side === 'out') return plan.out.loop[0] + ((k % loopBeats) + frac) * plan.out.beatSec;
+  return plan.in.loop[0] + (((k * plan.fold) % loopBeats) + frac * plan.fold) * plan.in.beatSec;
+}
+
+/** Where in its beat the mix is at [t], 0 on the beat and rising to 1; null outside the mix. */
+export function mixBeatPhaseAt(times: LoopMixTimes, t: number): number | null {
+  const bt = times.beatTimes;
+  if (t < times.t0 || t >= bt[bt.length - 1]!) return null;
+  let k = 0;
+  while (k + 1 < bt.length && bt[k + 1]! <= t) k++;
+  return (t - bt[k]!) / (bt[k + 1]! - bt[k]!);
+}

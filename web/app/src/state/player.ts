@@ -71,6 +71,8 @@ interface PlayerState extends Settings {
   deck: number;
   /** AutoMix's loop, while it runs: what it plans and when. */
   automixState: AutoDJSnapshot | null;
+  /** A loop mix is playing from its decks: read the position from getPlayhead(), not the element. */
+  mixing: boolean;
 
   /** Plays [tracks] as the context (an album, a playlist), from [startIndex]. */
   playTracks: (tracks: Track[], startIndex: number, source: QueueSource) => void;
@@ -149,6 +151,27 @@ let active = 0;
 /** The audio element in front, if playback has started at least once. */
 export function getAudio(): HTMLAudioElement | null {
   return decks?.[active]?.audio ?? null;
+}
+
+/**
+ * Where the song in front is, in seconds, and whether it's moving. Its
+ * element, except while a loop mix plays it from a deck: then the mix's own
+ * beat clock, which loops and follows the tempo ramp (the element is paused
+ * underneath). The lyrics and the seek bars read this.
+ */
+export function getPlayhead(): { sec: number; paused: boolean } | null {
+  const audio = getAudio();
+  const { mixing, nowPlaying } = usePlayer.getState();
+  if (mixing && graph && nowPlaying) {
+    const sec = graph.dj.mixPlayhead(nowPlaying.videoId);
+    if (sec !== null) return { sec, paused: false };
+  }
+  return audio ? { sec: audio.currentTime, paused: audio.paused } : null;
+}
+
+/** The running Automix blend's beat (phase 0 on the beat), for the seek bar's pulse; null between blends. */
+export function getMixBeat(): { phase: number | null } | null {
+  return graph?.dj.mixBeat() ?? null;
 }
 
 function getDecks(): Promise<Deck[]> {
@@ -256,7 +279,7 @@ function ensureAutomix(): Promise<AutomixGraph | null> {
         handoff: automixHandoff,
         hold: (on) => {
           holding = on;
-          if (on) usePlayer.setState({ status: 'playing' });
+          usePlayer.setState(on ? { status: 'playing', mixing: true } : { mixing: false });
         },
         finished: () => {
           void all[1 - active]!.engine.stop().catch(() => {});
@@ -369,6 +392,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   error: null,
   deck: 0,
   automixState: null,
+  mixing: false,
 
   playTracks(tracks, startIndex, source) {
     if (!tracks.length) return;

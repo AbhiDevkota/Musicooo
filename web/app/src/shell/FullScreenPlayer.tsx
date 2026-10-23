@@ -45,7 +45,7 @@ function useBrowserFullScreen(): boolean {
 
 /** The seek line under the track's names: thicker on hover, with the times beneath its ends. */
 function Scrubber() {
-  const { bar, elapsed, remaining, dragging, handlers } = useScrubber();
+  const { bar, elapsed, remaining, mixLabel, dragging, handlers } = useScrubber();
   return (
     <div className="group/scrub mt-3.5" data-dragging={dragging || undefined}>
       {/* A taller hit area than the line it carries. */}
@@ -61,8 +61,11 @@ function Scrubber() {
           />
         </div>
       </div>
-      <div className="mt-0.5 flex justify-between type-[500_11px/14px] tabular-nums text-tertiary">
+      <div className="relative mt-0.5 flex justify-between type-[500_11px/14px] tabular-nums text-tertiary">
         <span ref={elapsed} />
+        <span ref={mixLabel} className="pointer-events-none absolute inset-x-0 text-center text-secondary opacity-0" aria-hidden="true">
+          Mixing
+        </span>
         <span ref={remaining} />
       </div>
     </div>

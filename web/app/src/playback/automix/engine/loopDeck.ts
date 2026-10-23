@@ -51,6 +51,8 @@ export class LoopDeck {
     };
     this.gain = new GainNode(ctx, { gain: 0 });
     stretch.connect(this.eq.input);
+    // AutoMix's: keeps inputTime current (the default leaves it stale)
+    stretch.setUpdateInterval(0.05);
     this.eq.output.connect(this.sweep.highpass).connect(this.sweep.lowpass).connect(this.gain).connect(destination);
   }
 

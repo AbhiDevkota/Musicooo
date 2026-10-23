@@ -17,6 +17,8 @@ import { asOutgoing, gridOf, phraseAtOrBefore } from './grid';
 import type { LoopDeck } from './loopDeck';
 import {
   IN_REGION_SEC,
+  mixBeatPhaseAt,
+  mixPositionAt,
   OUT_REGION_SEC,
   OUT_SEARCH_SEC,
   planLoopMix,
@@ -151,6 +153,38 @@ export class AutoDJ {
     };
   }
 
+  /**
+   * Where [videoId] is right now in its own seconds while a loop mix plays it
+   * from a deck (looping, at the ramped tempo); null when its element is
+   * what's playing it. The lyrics, the seek bar and a cancelled mix read this.
+   */
+  mixPlayhead(videoId: string): number | null {
+    const plan = this.loopPlan;
+    const times = this.loopTimes;
+    if (!plan || !times) return null;
+    const side = videoId === plan.out.key ? 'out' : videoId === plan.in.key ? 'in' : null;
+    return side ? mixPositionAt(plan, times, side, this.host.ctx.currentTime) : null;
+  }
+
+  /**
+   * The running mix's beat, for the seek bar's pulse: [phase] 0 on the beat,
+   * rising to 1; null phase when the tempo isn't known. Null between mixes.
+   */
+  mixBeat(): { phase: number | null } | null {
+    if (this.state !== 'scheduled' || !this.plan) return null;
+    const now = this.host.ctx.currentTime;
+    if (this.loopTimes) {
+      const phase = mixBeatPhaseAt(this.loopTimes, now);
+      return phase === null ? null : { phase };
+    }
+    const { t0, durationSec } = this.plan;
+    if (now < t0 || now > t0 + durationSec) return null;
+    const beat = this.beatSec;
+    if (!beat) return { phase: null };
+    const x = (now - t0) / beat;
+    return { phase: x - Math.floor(x) };
+  }
+
   /** True while a loop mix runs: both elements are held paused and the decks carry the sound. */
   get loopMixing(): boolean {
     return this.state === 'scheduled' && this.loopTimes !== null;
@@ -190,7 +224,11 @@ export class AutoDJ {
       const onIncoming = this.blend.handedOff;
       const keep = onIncoming ? this.blend.to : this.blend.from;
       const drop = onIncoming ? this.blend.from : this.blend.to;
-      const at = (onIncoming ? inDeck : outDeck).inputTime;
+      // where the song really is in the mix (the deck's own report lags and starts stale)
+      const at =
+        this.mixPlayhead((onIncoming ? this.loopPlan?.in.key : this.loopPlan?.out.key) ?? '') ??
+        (onIncoming ? this.loopTimes.elementTrackTime : this.loopPlan?.out.loop[0]) ??
+        keep.audio.currentTime;
       outDeck.stop();
       inDeck.stop();
       drop.cancel();

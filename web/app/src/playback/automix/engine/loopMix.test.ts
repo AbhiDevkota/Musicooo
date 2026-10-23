@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('signalsmith-stretch', () => ({ default: vi.fn() }));
 import type { TrackAnalysis } from '../analysis/types';
 import type { LoopChange, LoopDeck } from './loopDeck';
-import { LOOP_BARS, planLoopMix, scheduleLoopMix, sungShare } from './loopMix';
+import { LOOP_BARS, mixBeatPhaseAt, mixPositionAt, planLoopMix, scheduleLoopMix, sungShare } from './loopMix';
 
 const SR = 1000;
 
@@ -173,5 +173,45 @@ describe('sungShare', () => {
     expect(sungShare(w, 0, 10)).toBeCloseTo(0.5, 9);
     expect(sungShare(w, 0, 5)).toBe(0);
     expect(sungShare(w, 8, 14)).toBeNull();
+  });
+});
+
+describe('mixPositionAt', () => {
+  const plan = planLoopMix(analysis('o', 111, 200), buffer(200), analysis('i', 169, 180), buffer(180), 0)!;
+  const times = scheduleLoopMix(plan, fakeDeck(), fakeDeck(), 100);
+
+  it('is nothing before the mix, and the loop start at its first beat', () => {
+    expect(mixPositionAt(plan, times, 'out', 99.9)).toBeNull();
+    expect(mixPositionAt(plan, times, 'out', 100)).toBeCloseTo(plan.out.loop[0], 9);
+    expect(mixPositionAt(plan, times, 'in', 100)).toBeCloseTo(plan.in.loop[0], 9);
+  });
+
+  it('stays inside each loop, wrapping back to its start', () => {
+    let sawWrap = false;
+    let last = -1;
+    for (let t = 100; t < times.releaseAt; t += 0.05) {
+      const out = mixPositionAt(plan, times, 'out', t)!;
+      expect(out).toBeGreaterThanOrEqual(plan.out.loop[0] - 1e-9);
+      expect(out).toBeLessThanOrEqual(plan.out.loop[1] + 1e-9);
+      if (out < last - 1) sawWrap = true;
+      last = out;
+      const inn = mixPositionAt(plan, times, 'in', t)!;
+      expect(inn).toBeGreaterThanOrEqual(plan.in.loop[0] - 1e-9);
+      expect(inn).toBeLessThanOrEqual(plan.in.loop[1] + 1e-9);
+    }
+    expect(sawWrap).toBe(true);
+  });
+
+  it('lets the incoming song go on from its loop end in real time, and the outgoing one stop', () => {
+    expect(mixPositionAt(plan, times, 'out', times.releaseAt + 0.1)).toBeNull();
+    expect(mixPositionAt(plan, times, 'in', times.releaseAt)).toBeCloseTo(plan.in.loop[1], 9);
+    expect(mixPositionAt(plan, times, 'in', times.elementAt)).toBeCloseTo(times.elementTrackTime, 9);
+  });
+
+  it('puts the beat phase at 0 on every scheduled beat', () => {
+    expect(mixBeatPhaseAt(times, times.beatTimes[5]!)).toBeCloseTo(0, 9);
+    const mid = (times.beatTimes[5]! + times.beatTimes[6]!) / 2;
+    expect(mixBeatPhaseAt(times, mid)).toBeCloseTo(0.5, 9);
+    expect(mixBeatPhaseAt(times, 99)).toBeNull();
   });
 });
