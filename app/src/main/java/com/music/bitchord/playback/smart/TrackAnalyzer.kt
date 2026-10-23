@@ -63,7 +63,10 @@ import java.util.Locale
 class TrackAnalyzer(private val context: Context, private val cache: AudioCache) {
 
     private val tracker = BeatTracker(
-        modelPath = { unpackedAsset(BeatTracker.MODEL_ASSET) },
+        modelPath = {
+            java.io.File(context.filesDir, BeatTracker.RETIRED_MODEL_ASSET).delete()
+            unpackedAsset(BeatTracker.MODEL_ASSET)
+        },
         inferenceThreads = { AppSettings.automixPerformanceMode.value.inferenceThreads },
     )
     private val vocals = VocalTracker(
@@ -1058,6 +1061,9 @@ class TrackAnalyzer(private val context: Context, private val cache: AudioCache)
                 "conf=${leading?.beatConfidence ?: features.beatConfidence} " +
                 "key=${features.key} contentEnd=${features.contentEndTime} " +
                 "mixOutCandidates=${features.mixOutCandidates.size} " +
+                "grid=${if (leading != null) "model" else "dsp"} " +
+                "beats=${headGrid?.beats?.size ?: 0}+${tailGrid?.beats?.size ?: 0} " +
+                "downbeats=${headGrid?.downbeats?.size ?: 0}+${tailGrid?.downbeats?.size ?: 0} " +
                 "vocalMask=${if (head?.vocalMask != null || tail?.vocalMask != null) "model" else "dsp"}",
         )
 
