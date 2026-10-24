@@ -1814,7 +1814,9 @@ class PlaybackService : MediaLibraryService() {
         val resolver = streamResolver ?: return@withContext null
         // Ungated: the receiver plays items this player is not on.
         val resolved = DirectSourceGate.ungated { resolver.resolveDataSpec(DataSpec(uri)) }.uri
-        if (resolved.scheme != "http" && resolved.scheme != "https") {
+        if (resolved.scheme == "http" || resolved.scheme == "https") {
+            CastStream(resolved.toString(), CastPlayback.mimeTypeOf(resolved))
+        } else {
             // The item's URI may be a local/offline path for a downloaded track.
             // Fall back to resolving the remote stream URL using the same path
             // non-downloaded tracks use, so the receiver gets an HTTP URL it can
@@ -1827,7 +1829,7 @@ class PlaybackService : MediaLibraryService() {
                 if (id.isBlank()) return@let null
                 "bitchord://watch?v=$id"
             }
-            val result = if (fallback != null) {
+            if (fallback != null) {
                 runCatching {
                     DirectSourceGate.ungated { resolver.resolveDataSpec(DataSpec(fallback.toUri())) }.uri
                         .takeIf { it.scheme == "http" || it.scheme == "https" }
@@ -1835,9 +1837,6 @@ class PlaybackService : MediaLibraryService() {
                     CastStream(url.toString(), CastPlayback.mimeTypeOf(url))
                 }
             } else null
-            return result
-        } else {
-            CastStream(resolved.toString(), CastPlayback.mimeTypeOf(resolved))
         }
     }
 
