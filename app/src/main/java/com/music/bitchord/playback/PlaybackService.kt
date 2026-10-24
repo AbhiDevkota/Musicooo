@@ -1827,11 +1827,13 @@ class PlaybackService : MediaLibraryService() {
                 if (id.isBlank()) return@let null
                 "bitchord://watch?v=$id"
             }
-            if (fallback != null) {
+            return if (fallback != null) {
                 runCatching {
                     DirectSourceGate.ungated { resolver.resolveDataSpec(DataSpec(fallback.toUri())) }.uri
                         .takeIf { it.scheme == "http" || it.scheme == "https" }
-                }.getOrNull()
+                }.getOrNull()?.let { url ->
+                    CastStream(url.toString(), CastPlayback.mimeTypeOf(url))
+                }
             } else null
         } else {
             CastStream(resolved.toString(), CastPlayback.mimeTypeOf(resolved))
