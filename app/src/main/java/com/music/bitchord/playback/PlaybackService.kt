@@ -1827,7 +1827,7 @@ class PlaybackService : MediaLibraryService() {
                 if (id.isBlank()) return@let null
                 "bitchord://watch?v=$id"
             }
-            return if (fallback != null) {
+            val result = if (fallback != null) {
                 runCatching {
                     DirectSourceGate.ungated { resolver.resolveDataSpec(DataSpec(fallback.toUri())) }.uri
                         .takeIf { it.scheme == "http" || it.scheme == "https" }
@@ -1835,6 +1835,7 @@ class PlaybackService : MediaLibraryService() {
                     CastStream(url.toString(), CastPlayback.mimeTypeOf(url))
                 }
             } else null
+            return result
         } else {
             CastStream(resolved.toString(), CastPlayback.mimeTypeOf(resolved))
         }
