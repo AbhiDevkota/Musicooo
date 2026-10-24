@@ -743,6 +743,14 @@ object AppSettings {
     val smartAnalysis = MutableStateFlow(SmartAnalysis())
 
     /**
+     * Automix's detailed line for stats for nerds: each song's analysis while
+     * it waits, then the planned mix (a loop mix's loops and tempo ramp, a
+     * blend's length and stretch, or why the pair isn't beatmatched). Published
+     * by the crossfade controller; null while Automix is off.
+     */
+    val automixDetail = MutableStateFlow<String?>(null)
+
+    /**
      * Where on the *playing* track the next transition is planned to happen, as
      * fractions of its duration, or null when there is nothing worth drawing.
      *

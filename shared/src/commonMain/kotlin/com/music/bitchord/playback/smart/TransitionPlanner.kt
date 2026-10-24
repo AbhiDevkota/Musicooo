@@ -277,7 +277,7 @@ private fun isUnmixablePair(analysis: TrackAnalysis, nextAnalysis: TrackAnalysis
     val currentBpm = analysis.bpm.orZero()
     val nextBpm = nextAnalysis.bpm.orZero()
     if (currentBpm <= 0 || nextBpm <= 0) return false
-    if (speedUpBetween(currentBpm, nextBpm) - 1 <= MAX_SPEED_UP) return false
+    if (stretchReachable(currentBpm, nextBpm)) return false
     val left = trustedKey(analysis)
     val right = trustedKey(nextAnalysis)
     val keyClash = left.isNotEmpty() && right.isNotEmpty() && !harmonicallyCompatible(left, right)
@@ -570,7 +570,7 @@ private fun phraseBarPlan(
     val beatmatched = policy.tier == TransitionTier.BEATMATCHED
     val nextBpm = nextAnalysis.bpm.orZero()
     val alignedIncomingBpm = alignTempoOctave(outgoingBpm, nextBpm)
-    val tempoFar = nextBpm > 0 && speedUpBetween(outgoingBpm, nextBpm) - 1 > MAX_SPEED_UP
+    val tempoFar = nextBpm > 0 && !stretchReachable(outgoingBpm, nextBpm)
     val mediaRatio =
         if (nextBpm > 0 && !tempoFar) roundRate(1.0 / normalizedTempoRatio(outgoingBpm, nextBpm)) else 1.0
     val incomingPlaybackRate = incomingRateFor(mediaRatio, advanced)
@@ -1078,10 +1078,10 @@ private fun phraseSwitch(
         nextDuration = nextLength,
         advanced = advanced,
     ) as? WsolaPlanResult.Planned ?: return null
-    // Advanced mode never slows the incoming song or retimes the audible
-    // outgoing song. A phrase switch that requires either degrades to the
-    // vocal-aware filter planner below.
-    if (advanced && planned.stretchRatio < 1.0) return null
+    // The incoming song is slowed by at most 10% and sped up by at most 25%;
+    // the audible outgoing song is never retimed. A phrase switch that needs
+    // more degrades to the vocal-aware filter planner below.
+    if (planned.stretchRatio !in MIN_INCOMING_RATE..MAX_INCOMING_RATE) return null
 
     val overlap = planned.transitionEnd - planned.transitionStart
     val renderedIncomingRate = incomingRateFor(planned.stretchRatio, advanced)
@@ -1138,18 +1138,16 @@ private data class Overlap(
     val incomingPlaybackRate: Double,
 )
 
-/** The tempo ratios [adaptiveOverlap] stretches the incoming track across; outside it the grids flam. */
-private val STRETCH_WINDOW = 0.9..1.1
-
 /**
  * How fast the incoming track plays for a blend whose incoming timeline must
- * run [mediaRatio] times the outgoing one's. Classically that is simply the
- * ratio, up or down. Advanced only speeds up the incoming track. Changing the
- * already-audible outgoing deck's AudioTrack rate causes discontinuities on
- * some Android routes, so a faster incoming track uses a filter transition.
+ * run [mediaRatio] times the outgoing one's: the ratio itself, inside the
+ * stretch window ([MIN_INCOMING_RATE]..[MAX_INCOMING_RATE]), in both modes.
+ * Changing the already-audible outgoing deck's AudioTrack rate causes
+ * discontinuities on some Android routes, so only the incoming one moves.
  */
+@Suppress("UNUSED_PARAMETER")
 private fun incomingRateFor(mediaRatio: Double, advanced: Boolean): Double =
-    roundRate(if (advanced && mediaRatio < 1) 1.0 else mediaRatio)
+    roundRate(clamp(mediaRatio, MIN_INCOMING_RATE, MAX_INCOMING_RATE))
 
 /** The audible outgoing deck is never tempo-shifted. */
 private fun outgoingRateFor(mediaRatio: Double, advanced: Boolean): Double =
@@ -1199,7 +1197,7 @@ private class PairTraits(analysis: TrackAnalysis, nextAnalysis: TrackAnalysis) {
     private val nextBpm = nextAnalysis.bpm.orZero()
 
     /** Too far apart for either to be sped up to the other, so both kicks would flam. */
-    val tempoFar = currentBpm > 0 && nextBpm > 0 && speedUpBetween(currentBpm, nextBpm) - 1 > MAX_SPEED_UP
+    val tempoFar = currentBpm > 0 && nextBpm > 0 && !stretchReachable(currentBpm, nextBpm)
     val keyClash: Boolean = run {
         val left = trustedKey(analysis)
         val right = trustedKey(nextAnalysis)
@@ -1328,7 +1326,7 @@ private fun adaptiveOverlap(
         // the two players. Advanced stretches anything a speed-up can meet.
         incomingPlaybackRate = when {
             traits != null -> if (traits.tempoFar) 1.0 else roundRate(1 / ratio)
-            ratio in STRETCH_WINDOW -> roundRate(clamp(1 / ratio, 0.9, 1.1))
+            1 / ratio in MIN_INCOMING_RATE..MAX_INCOMING_RATE -> roundRate(1 / ratio)
             else -> 1.0
         },
     )

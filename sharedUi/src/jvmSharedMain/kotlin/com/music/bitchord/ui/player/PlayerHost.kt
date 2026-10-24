@@ -244,6 +244,12 @@ interface PlayerSettingsSource {
     val reduceDynamicBlur: StateFlow<Boolean>
     val showNerdStats: StateFlow<Boolean>
     val smartAnalysis: StateFlow<SmartAnalysis>
+    /**
+     * Automix's detailed stats line — both songs' analysis, then the planned
+     * mix (loop lengths and what cleared them, the tempo ramp) — or null when
+     * there is nothing to say beyond [smartAnalysis].
+     */
+    val automixDetail: StateFlow<String?>
     val smartFadeEnabled: StateFlow<Boolean>
     /** True only while an analysed Automix transition is audibly mixing two tracks. */
     val smartMixInProgress: StateFlow<Boolean>
