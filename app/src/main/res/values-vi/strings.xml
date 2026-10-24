@@ -1289,4 +1289,11 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Tệp đã mở</string>
+    <string name="folders">Thư mục</string>
+    <string name="folder">Thư mục</string>
+    <string name="no_local_folders">Không có thư mục nào chứa nhạc</string>
+    <string name="offline_playlist_empty">Danh sách phát này vẫn trống. Thêm bài hát từ menu của chúng.</string>
+    <string name="offline_liked_empty">Các bài hát bạn thích trên thiết bị này sẽ hiện ở đây</string>
+    <string name="saved_on_this_device">Đã lưu trên thiết bị này</string>
 </resources>

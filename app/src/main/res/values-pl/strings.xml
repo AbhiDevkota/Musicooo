@@ -1412,4 +1412,11 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Otwarty plik</string>
+    <string name="folders">Foldery</string>
+    <string name="folder">Folder</string>
+    <string name="no_local_folders">Brak folderów z muzyką</string>
+    <string name="offline_playlist_empty">Ta playlista jest jeszcze pusta. Dodaj utwory z ich menu.</string>
+    <string name="offline_liked_empty">Utwory polubione na tym urządzeniu pojawią się tutaj</string>
+    <string name="saved_on_this_device">Zapisano na tym urządzeniu</string>
 </resources>

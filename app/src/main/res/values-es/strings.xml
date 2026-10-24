@@ -1344,4 +1344,11 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Archivo abierto</string>
+    <string name="folders">Carpetas</string>
+    <string name="folder">Carpeta</string>
+    <string name="no_local_folders">No hay carpetas con música</string>
+    <string name="offline_playlist_empty">Esta lista aún está vacía. Añade canciones desde su menú.</string>
+    <string name="offline_liked_empty">Las canciones que te gusten en este dispositivo aparecerán aquí</string>
+    <string name="saved_on_this_device">Guardada en este dispositivo</string>
 </resources>
