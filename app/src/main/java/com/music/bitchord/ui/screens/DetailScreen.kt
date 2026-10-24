@@ -1617,7 +1617,6 @@ private fun ActionPill(
     Row(
         modifier = modifier
             .height(size)
-            .glassArea(area)
             .then(
                 if (filled) {
                     Modifier.background(Color.White, CircleShape)
@@ -1631,7 +1630,9 @@ private fun ActionPill(
                 haptics.play(Haptic.Resume)
                 onClick()
             }
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 24.dp)
+            // Inside the padding: what is under the glyph and the label.
+            .glassArea(area),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1728,7 +1729,6 @@ private fun CircleIconButton(
         modifier = Modifier
             .size(size)
             .alpha(if (enabled) 1f else DISABLED_ACTION_ALPHA)
-            .glassArea(area)
             .detailGlass(CircleShape)
             // After the surface: glass draws its outline just outside its edge.
             .clip(CircleShape)
@@ -1742,7 +1742,8 @@ private fun CircleIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = detailGlassContent(area),
-            modifier = Modifier.size(size * 0.44f),
+            // What is under the glyph, not the whole circle round it.
+            modifier = Modifier.size(size * 0.44f).glassArea(area),
         )
     }
 }
@@ -2250,7 +2251,6 @@ private fun TopReleaseCard(
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .glassArea(area)
                     .detailGlass(CircleShape)
                     // After the surface: glass draws its outline just outside its edge.
                     .clip(CircleShape)
@@ -2266,7 +2266,7 @@ private fun TopReleaseCard(
                         if (saved) R.string.remove_from_library else R.string.add_to_library,
                     ),
                     tint = detailGlassContent(area),
-                    modifier = Modifier.size(17.dp),
+                    modifier = Modifier.size(17.dp).glassArea(area),
                 )
             }
         }

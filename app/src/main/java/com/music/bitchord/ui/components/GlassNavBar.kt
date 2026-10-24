@@ -376,7 +376,6 @@ private fun GlassNowPlaying(
                 scaleY = pressScale
             }
             .then(modifier)
-            .glassArea(glassArea)
             .clickable(
                 interactionSource = pressSource,
                 indication = null,
@@ -430,67 +429,74 @@ private fun GlassNowPlaying(
                 }
             }
             Spacer(Modifier.width(if (isInline) 8.dp else 9.dp))
-            // Title and artist at both densities, as Apple Music has them, in its
-            // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]). The inline
-            // row shares its width with the tab pill and the Search circle, so
-            // a long line fades out at its end, as Apple's does.
-            Column(Modifier.weight(1f)) {
-                val secondary = contentColor.copy(alpha = 0.7f)
-                ExplicitSongTitle(
-                    song = song,
-                    style = titleStyle,
-                    color = contentColor,
-                    badgeColor = secondary,
-                    fadeOverflow = true,
-                )
-                FadingLine(
-                    text = song.artist,
-                    style = artistStyle,
-                    color = secondary,
-                    modifier = Modifier.vibrancy(contentColor),
-                )
-            }
-            if (isLoading) {
-                Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
+            // Everything after the artwork, which is the region the glyphs and
+            // the words read the glass under: the sleeve covers what is behind it.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).glassArea(glassArea),
+            ) {
+                // Title and artist at both densities, as Apple Music has them, in its
+                // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]). The inline
+                // row shares its width with the tab pill and the Search circle, so
+                // a long line fades out at its end, as Apple's does.
+                Column(Modifier.weight(1f)) {
+                    val secondary = contentColor.copy(alpha = 0.7f)
+                    ExplicitSongTitle(
+                        song = song,
+                        style = titleStyle,
                         color = contentColor,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(if (isInline) 18.dp else 20.dp),
+                        badgeColor = secondary,
+                        fadeOverflow = true,
+                    )
+                    FadingLine(
+                        text = song.artist,
+                        style = artistStyle,
+                        color = secondary,
+                        modifier = Modifier.vibrancy(contentColor),
                     )
                 }
-            } else {
-                IconButton(
-                    onClick = {
-                        haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
-                        onPlayPause()
-                    },
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = contentColor,
-                        modifier = Modifier.size(glyphSize),
-                    )
+                if (isLoading) {
+                    Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            color = contentColor,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(if (isInline) 18.dp else 20.dp),
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = {
+                            haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
+                            onPlayPause()
+                        },
+                        modifier = Modifier.size(glyphSlot),
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
+                            tint = contentColor,
+                            modifier = Modifier.size(glyphSize),
+                        )
+                    }
                 }
-            }
-            // Dropped inline: the collapsed row is sharing its width with the
-            // tab pill and the Search circle, and the title is what has to
-            // survive that, not a second transport button.
-            if (!isInline) {
-                // Glyph centres 44dp apart, as Apple's are.
-                Spacer(Modifier.width(4.dp))
-                IconButton(
-                    onClick = {
-                        haptics.play(Haptic.SkipNext)
-                        onNext()
-                    },
-                    enabled = !controlsLocked,
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    MiniPlayerNextGlyph(
-                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
-                    )
+                // Dropped inline: the collapsed row is sharing its width with the
+                // tab pill and the Search circle, and the title is what has to
+                // survive that, not a second transport button.
+                if (!isInline) {
+                    // Glyph centres 44dp apart, as Apple's are.
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = {
+                            haptics.play(Haptic.SkipNext)
+                            onNext()
+                        },
+                        enabled = !controlsLocked,
+                        modifier = Modifier.size(glyphSlot),
+                    ) {
+                        MiniPlayerNextGlyph(
+                            tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                        )
+                    }
                 }
             }
         }

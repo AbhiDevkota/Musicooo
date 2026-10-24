@@ -322,7 +322,13 @@ fun FrostedTopBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (accessory != null) {
-                    Box(Modifier.weight(1f)) { accessory() }
+                    Box(Modifier.weight(1f)) {
+                        if (useFloatingChrome) {
+                            ArtworkPageAccessory(hazeState = backButtonHazeState, content = accessory)
+                        } else {
+                            accessory()
+                        }
+                    }
                     Spacer(Modifier.width(ACCESSORY_GAP))
                 }
                 if (useFloatingChrome) {
@@ -359,13 +365,14 @@ private fun ArtworkPageBackButton(
         onClick = onClick,
         modifier = modifier
             .size(TOP_CONTROL_SIZE)
-            .glassArea(glassArea)
             .then(artworkPageSurface(shape = shape, hazeState = hazeState)),
     ) {
         Icon(
             Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = stringResource(R.string.back),
             tint = contentColor,
+            // What is under the glyph, not the whole circle round it.
+            modifier = Modifier.glassArea(glassArea),
         )
     }
 }
@@ -446,6 +453,45 @@ private fun ActionsRow(modifier: Modifier, content: @Composable () -> Unit) {
         }
     }
 }
+
+/**
+ * The bar's accessory — the Search tab's field — on the same surface as the
+ * controls either side of it, at their height: a squircle pill of the bar's
+ * glass, its glyphs and words in what the glass shows.
+ */
+@Composable
+private fun ArtworkPageAccessory(hazeState: HazeState?, content: @Composable () -> Unit) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glass = LocalLiquidGlassEnabled.current && isGlassSupported() && !reduceDynamicBlur
+    val glassArea = remember { GlassArea() }
+    val shape = remember { SquirclePillShape() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TOP_CONTROL_SIZE)
+            .glassArea(glassArea)
+            .then(artworkPageSurface(shape = shape, hazeState = hazeState)),
+    ) {
+        CompositionLocalProvider(LocalSearchFieldOnSurface provides true) {
+            if (glass) {
+                val glassContent = glassContentColor(glassArea)
+                MaterialTheme(
+                    colorScheme = MaterialTheme.colorScheme.copy(
+                        onBackground = glassContent,
+                        onSurfaceVariant = glassContent.copy(alpha = ACCESSORY_HINT_ALPHA),
+                        primary = glassContent,
+                    ),
+                    content = content,
+                )
+            } else {
+                content()
+            }
+        }
+    }
+}
+
+/** The field's hint and glyphs on glass, against its typed text at full strength. */
+private const val ACCESSORY_HINT_ALPHA = 0.6f
 
 /**
  * Edge padding that collapses only for the profile-only state.

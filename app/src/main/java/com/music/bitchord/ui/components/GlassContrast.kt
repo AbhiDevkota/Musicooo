@@ -54,8 +54,8 @@ import kotlinx.coroutines.flow.collectLatest
  * recording is drawn at [SAMPLE_SCALE] of its size and read back: one small
  * readback shared by every control over that backdrop. Working it out on the
  * GPU instead would take a layer and a shader pass over every glass surface on
- * every frame, which is what made scrolling drop frames before. A twelfth is
- * still finer than any control, and the glass blurs what is under it anyway.
+ * every frame, which is what made scrolling drop frames before. An eighth is
+ * finer than any glyph, and the glass blurs what is under it anyway.
  */
 @Stable
 class BackdropLuminance internal constructor(
@@ -99,18 +99,29 @@ class BackdropLuminance internal constructor(
         samples++
     }
 
-    /** The mean relative luminance under [bounds], in window coordinates; null before the first sample. */
+    /**
+     * How bright it is under [bounds], in window coordinates, at its brighter
+     * end: the luminance [BRIGHT_SHARE] of the region is at or above. Null
+     * before the first sample.
+     *
+     * Not the mean. A glyph over a dark sleeve with a white patch under part
+     * of it stayed white, because the patch averaged away into the dark round
+     * it — and the part of the glyph over the patch vanished. Read at the
+     * brighter end, a patch a quarter of the region wide is enough to turn it.
+     */
     internal fun luminanceIn(bounds: Rect): Float? {
         if (width == 0) return null
         val left = ((bounds.left - origin.x) * SAMPLE_SCALE).toInt().coerceIn(0, width - 1)
         val right = ceil((bounds.right - origin.x) * SAMPLE_SCALE).toInt().coerceIn(left + 1, width)
         val top = ((bounds.top - origin.y) * SAMPLE_SCALE).toInt().coerceIn(0, height - 1)
         val bottom = ceil((bounds.bottom - origin.y) * SAMPLE_SCALE).toInt().coerceIn(top + 1, height)
-        var sum = 0f
+        val values = FloatArray((right - left) * (bottom - top))
+        var i = 0
         for (y in top until bottom) {
-            for (x in left until right) sum += Color(pixels[y * width + x]).luminance()
+            for (x in left until right) values[i++] = Color(pixels[y * width + x]).luminance()
         }
-        return sum / ((right - left) * (bottom - top))
+        values.sort()
+        return values[((values.size - 1) * (1f - BRIGHT_SHARE)).toInt()]
     }
 }
 
@@ -202,8 +213,14 @@ fun glassContentColor(area: GlassArea): Color {
     return color
 }
 
-/** The fraction of its size the backdrop is sampled at. */
-private const val SAMPLE_SCALE = 1f / 12f
+/**
+ * The fraction of its size the backdrop is sampled at: a sample every 8px, 3dp
+ * at 3x, fine enough to find a patch under a single glyph's stroke.
+ */
+private const val SAMPLE_SCALE = 1f / 8f
+
+/** How much of a region has to be bright for its content to turn dark. */
+private const val BRIGHT_SHARE = 0.25f
 
 /** How often it is sampled — well inside the crossfade, so the glyphs keep up with a scroll. */
 private const val SAMPLE_INTERVAL_MS = 150L
