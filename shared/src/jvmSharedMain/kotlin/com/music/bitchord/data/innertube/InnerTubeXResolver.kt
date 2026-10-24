@@ -292,7 +292,9 @@ object InnerTubeXResolver {
             audioQuality = AudioQuality.LOW,
             clientPlaybackNonce = generateClientPlaybackNonce(),
         ) ?: return null
-        val url = stream.videoUrl ?: return null
+        // A live broadcast's video-only URL is a window that ends in seconds,
+        // like its audio one; no picture beats a frozen one.
+        val url = stream.videoUrl?.takeUnless(StreamResolver::isLiveUrl) ?: return null
         val width = stream.videoWidth ?: 0
         val height = stream.videoHeight ?: 0
         val mime = stream.videoMimeType.orEmpty()
