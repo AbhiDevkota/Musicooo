@@ -45,7 +45,7 @@
     <string name="shuffle">셔플</string>
     <string name="more">더보기</string>
     <string name="lyrics_offset">가사 오프셋</string>
-    <string name="auto_quick_picks">빠른 선택</string>
+    <string name="auto_quick_picks">빠른 선곡</string>
     <string name="auto_recents">최근</string>
     <string name="auto_liked">좋아요 표시한 음악</string>
     <string name="auto_login_title">폰에서 YouTube에 로그인하세요</string>
@@ -365,7 +365,7 @@
     <string name="hide_song_status">음악 상태 숨김</string>
     <string name="show_queue_history">대기열 기록 표시</string>
     <string name="show_queue_history_subtitle">이전에 재생한 최대 25곡을 대기열의 지금 재생 중인 곡 위에 표시합니다</string>
-   <string name="hide_song_status_subtitle">메인 플레이어에서 “Playing from”, “Played by” 등의 문구를 숨깁니다</string> //FIXME:
+   <string name="hide_song_status_subtitle">메인 플레이어에서 “—에서 재생”, “— 님이 재생함” 등의 문구를 숨깁니다</string>
     <string name="off">끔</string>
     <string name="low">낮음</string>
     <string name="medium">보통</string>
@@ -549,7 +549,7 @@
     <string name="about_album">앨범 정보</string>
     <string name="nothing_matches">“%1$s”에 맞는 항목 없음</string>
     <string name="close_search">검색 닫기</string>
-    <string name="less">Less</string>
+    <string name="less">덜보기</string>
     <string name="song_count_with_minutes">%1$s, %2$d분</string>
     <string name="song_count_with_duration">%1$s, %2$s</string>
     <string name="song_count_with_hours_minutes">%1$s, %2$s %3$d분</string>
