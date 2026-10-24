@@ -461,10 +461,15 @@ fun SettingsScreen(
             val directSourceTitle = stringResource(R.string.direct_source_stream)
             // Drawn like the animated-cover cellular line: no icon, no divider.
             row(directSourceTitle, "addon", "direct", "prefetch", "read-ahead", divided = false) {
+                // Off for the length of a party: holding every fetch until a
+                // track is about to play would leave this phone behind the
+                // others at each sync — see [DirectSourceGate.isActive].
                 SettingsSubRow(
                     title = directSourceTitle,
-                    checked = directSourceStream,
+                    checked = directSourceStream && !party.inParty,
                     onCheckedChange = AppSettings::setDirectSourceStream,
+                    subtitle = stringResource(R.string.direct_source_stream_in_party).takeIf { party.inParty },
+                    enabled = !party.inParty,
                 )
             }
             val onWifiTitle = stringResource(R.string.on_wifi)
@@ -2526,11 +2531,13 @@ internal fun SettingsSubRow(
     onCheckedChange: (Boolean) -> Unit,
     badge: String? = null,
     subtitle: String? = null,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .alpha(if (enabled) 1f else 0.45f)
             .padding(start = ROW_INSET, end = ROW_INSET, top = 0.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -2560,6 +2567,7 @@ internal fun SettingsSubRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                 checkedBorderColor = MaterialTheme.colorScheme.primary,

@@ -1,6 +1,7 @@
 package com.music.bitchord.playback
 
 import com.music.bitchord.data.TrackLog
+import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sources.SourceResolver
 import com.music.bitchord.data.sources.SourceStream
@@ -64,9 +65,16 @@ object DirectSourceGate {
      */
     const val LOOKUP_TIMEOUT_MS = 15_000L
 
-    /** Whether Direct Source Stream is on *and* has an addon to stream from. */
+    /**
+     * Whether Direct Source Stream is on *and* has an addon to stream from.
+     *
+     * Never during a Listen Together party: a party seeks every member to the
+     * host's position and expects the track to be there, and a fetch held
+     * until the window opens would leave this phone behind the others.
+     */
     fun isActive(): Boolean =
-        AppSettings.directSourceStream.value && SourceResolver.directAddons().isNotEmpty()
+        AppSettings.directSourceStream.value && !ListenTogether.state.value.inParty &&
+            SourceResolver.directAddons().isNotEmpty()
 
     private data class Open(val playing: Set<String>, val next: String?)
 
@@ -108,7 +116,9 @@ object DirectSourceGate {
     suspend fun awaitOpen(mediaId: String) {
         if (bypass.get() == true || !isActive() || open.value.admits(mediaId)) return
         TrackLog.d(TAG, "holding $mediaId until it is within ${WINDOW_MS / 1000}s of playing", about = mediaId)
-        combine(open, AppSettings.directSourceStream) { state, on -> !on || state.admits(mediaId) }
+        combine(open, AppSettings.directSourceStream, ListenTogether.state) { state, on, party ->
+            !on || party.inParty || state.admits(mediaId)
+        }
             .first { it }
         TrackLog.d(TAG, "released $mediaId", about = mediaId)
     }
