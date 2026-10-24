@@ -66,7 +66,7 @@
     <string name="d_show_motion_artwork_when_it_is_available">가능하면 움직이는 아트워크 표시</string>
     <string name="d_sign_in_to_last_fm">Last.fm에 로그인</string>
     <string name="d_song">노래</string>
-    <string name="d_sort_library">보관함 정렬</string>
+    <string name="d_sort_library">라이브러리 정렬</string>
     <string name="d_sources_are_tried_in_this_order">이 순서대로 소스에 접근합니다. 드래그하여 순서를 변경하세요. 음절 단위 가사를 우선으로 설정하지 않았다면 가사가 있는 첫 번째 소스를 사용합니다.</string>
     <string name="d_there_s_no_music_in_the_queue">대기열에 음악이 없습니다.</string>
     <string name="d_third_party_licenses">서드파티 라이선스</string>

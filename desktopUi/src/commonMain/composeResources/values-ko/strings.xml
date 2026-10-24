@@ -141,9 +141,10 @@
     <string name="card_views_format">조회 %1$s회</string>
     <string name="clear_search">검색 지우기</string>
     <string name="downloaded">다운로드</string>
-    <string name="explore">둘러보기</string>
-    <string name="library">보관함</string>
-    <string name="library_sign_in_description">Google 계정에 로그인하여 좋아요 표시한 음악, 재생목록, YouTube Music 기록을 확인하세요.</string>
+    <string name="explore">탐색</string>
+    <string name="library">라이브러리</string>
+    <string name="library_sign_in_description">Google 계정에 로그인하여 좋아요 표시한 음악, 재생목록, YouTube Music 기록을
+        확인하세요.</string>
     <string name="new_playlist">새 재생목록</string>
     <string name="on_device">기기에 저장됨</string>
     <string name="personalized_recommendations">맞춤 추천 받기</string>
@@ -177,7 +178,7 @@
     <string name="shelf_for_you">추천</string>
     <string name="shelf_forgotten_favorites">잊고 있던 좋은 음악</string>
     <string name="shelf_from_the_community">커뮤니티 제공</string>
-    <string name="shelf_from_your_library">내 보관함</string>
+    <string name="shelf_from_your_library">내 라이브러리</string>
     <string name="shelf_hits_today">오늘의 히트곡</string>
     <string name="shelf_listen_again">다시 듣기</string>
     <string name="shelf_mixed_for_you">맞춤 믹스</string>
