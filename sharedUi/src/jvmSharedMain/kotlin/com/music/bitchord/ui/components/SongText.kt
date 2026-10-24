@@ -3,6 +3,8 @@ package com.music.bitchord.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -30,6 +32,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
@@ -101,6 +104,36 @@ fun FadingLine(text: String, style: TextStyle, color: Color, modifier: Modifier 
         // that fits has nothing to fade.
         modifier = modifier.then(if (overflowing) Modifier.fadingEdges(LINE_FADE, end = FullFade) else Modifier),
     )
+}
+
+/**
+ * Text over at most [maxLines] lines that, where it is too long for them, fades
+ * out at the end of its last line rather than ending in an ellipsis.
+ *
+ * A clipped paragraph would wrap its last line short at a word, leaving it
+ * nowhere near the edge it fades at. So the lines before the last are set as
+ * the paragraph sets them and the rest runs on unbroken as a [FadingLine].
+ * Give [style] a line height trimmed of nothing (`LineHeightStyle.Trim.None`)
+ * so the lines set apart sit the same distance apart as lines set together.
+ */
+@Composable
+fun FadingText(text: String, style: TextStyle, color: Color, maxLines: Int, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier) {
+        val maxWidth = constraints.maxWidth
+        val layout = remember(text, style, maxWidth) {
+            measurer.measure(text, style, constraints = Constraints(maxWidth = maxWidth))
+        }
+        if (layout.lineCount <= maxLines) {
+            Text(text = text, style = style, color = color)
+        } else {
+            val lastStart = layout.getLineStart(maxLines - 1)
+            Column {
+                Text(text = text.substring(0, lastStart).trimEnd(), style = style, color = color, maxLines = maxLines - 1)
+                FadingLine(text = text.substring(lastStart), style = style, color = color)
+            }
+        }
+    }
 }
 
 /**

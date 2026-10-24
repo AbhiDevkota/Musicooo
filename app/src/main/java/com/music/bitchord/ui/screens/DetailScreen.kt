@@ -26,6 +26,8 @@ import com.music.bitchord.ui.components.GLASS_EDGE_COLOR
 import com.music.bitchord.ui.components.GLASS_EDGE_WIDTH
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
+import com.music.bitchord.ui.components.continuous
+import com.music.bitchord.ui.components.FadingText
 import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,6 +119,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -2157,7 +2160,13 @@ private fun ShelfItem.recentLabel(): Int {
 
 /**
  * The artist page's top-release card: sleeve, what it is and when, and its
- * title, in a rounded glass panel the width of the page.
+ * title, in a squircle panel the width of the page.
+ *
+ * Proportioned off Apple Music's: a 24pt continuous corner, a 96pt sleeve 12pt
+ * in from the edge, the text 12pt after it, and a 32pt add button 19pt in
+ * from the end. The panel is Apple's own surface, a plus-lighter veil with a
+ * light hairline — tried in the page's glass, it pulled the eye — and the add
+ * button, being a button, is the page's glass (see [detailGlass]).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2171,64 +2180,80 @@ private fun TopReleaseCard(
     /** Null hides the button. */
     onToggleSaved: (() -> Unit)?,
 ) {
-    val shape = RoundedCornerShape(28.dp)
-    val coverShape = RoundedCornerShape(12.dp)
+    val shape = remember { RoundedCornerShape(TOP_RELEASE_CORNER).continuous() }
+    // Concentric with the panel: its corner less the inset the sleeve sits at.
+    val coverShape = remember { RoundedCornerShape(TOP_RELEASE_CORNER - TOP_RELEASE_INSET).continuous() }
     val haptics = rememberHaptics()
+    val hasButton = onToggleSaved != null && saved != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ARTIST_CONTENT_GUTTER)
             .padding(bottom = 22.dp)
-            // A light veil rather than the dark glass: Apple's containers read
-            // slightly white against the page, and a dark panel reads as a hole.
-            .clip(shape)
             .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), shape)
             .lightReleaseEdge(shape)
             .clip(shape)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
-            .padding(16.dp),
+            .padding(
+                start = TOP_RELEASE_INSET,
+                top = TOP_RELEASE_INSET,
+                bottom = TOP_RELEASE_INSET,
+                end = if (hasButton) 19.dp else TOP_RELEASE_INSET,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
             contentDescription = null,
             modifier = Modifier
-                .size(88.dp)
+                .size(96.dp)
                 .clip(coverShape)
                 .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_COVER_EDGE_ALPHA), coverShape)
                 .background(palette.elevated),
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
+            // The lines either side of the title in the player's secondary
+            // treatment, the artist line's: the page's own colour, partly
+            // transparent and added plus-lighter onto the panel.
+            val secondary = palette.onBackground.copy(alpha = TOP_RELEASE_SECONDARY_ALPHA)
             Text(
                 text = item.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.onBackgroundVariant,
+                color = secondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.vibrancy(palette.onBackground),
             )
-            Text(
+            // Faded out at the end of its last line, as the player's title is,
+            // and set a little tighter than the scale for when it takes two.
+            FadingText(
                 text = item.title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    lineHeight = TOP_RELEASE_TITLE_LINE_HEIGHT,
+                    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+                ),
                 color = palette.onBackground,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = stringResource(item.recentLabel()),
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.onBackgroundVariant,
+                color = secondary,
                 maxLines = 1,
+                modifier = Modifier.vibrancy(palette.onBackground),
             )
         }
         if (onToggleSaved != null && saved != null) {
             Spacer(Modifier.width(10.dp))
+            val area = remember { GlassArea() }
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
+                    .glassArea(area)
+                    .detailGlass(CircleShape)
+                    // After the surface: glass draws its outline just outside its edge.
                     .clip(CircleShape)
-                    .vibrantBackground(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
-                    .lightReleaseEdge(CircleShape)
                     .clickable {
                         haptics.play(if (saved) Haptic.ToggleOff else Haptic.ToggleOn)
                         onToggleSaved()
@@ -2240,13 +2265,23 @@ private fun TopReleaseCard(
                     contentDescription = stringResource(
                         if (saved) R.string.remove_from_library else R.string.add_to_library,
                     ),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp),
+                    tint = detailGlassContent(area),
+                    modifier = Modifier.size(17.dp),
                 )
             }
         }
     }
 }
+
+/** The top-release panel's continuous corner, and the inset its sleeve sits at. */
+private val TOP_RELEASE_CORNER = 24.dp
+private val TOP_RELEASE_INSET = 12.dp
+
+/** The panel's secondary lines, at the player's artist line's strength. */
+private const val TOP_RELEASE_SECONDARY_ALPHA = 0.55f
+
+/** The panel's title on two lines: a little under titleLarge's natural 24sp. */
+private val TOP_RELEASE_TITLE_LINE_HEIGHT = 22.sp
 
 /** The white veil under Apple-style containers and their buttons, added onto the page. */
 private const val LIGHT_FILL_ALPHA = 0.07f

@@ -510,8 +510,9 @@ private val INLINE_LIFT = 7.dp
 
 /**
  * The accessory's type, measured off Apple's, collapsed and expanded alike:
- * 13pt over 12pt, set looser than the scale's 16 and 14 — Apple sets these
- * sizes in SF Pro Text, which is spaced wider than the Display cut bundled here.
+ * 13pt over 12pt, set looser than the scale's 16 and 14 as SF Pro Text spaces
+ * these sizes — the title less so than measured, tuned by eye on device: in
+ * Semibold +0.4 read loose and the cut's own spacing tight.
  */
 private val ACCESSORY_TITLE_SIZE = 13.sp
 
@@ -521,7 +522,7 @@ private val ACCESSORY_TITLE_SIZE = 13.sp
  * Medium cut — read thin at 13sp.
  */
 private val ACCESSORY_TITLE_WEIGHT = FontWeight.W700
-private val ACCESSORY_TITLE_TRACKING = 0.4.sp
+private val ACCESSORY_TITLE_TRACKING = 0.15.sp
 private val ACCESSORY_ARTIST_SIZE = 12.sp
 private val ACCESSORY_ARTIST_TRACKING = 0.35.sp
 
