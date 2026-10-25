@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Download
@@ -323,7 +324,7 @@ fun SongActionsSheet(
 
         onRemoveFromHistory?.let {
             ActionRow(
-                icon = Icons.Rounded.Close,
+                icon = Icons.Rounded.History,
                 label = stringResource(R.string.remove_from_history),
                 accent = palette.accent,
                 onClick = it,
