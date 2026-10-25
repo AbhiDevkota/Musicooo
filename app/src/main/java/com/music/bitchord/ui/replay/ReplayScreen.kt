@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.R
 import com.music.bitchord.data.model.ROW_ART_PX
@@ -63,16 +61,7 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.data.stats.ArtistFacts
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
-import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.ui.components.GlassSegmentedControl
-import com.music.bitchord.ui.components.LocalGlassFloor
-import com.music.bitchord.ui.components.glassTrackColor
 import com.music.bitchord.ui.components.PAGE_GUTTER
-import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
-import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
-import com.music.bitchord.ui.components.isLiquidGlassActive
-import com.music.bitchord.ui.components.vibrancy
-import com.music.bitchord.ui.components.vibrantBackground
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.rememberArtworkColors
@@ -153,40 +142,29 @@ fun ReplayScreen(
         if (summary != null) landed = true
     }
 
-    // The page's background on its own, for the period picker's glass to show:
-    // the app's backdrop is the whole page, the picker included. See DetailScreen.
-    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val pageGlass = if (isLiquidGlassActive() && !reduceDynamicBlur) rememberLayerBackdrop() else null
-
     Box(modifier.fillMaxSize()) {
+        MeshGradientBackground(palette = palette, trackKey = leadArtwork, animated = false)
+        // The mesh is built to sit behind a player, where the only thing over it
+        // is a handful of large controls. A page of ranked lists needs a good
+        // deal more separation than that, so most of it is put back under ink.
         val dark = isDarkMode()
         Box(
             Modifier
-                .matchParentSize()
-                .then(if (pageGlass != null) Modifier.layerBackdrop(pageGlass) else Modifier),
-        ) {
-            MeshGradientBackground(palette = palette, trackKey = leadArtwork, animated = false)
-            // The mesh is built to sit behind a player, where the only thing over it
-            // is a handful of large controls. A page of ranked lists needs a good
-            // deal more separation than that, so most of it is put back under ink.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            if (dark) listOf(
-                                Color.Black.copy(alpha = 0.30f),
-                                Color.Black.copy(alpha = 0.72f),
-                                Color.Black.copy(alpha = 0.88f),
-                            ) else listOf(
-                                Color.White.copy(alpha = 0.25f),
-                                Color.White.copy(alpha = 0.65f),
-                                Color.White.copy(alpha = 0.82f),
-                            ),
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        if (dark) listOf(
+                            Color.Black.copy(alpha = 0.30f),
+                            Color.Black.copy(alpha = 0.72f),
+                            Color.Black.copy(alpha = 0.88f),
+                        ) else listOf(
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.65f),
+                            Color.White.copy(alpha = 0.82f),
                         ),
                     ),
-            )
-        }
+                ),
+        )
 
         val textColor = if (dark) Color.White else Color.Black
         val textVariant = if (dark) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.55f)
@@ -196,19 +174,12 @@ fun ReplayScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
         ) {
-            item("heading") {
-                CompositionLocalProvider(LocalGlassFloor provides (pageGlass ?: LocalGlassFloor.current)) {
-                    Heading(state, onPeriodChange, dark)
-                }
-            }
+            item("heading") { Heading(state, onPeriodChange, dark) }
 
             when {
                 state.loading && summary == null -> item("loading") {
                     Box(Modifier.fillMaxWidth().padding(64.dp), Alignment.Center) {
-                        CircularProgressIndicator(
-                            color = textColor.copy(alpha = 0.6f),
-                            modifier = Modifier.vibrancy(textColor),
-                        )
+                        CircularProgressIndicator(color = textColor.copy(alpha = 0.6f))
                     }
                 }
                 summary == null || summary.isEmpty -> item("empty") { EmptyReplay(state.period, dark) }
@@ -309,7 +280,6 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
             text = state.summary?.localizedLabel(context) ?: state.period.localizedChip(context),
             style = MaterialTheme.typography.titleMedium,
             color = textColor.copy(alpha = 0.6f),
-            modifier = Modifier.vibrancy(textColor),
         )
         Spacer(Modifier.height(14.dp))
         PeriodPicker(state.period, onPeriodChange, dark)
@@ -328,16 +298,6 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
 @Composable
 private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Unit, dark: Boolean) {
     val context = LocalContext.current
-    if (isLiquidGlassActive()) {
-        GlassSegmentedControl(
-            options = ReplayPeriod.entries.map { it.localizedChip(context) },
-            selectedIndex = ReplayPeriod.entries.indexOf(selected),
-            onSelect = { onSelect(ReplayPeriod.entries[it]) },
-            // The grey sank into the mesh; white added on stands out of any colour.
-            trackColor = if (dark) Color.White.copy(alpha = REPLAY_TRACK_ALPHA) else glassTrackColor(),
-        )
-        return
-    }
     val textColor = if (dark) Color.White else Color.Black
     // Four equal shares of the full width, each held to one line. Sized to
     // their labels instead, the chips ran past the edge on a narrow phone and
@@ -346,7 +306,7 @@ private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Uni
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .vibrantBackground(textColor.copy(alpha = 0.10f))
+            .background(textColor.copy(alpha = 0.10f))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -357,30 +317,24 @@ private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Uni
                 tween(160),
                 label = "periodChip",
             )
-            val labelColor = if (active) if (dark) Color.Black else Color.White else textColor.copy(alpha = 0.75f)
             Text(
                 text = period.localizedTab(context),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.W700,
-                color = labelColor,
+                color = if (active) if (dark) Color.Black else Color.White else textColor.copy(alpha = 0.75f),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .vibrantBackground(background)
+                    .background(background)
                     .clickable { onSelect(period) }
-                    .padding(horizontal = 6.dp, vertical = 8.dp)
-                    // Inside the chip's fill, so only the label is added.
-                    .vibrancy(labelColor),
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
             )
         }
     }
 }
-
-/** The period picker's track on dark, white added plus-lighter. */
-private const val REPLAY_TRACK_ALPHA = 0.16f
 
 // ── The cards ───────────────────────────────────────────────────────────────
 
@@ -457,7 +411,7 @@ private fun ReplayActionRow(icon: ImageVector, label: String, dark: Boolean, onC
             .padding(horizontal = PAGE_GUTTER + 4.dp, vertical = 18.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .vibrantBackground(textColor.copy(alpha = 0.12f))
+            .background(textColor.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -479,7 +433,7 @@ private fun ReplayActionRow(icon: ImageVector, label: String, dark: Boolean, onC
             imageVector = BitChordIcons.ChevronRight,
             contentDescription = null,
             tint = textColor.copy(alpha = 0.5f),
-            modifier = Modifier.size(16.dp).vibrancy(textColor),
+            modifier = Modifier.size(16.dp),
         )
     }
 }
@@ -559,7 +513,6 @@ private fun ReplayChartRow(row: ReplayRow, circular: Boolean, dark: Boolean, onC
                 color = textVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.vibrancy(textVariant),
             )
         }
         if (row.plays > 0) {
@@ -567,7 +520,6 @@ private fun ReplayChartRow(row: ReplayRow, circular: Boolean, dark: Boolean, onC
                 text = row.plays.toString(),
                 style = MaterialTheme.typography.labelMedium,
                 color = textColor.copy(alpha = 0.45f),
-                modifier = Modifier.vibrancy(textColor),
             )
         }
     }
@@ -622,7 +574,7 @@ private fun StatTile(label: String, value: String, dark: Boolean, modifier: Modi
     Column(
         modifier
             .clip(RoundedCornerShape(14.dp))
-            .vibrantBackground(textColor.copy(alpha = 0.09f))
+            .background(textColor.copy(alpha = 0.09f))
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -637,7 +589,6 @@ private fun StatTile(label: String, value: String, dark: Boolean, modifier: Modi
             style = MaterialTheme.typography.labelSmall,
             color = textColor.copy(alpha = 0.55f),
             letterSpacing = 1.sp,
-            modifier = Modifier.vibrancy(textColor),
         )
     }
 }
@@ -649,7 +600,7 @@ private fun Note(text: String, dark: Boolean, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = textColor.copy(alpha = 0.6f),
-        modifier = modifier.vibrancy(textColor),
+        modifier = modifier,
     )
 }
 
@@ -665,7 +616,7 @@ private fun EmptyReplay(period: ReplayPeriod, dark: Boolean) {
             imageVector = BitChordIcons.Clock,
             contentDescription = null,
             tint = emptyVariant,
-            modifier = Modifier.size(44.dp).vibrancy(emptyVariant),
+            modifier = Modifier.size(44.dp),
         )
         Spacer(Modifier.height(16.dp))
         Text(
@@ -684,7 +635,6 @@ private fun EmptyReplay(period: ReplayPeriod, dark: Boolean) {
             style = MaterialTheme.typography.bodyMedium,
             color = emptyColor.copy(alpha = 0.6f),
             textAlign = TextAlign.Center,
-            modifier = Modifier.vibrancy(emptyColor),
         )
     }
 }

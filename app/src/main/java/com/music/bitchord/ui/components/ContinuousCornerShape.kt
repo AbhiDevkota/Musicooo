@@ -127,13 +127,10 @@ class ContinuousCornerShape(
 
 /**
  * The same corners as this shape, cut continuous — see [ContinuousCornerShape].
- * A [SquirclePillShape] is already as continuous as it is meant to be.
  */
-fun CornerBasedShape.continuous(smoothing: Float = GLASS_CORNER_SMOOTHING): CornerBasedShape =
-    when (this) {
-        is ContinuousCornerShape, is SquirclePillShape -> this
-        else -> ContinuousCornerShape(topStart, topEnd, bottomEnd, bottomStart, smoothing)
-    }
+fun CornerBasedShape.continuous(smoothing: Float = GLASS_CORNER_SMOOTHING): ContinuousCornerShape =
+    this as? ContinuousCornerShape
+        ?: ContinuousCornerShape(topStart, topEnd, bottomEnd, bottomStart, smoothing)
 
 /**
  * Apple's corner smoothing, as the share of each corner's turn given over to the

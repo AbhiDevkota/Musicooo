@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -126,7 +127,7 @@ private fun CastDeviceRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .vibrantBackground(if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent)
+            .background(if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -136,7 +137,7 @@ private fun CastDeviceRow(
                 imageVector = if (connected) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = if (connected) 1f else 0.8f),
-                modifier = Modifier.size(20.dp).vibrancy(),
+                modifier = Modifier.size(20.dp),
             )
         }
         Spacer(Modifier.width(16.dp))
@@ -156,7 +157,7 @@ private fun CastDeviceRow(
                     text = stringResource(
                         if (connecting) R.string.cast_device_connecting else R.string.cast_device_connected,
                     ),
-                    modifier = Modifier.padding(top = 1.dp).vibrancy(),
+                    modifier = Modifier.padding(top = 1.dp),
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
                     color = Color.White.copy(alpha = 0.6f),
                 )
@@ -164,7 +165,7 @@ private fun CastDeviceRow(
         }
         when {
             connecting -> CircularProgressIndicator(
-                modifier = Modifier.size(16.dp).vibrancy(),
+                modifier = Modifier.size(16.dp),
                 color = Color.White.copy(alpha = 0.8f),
                 strokeWidth = 1.75.dp,
             )
@@ -188,7 +189,7 @@ private fun SearchingRow() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(20.dp).vibrancy(),
+            modifier = Modifier.size(20.dp),
             color = Color.White.copy(alpha = 0.7f),
             strokeWidth = 2.dp,
         )
@@ -200,7 +201,7 @@ private fun SearchingRow() {
         )
         Text(
             text = stringResource(R.string.cast_searching_hint),
-            modifier = Modifier.padding(top = 4.dp).vibrancy(),
+            modifier = Modifier.padding(top = 4.dp),
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp),
             color = Color.White.copy(alpha = 0.6f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -215,7 +216,7 @@ private fun CastActionRow(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .vibrantBackground(if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent)
+            .background(if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         contentAlignment = Alignment.CenterStart,

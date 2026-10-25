@@ -186,7 +186,6 @@ fun FloatingBottomBar(
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
-    val glassArea = remember { GlassArea() }
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     // The glass settle is exactly the motion "reduce animation" promises to
     // drop — snapping both the indicator's travel and the glyph's pop to
@@ -243,7 +242,6 @@ fun FloatingBottomBar(
             .padding(horizontal = NAV_BAR_GUTTER)
             .padding(bottom = NAV_BAR_LIFT)
             .fillMaxWidth()
-            .glassArea(glassArea)
             .clip(pillShape)
             .then(
                 if (reduceDynamicBlur) {
@@ -257,10 +255,7 @@ fun FloatingBottomBar(
                     )
                 },
             )
-            // The glass draws its own edge; the hairline is for the other materials.
-            .then(
-                if (useGlass && !reduceDynamicBlur) Modifier else Modifier.border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, pillShape),
-            )
+            .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, pillShape)
             .padding(horizontal = PILL_INSET, vertical = PILL_INSET),
     ) {
         if (tabWidthPx > 0f) {
@@ -326,9 +321,11 @@ fun FloatingBottomBar(
         ) {
             // A real glass pill samples whatever artwork is behind it, not the
             // theme's surface color, so a fixed onSurfaceVariant gray can lose
-            // contrast against it. Glass mode picks pure black or white off what
-            // the pill is actually showing — see [glassContentColor].
-            val adaptiveTint = if (useGlass) glassContentColor(glassArea) else null
+            // contrast against it. Glass mode reads luminance off the surface
+            // color instead and picks pure black or white, same as the tint
+            // Echo's floating nav bar uses for its own liquid glass.
+            val glassTint = glassContentColor()
+            val adaptiveTint = if (useGlass) glassTint else null
             tabs.forEachIndexed { index, tab ->
                 BottomBarItem(
                     tab = tab,

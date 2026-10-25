@@ -418,7 +418,7 @@ fun SongActionsSheet(
         }
 
         SheetTrackHeader(song, subtitleColor = palette.onBackgroundVariant)
-        HorizontalDivider(thickness = 0.5.dp, color = palette.divider, modifier = Modifier.vibrancy(palette.divider))
+        HorizontalDivider(thickness = 0.5.dp, color = palette.divider)
         rows()
         Spacer(Modifier.height(24.dp))
     }
@@ -465,11 +465,11 @@ private fun GroupSeparator(palette: ArtworkPalette) {
             Modifier
                 .fillMaxWidth()
                 .height(6.dp)
-                .vibrantBackground(palette.divider),
+                .background(palette.divider),
         )
     } else {
         HorizontalDivider(
-            modifier = Modifier.padding(vertical = 6.dp).vibrancy(palette.divider),
+            modifier = Modifier.padding(vertical = 6.dp),
             thickness = 0.5.dp,
             color = palette.divider,
         )
@@ -529,7 +529,7 @@ private fun TintedSheet(
                     Modifier
                         .size(width = 34.dp, height = 4.dp)
                         .clip(CircleShape)
-                        .vibrantBackground(palette.onBackground.copy(alpha = 0.35f)),
+                        .background(palette.onBackground.copy(alpha = 0.35f)),
                 )
             }
             Column(
@@ -718,7 +718,7 @@ private fun SleepTimerPicker(palette: ArtworkPalette, onBack: () -> Unit) {
                 )
             }
         }
-        HorizontalDivider(thickness = 0.5.dp, color = palette.divider, modifier = Modifier.vibrancy(palette.divider))
+        HorizontalDivider(thickness = 0.5.dp, color = palette.divider)
 
         // Finishing the song is the one people reach for at the end of a
         // listen, so it leads rather than sitting under the durations.
@@ -835,14 +835,12 @@ internal fun ActionRow(
     // text follows the surface's colour — the two differ in light mode.
     val foreground = if (menu) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onBackground
     val alpha = if (enabled) 1f else 0.4f
-    // Only a disabled row is translucent, so only it pays for the layer.
-    fun dimmed(color: Color): Modifier = if (enabled) Modifier else Modifier.vibrancy(color)
     val iconView: @Composable () -> Unit = {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = (tint ?: foreground).copy(alpha = alpha),
-            modifier = Modifier.size(if (menu) 20.dp else 22.dp).then(dimmed(tint ?: foreground)),
+            modifier = Modifier.size(if (menu) 20.dp else 22.dp),
         )
     }
     Row(
@@ -870,7 +868,7 @@ internal fun ActionRow(
             color = foreground.copy(alpha = alpha),
             maxLines = if (menu) 2 else Int.MAX_VALUE,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).then(dimmed(foreground)),
+            modifier = Modifier.weight(1f),
         )
         if (value != null) {
             Spacer(Modifier.width(12.dp))
@@ -879,7 +877,6 @@ internal fun ActionRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = accent.copy(alpha = alpha),
                 maxLines = 1,
-                modifier = dimmed(accent),
             )
         }
         if (menu) {
@@ -914,14 +911,14 @@ private fun LoadingActionRow(icon: ImageVector, label: String, palette: ArtworkP
             imageVector = icon,
             contentDescription = null,
             tint = palette.onBackground.copy(alpha = 0.4f),
-            modifier = Modifier.size(22.dp).vibrancy(palette.onBackground),
+            modifier = Modifier.size(22.dp),
         )
         Spacer(Modifier.width(18.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = palette.onBackground.copy(alpha = 0.4f),
-            modifier = Modifier.weight(1f).vibrancy(palette.onBackground),
+            modifier = Modifier.weight(1f),
         )
         CircularProgressIndicator(
             color = palette.onBackgroundVariant,

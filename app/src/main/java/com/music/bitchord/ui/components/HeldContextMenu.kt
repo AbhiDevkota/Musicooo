@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -194,7 +195,7 @@ fun <T : Any> HeldContextMenu(
                     .pointerInput(Unit) {}
                     .clip(cardShape)
                     .background(plate)
-                    .vibrantBorder(0.5.dp, hairline, cardShape)
+                    .border(0.5.dp, hairline, cardShape)
                     .then(
                         if (onPreviewClick != null) {
                             Modifier.clickable(enabled = open) { onPreviewClick(menuItem) }
@@ -219,7 +220,7 @@ fun <T : Any> HeldContextMenu(
                     .pointerInput(Unit) {}
                     .clip(menuShape)
                     .background(plate)
-                    .vibrantBorder(0.5.dp, hairline, menuShape),
+                    .border(0.5.dp, hairline, menuShape),
             ) {
                 actions(menuItem)
             }

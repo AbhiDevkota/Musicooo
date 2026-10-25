@@ -97,7 +97,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -136,11 +135,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
-import com.music.bitchord.ui.components.GlassSegmentedControl
-import com.music.bitchord.ui.components.LocalGlassFloor
 import com.music.bitchord.ui.components.isGlassSupported
-import com.music.bitchord.ui.components.isLiquidGlassActive
-import com.music.bitchord.ui.components.rememberGlassFloor
 import com.music.bitchord.ui.components.languageDisplayNameRes
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.SearchField
@@ -2404,11 +2399,7 @@ internal fun SettingsGroup(
             .clip(GroupShape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        // What the glass in the card's controls shows through to.
-        CompositionLocalProvider(
-            LocalGlassFloor provides rememberGlassFloor(MaterialTheme.colorScheme.surfaceVariant),
-            content = content,
-        )
+        content()
     }
     if (footer != null) {
         Text(
@@ -2692,11 +2683,7 @@ internal fun DestructiveRow(
     }
 }
 
-/**
- * Sliding pill selector, for the handful of settings with two or three states —
- * and, wherever a choice of one is offered, a [GlassSegmentedControl] while
- * Liquid Glass is on.
- */
+/** Sliding pill selector, for the handful of settings with two or three states. */
 @Composable
 internal fun SegmentedControl(
     options: List<String>,
@@ -2705,10 +2692,6 @@ internal fun SegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    if (isLiquidGlassActive()) {
-        GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
-        return
-    }
     val haptics = LocalHapticFeedback.current
     Row(
         modifier = modifier

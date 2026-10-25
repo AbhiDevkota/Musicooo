@@ -119,7 +119,7 @@ internal fun AudioPopupCard(
                 )
                 Text(
                     text = subtitle,
-                    modifier = Modifier.padding(top = 4.dp).vibrancy(),
+                    modifier = Modifier.padding(top = 4.dp),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 13.sp,
                         lineHeight = 17.sp,

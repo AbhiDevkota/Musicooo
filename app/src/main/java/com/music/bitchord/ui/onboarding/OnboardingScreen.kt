@@ -74,8 +74,6 @@ import com.music.bitchord.sharedui.resources.Res
 import com.music.bitchord.sharedui.resources.ic_google_g
 import com.music.bitchord.sharedui.resources.ic_logo
 import org.jetbrains.compose.resources.painterResource
-import com.music.bitchord.ui.components.vibrancy
-import com.music.bitchord.ui.components.vibrantBackground
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.MESH_CYCLE_MILLIS
@@ -238,7 +236,7 @@ private fun ColumnScope.NamePage(
         style = MaterialTheme.typography.titleMedium,
         fontSize = 17.sp,
         color = Color.White.copy(alpha = 0.78f),
-        modifier = Modifier.padding(start = 4.dp).vibrancy(),
+        modifier = Modifier.padding(start = 4.dp),
     )
     Spacer(Modifier.height(12.dp))
     NameField(value = name, onValueChange = onNameChange, onDone = onNext)
@@ -247,7 +245,7 @@ private fun ColumnScope.NamePage(
         text = stringResource(R.string.onboarding_name_footer),
         style = MaterialTheme.typography.bodyMedium,
         color = Color.White.copy(alpha = 0.55f),
-        modifier = Modifier.padding(horizontal = 4.dp).vibrancy(),
+        modifier = Modifier.padding(horizontal = 4.dp),
     )
     Spacer(Modifier.height(28.dp))
     PillButton(
@@ -276,7 +274,6 @@ private fun ColumnScope.ConnectPage(
         fontSize = 17.sp,
         lineHeight = 23.sp,
         color = Color.White.copy(alpha = 0.72f),
-        modifier = Modifier.vibrancy(),
     )
 
     Spacer(Modifier.weight(1f))
@@ -333,7 +330,7 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, onDone: ()
             .fillMaxWidth()
             .height(64.dp)
             .clip(CircleShape)
-            .vibrantBackground(Color.White.copy(alpha = 0.14f))
+            .background(Color.White.copy(alpha = 0.14f))
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -343,7 +340,6 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, onDone: ()
                 style = style,
                 color = Color.White.copy(alpha = 0.38f),
                 maxLines = 1,
-                modifier = Modifier.vibrancy(),
             )
         }
         BasicTextField(
@@ -390,7 +386,7 @@ private fun PillButton(
                 this.alpha = alpha
             }
             .clip(CircleShape)
-            .vibrantBackground(if (primary) Color.White else Color.White.copy(alpha = 0.16f))
+            .background(if (primary) Color.White else Color.White.copy(alpha = 0.16f))
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -422,7 +418,7 @@ private fun BackButton(onClick: () -> Unit) {
         Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .vibrantBackground(Color.White.copy(alpha = 0.16f))
+            .background(Color.White.copy(alpha = 0.16f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

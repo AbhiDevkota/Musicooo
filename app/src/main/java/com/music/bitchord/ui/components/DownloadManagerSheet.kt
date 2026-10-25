@@ -133,7 +133,7 @@ fun TopBarDownloadButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
                         // Never quite zero: a ring pinned at nothing reads as
                         // stalled where the first sliver reads as starting.
                         progress = { progress.coerceAtLeast(0.02f) },
-                        modifier = Modifier.size(RING_SIZE).vibrancy(tint),
+                        modifier = Modifier.size(RING_SIZE),
                         color = tint,
                         trackColor = tint.copy(alpha = 0.22f),
                         strokeWidth = 2.dp,
@@ -253,8 +253,7 @@ fun DownloadManagerSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .height(3.dp)
-                    .vibrancy(MaterialTheme.colorScheme.primary),
+                    .height(3.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                 strokeCap = StrokeCap.Round,
@@ -366,8 +365,7 @@ private fun DownloadManagerRow(
                         progress = { progress.fraction },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .vibrancy(MaterialTheme.colorScheme.primary),
+                            .height(3.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                         strokeCap = StrokeCap.Round,

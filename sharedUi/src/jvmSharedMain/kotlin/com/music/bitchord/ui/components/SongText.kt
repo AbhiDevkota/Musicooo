@@ -50,8 +50,8 @@ fun Modifier.thumbnailBorder(shape: Shape): Modifier = composed {
  * A song title with the catalogue-standard explicit badge after it, where Apple
  * Music sets it.
  *
- * Apple draws the badge in the secondary line's colour — the artist's, with its
- * vibrancy — rather than the title's; [badgeColor] is that colour. With
+ * Apple draws the badge in the secondary line's colour — the artist's — rather
+ * than the title's; [badgeColor] is that colour. With
  * [fadeOverflow] a title too long for its line fades out at its end, as Apple's
  * players let it, rather than ending in an ellipsis, as its lists do. Either
  * way the badge keeps its place after whatever of the title is shown.
@@ -80,7 +80,7 @@ fun ExplicitSongTitle(
         }
         if (song.isExplicit == true) {
             Spacer(Modifier.width(6.dp))
-            ExplicitBadge(badgeColor, Modifier.vibrancy(badgeColor))
+            ExplicitBadge(badgeColor)
         }
     }
 }

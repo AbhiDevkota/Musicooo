@@ -8,6 +8,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -550,8 +551,6 @@ private fun DrawScope.drawSignalFlow(
     val currentProgress = pulseProgress
     val stagePoints = listOf(p0, p1, p2, p3, p4)
     val nodeRadius = 11.5.dp.toPx()
-    // Every white stroke and glow below is added onto the frosted card.
-    val vibrant = vibrantBlendMode(Color.White)
 
     // 1. Static Node-to-Node Signal Bus Segments (~2.dp, butt caps at node rims)
     val busAlpha = if (currentFlowAlpha > 0f) 0.22f + 0.06f * currentFlowAlpha else 0.18f
@@ -567,7 +566,6 @@ private fun DrawScope.drawSignalFlow(
                 end = Offset(xCenter, yEnd),
                 strokeWidth = busStroke,
                 cap = StrokeCap.Butt,
-                blendMode = vibrant,
             )
 
             // Subtle ambient under-glow along the bus when powered
@@ -578,7 +576,6 @@ private fun DrawScope.drawSignalFlow(
                     end = Offset(xCenter, yEnd),
                     strokeWidth = 4.5.dp.toPx(),
                     cap = StrokeCap.Butt,
-                    blendMode = vibrant,
                 )
             }
         }
@@ -625,7 +622,6 @@ private fun DrawScope.drawSignalFlow(
                         end = Offset(xCenter, pEnd),
                         strokeWidth = 6.dp.toPx(),
                         cap = StrokeCap.Butt,
-                        blendMode = vibrant,
                     )
 
                     // B. Brilliant Core Energy Line along Segment
@@ -645,7 +641,6 @@ private fun DrawScope.drawSignalFlow(
                         end = Offset(xCenter, pEnd),
                         strokeWidth = 2.25.dp.toPx(),
                         cap = StrokeCap.Butt,
-                        blendMode = vibrant,
                     )
 
                     // C. Leading Micro-Photon Pip (when pulse head is on this segment)
@@ -662,13 +657,11 @@ private fun DrawScope.drawSignalFlow(
                             ),
                             radius = 7.dp.toPx(),
                             center = headCenter,
-                            blendMode = vibrant,
                         )
                         drawCircle(
                             color = Color.White.copy(alpha = 0.98f * pulseVisibility),
                             radius = 1.75.dp.toPx(),
                             center = headCenter,
-                            blendMode = vibrant,
                         )
                     }
                 }
@@ -702,7 +695,6 @@ private fun DrawScope.drawSignalFlow(
             ),
             radius = nodeRadius + 5.dp.toPx(),
             center = stageCenter,
-            blendMode = vibrant,
         )
 
         // C. Active Outer Luminous Flare Ring (When pulse arrives)
@@ -712,7 +704,6 @@ private fun DrawScope.drawSignalFlow(
                 radius = nodeRadius + 1.2.dp.toPx(),
                 center = stageCenter,
                 style = Stroke(width = 2.dp.toPx()),
-                blendMode = vibrant,
             )
         }
 
@@ -723,7 +714,6 @@ private fun DrawScope.drawSignalFlow(
             radius = nodeRadius,
             center = stageCenter,
             style = Stroke(width = 1.dp.toPx()),
-            blendMode = vibrant,
         )
 
         // E. High-Luminance Core Edge (When peak active)
@@ -733,7 +723,6 @@ private fun DrawScope.drawSignalFlow(
                 radius = nodeRadius,
                 center = stageCenter,
                 style = Stroke(width = 1.5.dp.toPx()),
-                blendMode = vibrant,
             )
         }
     }
@@ -824,7 +813,6 @@ private fun PipelineSection(
                         // arrive moves every icon below it; track that here.
                         reportCenter(coords, columnCoordinates)
                     }
-                    .vibrancy()
                     .graphicsLayer {
                         val act = stageActivationProvider(stageIndex)
                         alpha = (0.80f + 0.20f * act).coerceIn(0f, 1f)
@@ -848,7 +836,6 @@ private fun PipelineSection(
                 color = Color.White,
                 modifier = Modifier
                     .padding(top = 3.dp)
-                    .vibrancy()
                     .graphicsLayer {
                         val act = stageActivationProvider(stageIndex)
                         alpha = (0.65f + 0.32f * act).coerceIn(0f, 1f)
@@ -881,7 +868,6 @@ private fun PipelineRow(label: String, value: String) {
                 fontSize = 12.5.sp,
                 lineHeight = 17.sp,
             ),
-            modifier = Modifier.vibrancy(),
         )
     }
 }
@@ -893,7 +879,7 @@ internal fun PipelineRule(modifier: Modifier = Modifier.padding(start = 52.dp, e
         modifier
             .fillMaxWidth()
             .height(0.5.dp)
-            .vibrantBackground(Color.White.copy(alpha = 0.14f)),
+            .background(Color.White.copy(alpha = 0.14f)),
     )
 }
 
@@ -906,7 +892,7 @@ internal fun PipelineDoneAction(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(ACTION_HEIGHT)
-            .vibrantBackground(
+            .background(
                 if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent,
             )
             .clickable(
@@ -938,8 +924,7 @@ private fun PipelineNote(text: String) {
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 1.dp, bottom = 4.dp)
-            .vibrancy(),
+            .padding(top = 1.dp, bottom = 4.dp),
     )
 }
 

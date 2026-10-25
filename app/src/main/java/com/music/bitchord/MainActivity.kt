@@ -235,7 +235,6 @@ import com.music.bitchord.playback.setQueueDragActive
 import com.music.bitchord.ui.MainViewModel
 import com.music.bitchord.ui.SearchSource
 import com.music.bitchord.ui.components.BottomFadeScrim
-import com.music.bitchord.ui.components.TopFadeBlur
 import com.music.bitchord.ui.components.FloatingBarsTapGuard
 import com.music.bitchord.ui.components.BottomTab
 import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
@@ -249,8 +248,6 @@ import com.music.bitchord.ui.components.LocalLiquidGlassEnabled
 import com.music.bitchord.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
-import com.music.bitchord.ui.components.LocalBackdropLuminance
-import com.music.bitchord.ui.components.rememberBackdropLuminance
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.data.sources.SourceConfig
 import com.music.bitchord.data.sources.SourceKind
@@ -412,7 +409,6 @@ class MainActivity : AppCompatActivity() {
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
                     LocalAppBackdrop provides appBackdrop,
-                    LocalBackdropLuminance provides rememberBackdropLuminance(appBackdrop),
                 ) {
                 // The window's width, measured rather than asked for.
                 //
@@ -3451,13 +3447,12 @@ private fun BitChordApp(
                 } else {
                     MaterialTheme.colorScheme.background
                 }
-                // Apple's scroll edge: what passes up under the status bar and the
-                // controls is blurred — hardest at the top, none just below the
-                // controls — rather than faded out to the page colour. Under
-                // reduce dynamic blur the bottom floor's own fade stands in,
-                // turned upside down, so both edges share its curve and colour.
+                // This is the bottom floor itself turned upside down, not a
+                // separately maintained approximation. Both edges therefore
+                // share the same curve, height and page-aware colour — including
+                // the white theme background in light mode.
                 // On an artist page the photograph and logo run up under the status
-                // bar, and either across them would only muddy them. It comes in as
+                // bar, and a fade across them would only muddy them. It comes in as
                 // the page scrolls past that header, when content starts passing
                 // under the bar and needs the cover.
                 //
@@ -3483,23 +3478,13 @@ private fun BitChordApp(
                             (header * fadeRamp)).coerceIn(0f, 1f)
                     }
                 }
-                if (reduceDynamicBlur) {
-                    BottomFadeScrim(
-                        pageColor = chromePageColor,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .rotate(180f)
-                            .graphicsLayer { alpha = topFadeAlpha },
-                    )
-                } else {
-                    TopFadeBlur(
-                        hazeState = hazeState,
-                        pageColor = chromePageColor,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .graphicsLayer { alpha = topFadeAlpha },
-                    )
-                }
+                BottomFadeScrim(
+                    pageColor = chromePageColor,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .rotate(180f)
+                        .graphicsLayer { alpha = topFadeAlpha },
+                )
 
                 FrostedTopBar(
                     title = when (route) {

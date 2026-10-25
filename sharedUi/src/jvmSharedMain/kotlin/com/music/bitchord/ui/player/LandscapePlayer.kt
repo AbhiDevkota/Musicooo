@@ -61,8 +61,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import com.music.bitchord.ui.components.ExplicitBadge
-import com.music.bitchord.ui.components.vibrancy
-import com.music.bitchord.ui.components.vibrantBackground
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.theme.stableStatusBarInsets
@@ -257,7 +255,7 @@ internal fun LandscapePlayerLayout(
                     .height(5.dp)
                     .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
                     .clip(RoundedCornerShape(3.dp))
-                    .vibrantBackground(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                    .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
             )
         }
     }
@@ -325,7 +323,7 @@ internal fun LandscapeArtwork(
                     imageVector = BitChordIcons.MusicNote,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.35f),
-                    modifier = Modifier.fillMaxSize(0.36f).vibrancy(),
+                    modifier = Modifier.fillMaxSize(0.36f),
                 )
             }
             AsyncImage(
@@ -440,9 +438,9 @@ internal fun LandscapeCredits(
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     onOverflowChange = { titleOverflowing = it },
-                    // After the title, in the artist line's colour and vibrancy.
+                    // After the title, in the artist line's colour.
                     trailing = if (song.isExplicit == true) {
-                        { ExplicitBadge(artistColor, Modifier.vibrancy(artistColor)) }
+                        { ExplicitBadge(artistColor) }
                     } else {
                         null
                     },
@@ -531,7 +529,7 @@ internal fun LandscapeLyricsPane(
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center).vibrancy(),
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
         }

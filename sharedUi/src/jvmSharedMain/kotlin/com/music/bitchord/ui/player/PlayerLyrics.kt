@@ -133,9 +133,6 @@ import com.music.bitchord.data.lyrics.LyricAlignment
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.lyrics.translationLanguageName
-import com.music.bitchord.ui.components.vibrancy
-import com.music.bitchord.ui.components.vibrantBackground
-import com.music.bitchord.ui.components.vibrantBlendMode
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.Haptics
 import com.music.bitchord.ui.haptics.rememberHaptics
@@ -542,8 +539,7 @@ internal fun LyricsStatusWithChange(
                     } else {
                         Modifier
                     },
-                )
-                .vibrancy(LocalPlayerTint.current),
+                ),
         )
     }
 }
@@ -1462,7 +1458,7 @@ internal fun TranslationToggleButton(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .vibrantBackground(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1473,7 +1469,7 @@ internal fun TranslationToggleButton(
     ) {
         if (state is LyricsTranslationUiState.Loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(16.dp).vibrancy(tint),
+                modifier = Modifier.size(16.dp),
                 color = tint,
                 strokeWidth = 1.7.dp,
             )
@@ -1485,7 +1481,7 @@ internal fun TranslationToggleButton(
                     else Res.string.translate_lyrics,
                 ),
                 tint = tint,
-                modifier = Modifier.size(19.dp).vibrancy(tint),
+                modifier = Modifier.size(19.dp),
             )
         }
     }
@@ -1513,7 +1509,7 @@ internal fun RomanizationToggleButton(
         modifier = Modifier
             .size(34.dp)
             .clip(CircleShape)
-            .vibrantBackground(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1524,7 +1520,7 @@ internal fun RomanizationToggleButton(
     ) {
         if (state is LyricsTranslationUiState.Loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(16.dp).vibrancy(tint),
+                modifier = Modifier.size(16.dp),
                 color = tint,
                 strokeWidth = 1.7.dp,
             )
@@ -1536,7 +1532,7 @@ internal fun RomanizationToggleButton(
                     else Res.string.romanize_lyrics,
                 ),
                 tint = tint,
-                modifier = Modifier.size(19.dp).vibrancy(tint),
+                modifier = Modifier.size(19.dp),
             )
         }
     }
@@ -1683,7 +1679,7 @@ private fun LyricsSkeleton(modifier: Modifier = Modifier) {
                                         startX = startX,
                                         endX = startX + band,
                                     )
-                                    onDrawBehind { drawRect(brush, blendMode = vibrantBlendMode(Color.White)) }
+                                    onDrawBehind { drawRect(brush) }
                                 },
                         )
                     }
@@ -2016,7 +2012,6 @@ internal fun LyricsPanel(
                     text = stringResource(Res.string.no_lyrics_for_track),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.vibrancy(),
                 )
             }
         }
@@ -2034,11 +2029,6 @@ internal fun LyricsPanel(
             // below takes taps at the initial pass, so while a pick is open it
             // would swallow every choice before the row ever saw it.
             .revealLyricsControlsOnTap(!controlsOpen && !picking, onBottomHalfTap)
-            // Outside the fade: its DstIn mask needs an offscreen layer, and
-            // anything blended inside that would be adding onto transparency.
-            // Composited as one, every line, dot and pick in the list is added
-            // onto the artwork — the unsung words at their dim alpha included.
-            .vibrancy()
             .fadingEdges(),
         // Each row carries GLOW_ROOM of its own inset for the halo, so the
         // list hands that much back — otherwise the lines would sit a glow's
@@ -2825,7 +2815,7 @@ private fun CurrentLyricLine(
                 imageVector = BitChordIcons.ChevronRight,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.size(14.dp).vibrancy(),
+                modifier = Modifier.size(14.dp),
             )
         }
         return
@@ -2937,10 +2927,11 @@ private fun CurrentLyricLine(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     rise = false,
-                    modifier = Modifier.vibrancy().then(fading),
+                    modifier = fading,
                 )
             } else {
                 Text(
+                    modifier = fading,
                     text = lineText,
                     style = voiceStyle(
                         stripStyle.copy(
@@ -2952,7 +2943,6 @@ private fun CurrentLyricLine(
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.vibrancy().then(fading),
                 )
             }
         }
@@ -2964,7 +2954,7 @@ private fun CurrentLyricLine(
                 imageVector = BitChordIcons.ChevronRight,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.size(14.dp).vibrancy(),
+                modifier = Modifier.size(14.dp),
             )
         } else {
             Spacer(Modifier.width(6.dp))
@@ -2974,7 +2964,6 @@ private fun CurrentLyricLine(
                 tint = Color.White.copy(alpha = 0.5f),
                 modifier = Modifier
                     .size(14.dp)
-                    .vibrancy()
                     .graphicsLayer { scaleX = -1f },
             )
         }
@@ -3006,7 +2995,6 @@ private fun LyricsUnavailableLine(trackKey: Any, modifier: Modifier = Modifier) 
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .padding(vertical = 4.dp)
-            .vibrancy()
             .graphicsLayer { this.alpha = alpha },
     )
 }
@@ -3020,7 +3008,7 @@ private fun LyricsLoadingLine(text: String, modifier: Modifier = Modifier) {
         color = Color.White.copy(alpha = 0.55f),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier.padding(vertical = 4.dp).vibrancy(),
+        modifier = modifier.padding(vertical = 4.dp),
     )
 }
 

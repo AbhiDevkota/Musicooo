@@ -195,7 +195,7 @@ private fun LanguageRow(language: AppLanguage, selected: Boolean, onClick: () ->
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = ACTION_HEIGHT)
-            .vibrantBackground(
+            .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
             )
             .clickable(

@@ -3,6 +3,7 @@ package com.music.bitchord.ui.components
 import com.music.bitchord.R
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -399,7 +400,7 @@ fun MiniPlayer(
                     )
                 },
             )
-            .vibrantBorder(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+            .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
             // Deliberately silent: the whole bar is the target, so it catches
             // stray taps meant for the page behind it, and the sheet rising is
             // its own confirmation. The glyphs on it still buzz.
@@ -524,8 +525,6 @@ internal fun MiniPlayerNextGlyph(tint: Color) {
         tint = tint,
         modifier = Modifier
             .size(NEXT_GLYPH_SIZE)
-            // Dimmed while the controls are locked, and added onto the bar then.
-            .then(if (tint.alpha < 1f) Modifier.vibrancy(tint) else Modifier)
             .graphicsLayer { scaleY = 0.85f },
     )
 }
