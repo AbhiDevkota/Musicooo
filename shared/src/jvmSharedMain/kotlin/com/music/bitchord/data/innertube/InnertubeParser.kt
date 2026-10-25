@@ -1286,11 +1286,35 @@ object InnertubeParser {
         val defaultToken = toggle.feedbackToken("defaultServiceEndpoint")
         val toggledToken = toggle.feedbackToken("toggledServiceEndpoint")
 
+        // A plain (non-toggle) menu item carries a "Remove from history" action
+        // with its own feedback token, reachable via menu → menuRenderer → items.
+        val removeFromHistoryToken = row.o("menu")
+            ?.o("menuRenderer")
+            ?.a("items")
+            ?.firstNotNullOfOrNull { item ->
+                item.o("menuServiceItemRenderer")
+                    ?.o("icon")
+                    ?.o("iconType")
+                    ?.takeIf { it == "DELETE" }
+                    ?.let { _ ->
+                        item.o("menuServiceItemRenderer")
+                            ?.o("navigationEndpoint")
+                            ?.o("feedbackEndpoint")
+                            ?.s("feedbackToken")
+                            ?: item.o("menuServiceItemRenderer")
+                                ?.o("click")
+                                ?.o("command")
+                                ?.o("feedbackEndpoint")
+                                ?.s("feedbackToken")
+                    }
+            }
+
         return SongMenu(
             likeStatus = likeStatus,
             inLibrary = toggle != null && !defaultAdds,
             addToLibraryToken = if (defaultAdds) defaultToken else toggledToken,
             removeFromLibraryToken = if (defaultAdds) toggledToken else defaultToken,
+            removeFromHistoryToken = removeFromHistoryToken,
         )
     }
 

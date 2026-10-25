@@ -637,6 +637,8 @@ private fun BitChordApp(
     var menuFromPlayer by remember { mutableStateOf(false) }
     /** Whether the track menu was opened from the History screen. */
     var menuFromHistory by remember { mutableStateOf(false) }
+    /** Index of the history row being removed, set when the menu opens from History. Cleared when the menu closes. */
+    var historyRemoveIndex by remember { mutableStateOf<Int?>(null) }
     /**
      * The row or card that was held to open the track menu, or null when it
      * was opened any other way. Non-null lifts that item into
@@ -2732,8 +2734,9 @@ private fun BitChordApp(
                                 onSongClick = { songs, index ->
                                     playFrom(songs, index, QueueSource(historyLabel, PlaybackSourceType.HISTORY))
                                 },
-                                onSongLongPress = { song ->
+                                onSongLongPress = { song, index ->
                                     menuFromHistory = true
+                                    historyRemoveIndex = index
                                     openSongMenu(song)
                                 },
                                 onSongSwipe = onSongSwipe,
@@ -4361,10 +4364,10 @@ private fun BitChordApp(
                 } else {
                     null
                 },
-                onRemoveFromHistory = if (menuFromHistory) {
+                onRemoveFromHistory = if (menuFromHistory && historyRemoveIndex != null) {
                     {
                         songActions = null
-                        viewModel.removeFromHistory(song.videoId)
+                        viewModel.removeFromHistory(historyRemoveIndex!!)
                     }
                 } else {
                     null
@@ -4516,6 +4519,7 @@ private fun BitChordApp(
             if (songActions == null) {
                 songMenuOrigin = null
                 menuFromHistory = false
+                historyRemoveIndex = null
             }
         }
 

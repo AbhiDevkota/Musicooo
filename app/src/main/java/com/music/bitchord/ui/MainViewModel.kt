@@ -1973,21 +1973,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Removes a track from the account's listening history. Optimistically removes it from the in-memory list on success; leaves the list untouched on failure. */
-    fun removeFromHistory(videoId: String) {
+    /** Removes a track from the account's listening history via its feedback token. Optimistically removes it from the in-memory list on success; leaves the list untouched on failure. */
+    fun removeFromHistory(index: Int) {
+        val token = songMenu.value?.removeFromHistoryToken ?: return
         viewModelScope.launch {
-            YtMusicRepository.removeFromHistory(videoId).onSuccess {
-                // Optimistically remove the row so the list updates immediately without a loading flash
+            YtMusicRepository.removeFromHistory(token).onSuccess {
+                // Optimistically remove only this entry (by index) so the list updates immediately without a loading flash
                 val current = _history.value
                 if (current is UiState.Success<*>) {
                     @Suppress("UNCHECKED_CAST")
                     _history.value = (current as UiState.Success<List<Song>>).let { state ->
-                        state.copy(data = state.data.filterNot { it.videoId == videoId })
+                        state.copy(data = state.data.toMutableList().also { list ->
+                            if (index in list.indices) list.removeAt(index)
+                        })
                     }
                 }
             }.onFailure {
                 // Keep the existing history list untouched — do NOT replace it with an error
-                Log.w(TAG, "removeFromHistory failed for $videoId: ${it.message}")
+                Log.w(TAG, "removeFromHistory failed at index $index: ${it.message}")
             }
         }
     }

@@ -175,9 +175,9 @@ object YtMusicRepository {
         emptyList()
     }
 
-    /** Removes a track from the account's listening history. */
-    suspend fun removeFromHistory(videoId: String): Result<Unit> = call("removeFromHistory") {
-        Innertube.updateWatchHistory(videoId)
+    /** Removes a track from the account's listening history via its feedback token. */
+    suspend fun removeFromHistory(token: String): Result<Unit> = call("removeFromHistory") {
+        Innertube.removeHistory(token)
     }
 
     /**

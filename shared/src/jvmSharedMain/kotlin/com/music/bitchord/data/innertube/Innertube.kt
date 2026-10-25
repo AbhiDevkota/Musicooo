@@ -1099,12 +1099,10 @@ object Innertube {
         }
     }
 
-    /** Removes a track from the account's listening history on YouTube Music. */
-    suspend fun updateWatchHistory(videoId: String) {
-        postMusic("update_watch_history") {
-            put("videoId", videoId)
-            put("action", "ACTION_REMOVE_HISTORY")
-        }
+    /** Removes a track from the account's listening history on YouTube Music via the feedback endpoint. */
+    suspend fun removeHistory(token: String) {
+        requireSession()
+        sendFeedback(token)
     }
 
     /** A fresh client-playback-nonce, identifying one play of one track. */

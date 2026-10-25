@@ -698,6 +698,12 @@ data class SongMenu(
     val inLibrary: Boolean,
     val addToLibraryToken: String?,
     val removeFromLibraryToken: String?,
+    /**
+     * Token for removing this track from the account's listening history.
+     * Extracted from a plain (non-toggle) menu item on the watch queue row.
+     * Null when the row has no such menu item (e.g. not from History).
+     */
+    val removeFromHistoryToken: String?,
 )
 
 sealed interface UiState<out T> {
