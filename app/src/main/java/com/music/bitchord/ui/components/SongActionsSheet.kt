@@ -321,19 +321,19 @@ fun SongActionsSheet(
             GroupSeparator(palette)
         }
 
+        onRemoveFromHistory?.let {
+            ActionRow(
+                icon = Icons.Rounded.Close,
+                label = stringResource(R.string.remove_from_history),
+                accent = palette.accent,
+                onClick = it,
+            )
+        }
         DownloadRow(song, palette, isOffline, onDownload)
         onRemoveFromCache?.let {
             ActionRow(
                 icon = Icons.Rounded.DeleteSweep,
                 label = stringResource(R.string.remove_from_cache),
-                accent = palette.accent,
-                onClick = it,
-            )
-        }
-        onRemoveFromHistory?.let {
-            ActionRow(
-                icon = Icons.Rounded.Delete,
-                label = stringResource(R.string.remove_from_history),
                 accent = palette.accent,
                 onClick = it,
             )

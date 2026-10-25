@@ -1973,12 +1973,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Removes a track from the account's listening history and refreshes the feed. */
+    /** Removes a track from the account's listening history. Optimistically removes it from the in-memory list on success; falls back to a full refresh only if that fails. */
     fun removeFromHistory(videoId: String) {
         viewModelScope.launch {
             YtMusicRepository.removeFromHistory(videoId).onSuccess {
-                // Refresh the history feed so the row disappears reactively
-                loadHistory()
+                // Optimistically remove the row so the list updates immediately without a loading flash
+                _history.updateAndGet { state ->
+                    when (state) {
+                        is UiState.Success -> state.copy(data = state.data.filterNot { it.videoId == videoId })
+                        else -> state
+                    }
+                }
+            }.onFailure {
+                // Keep the existing list — no flash, just show the error
+                _history.value = UiState.Error(it.friendly())
             }
         }
     }
