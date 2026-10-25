@@ -1982,9 +1982,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (current is UiState.Success<*>) {
                     @Suppress("UNCHECKED_CAST")
                     _history.value = (current as UiState.Success<List<Song>>).let { state ->
-                        val list = state.data.toMutableList()
-                        val removed = list.removeFirstOrNull { it.feedbackToken == token }
-                        if (removed) state.copy(data = list) else state
+                        val idx = state.data.indexOfFirst { it.feedbackToken == token }
+                        if (idx >= 0) state.copy(data = state.data.filterIndexed { i, _ -> i != idx }) else state
                     }
                 }
                 // Invalidate the in-memory history cache so the next load fetches fresh data from YouTube
@@ -1992,7 +1991,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 onSuccess()
             }.onFailure {
                 // Keep the existing history list untouched — do NOT replace it with an error
-                Log.w(TAG, "removeFromHistory failed: ${it.message}")
+                Log.w("BitChord", "removeFromHistory failed: ${it.message}")
                 onFailure(it)
             }
         }

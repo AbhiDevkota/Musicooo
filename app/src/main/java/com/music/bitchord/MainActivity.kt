@@ -2736,7 +2736,7 @@ private fun BitChordApp(
                                 },
                                 onSongLongPress = { song, index ->
                                     menuFromHistory = true
-                                    historyRemoveToken = songMenu.value?.removeFromHistoryToken
+                                    historyRemoveToken = song.feedbackToken
                                     openSongMenu(song)
                                 },
                                 onSongSwipe = onSongSwipe,
