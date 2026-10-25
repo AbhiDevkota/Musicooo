@@ -415,7 +415,7 @@ object LocalMediaRepository {
     /** The MediaStore row behind [uri], when there is one this app may read. */
     private fun mediaStoreRow(context: Context, uri: Uri): Song? = runCatching {
         val resolver = context.contentResolver
-        val (target, selection, args): Triple<Uri, String?, Array<String>?> = when {
+        val (target, selection, args) = when {
             uri.scheme == "file" -> {
                 val path = uri.path ?: return@runCatching null
                 Triple(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, "${MediaStore.Audio.Media.DATA} = ?", arrayOf(path))
