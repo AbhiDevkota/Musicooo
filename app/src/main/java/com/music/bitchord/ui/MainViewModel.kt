@@ -1987,6 +1987,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         if (removed) state.copy(data = list) else state
                     }
                 }
+                // Invalidate the in-memory history cache so the next load fetches fresh data from YouTube
+                YtMusicRepository.invalidateHistoryCache()
                 onSuccess()
             }.onFailure {
                 // Keep the existing history list untouched — do NOT replace it with an error

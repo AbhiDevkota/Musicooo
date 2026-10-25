@@ -180,6 +180,11 @@ object YtMusicRepository {
         Innertube.removeHistory(token)
     }
 
+    /** Invalidates the in-memory history cache so the next load fetches fresh data. */
+    fun invalidateHistoryCache() {
+        historyMemo = null
+    }
+
     /**
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
