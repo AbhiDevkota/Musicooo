@@ -152,6 +152,11 @@ fun SongActionsSheet(
      * passes one only while the cache actually holds some of it.
      */
     onRemoveFromCache: (() -> Unit)? = null,
+    /**
+     * Removes this track from the account's listening history. Null hides the
+     * row — the History screen passes one only when the menu is opened there.
+     */
+    onRemoveFromHistory: (() -> Unit)? = null,
     showSleepTimer: Boolean = false,
     /**
      * Sends the playing track back to YouTube's own upload, and keeps it there.
@@ -321,6 +326,14 @@ fun SongActionsSheet(
             ActionRow(
                 icon = Icons.Rounded.DeleteSweep,
                 label = stringResource(R.string.remove_from_cache),
+                accent = palette.accent,
+                onClick = it,
+            )
+        }
+        onRemoveFromHistory?.let {
+            ActionRow(
+                icon = Icons.Rounded.Delete,
+                label = stringResource(R.string.remove_from_history),
                 accent = palette.accent,
                 onClick = it,
             )

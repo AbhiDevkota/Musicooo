@@ -1973,6 +1973,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Removes a track from the account's listening history and refreshes the feed. */
+    fun removeFromHistory(videoId: String) {
+        viewModelScope.launch {
+            YtMusicRepository.removeFromHistory(videoId).onSuccess {
+                // Refresh the history feed so the row disappears reactively
+                loadHistory()
+            }
+        }
+    }
+
     /** Recent searches, kept on device as rich entity records. */
     val searchHistory: StateFlow<List<SearchHistoryEntity>> = SearchHistory.recent
 

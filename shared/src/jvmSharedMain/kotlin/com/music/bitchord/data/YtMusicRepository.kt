@@ -175,6 +175,11 @@ object YtMusicRepository {
         emptyList()
     }
 
+    /** Removes a track from the account's listening history. */
+    suspend fun removeFromHistory(videoId: String): Result<Unit> = call("removeFromHistory") {
+        Innertube.updateWatchHistory(videoId)
+    }
+
     /**
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */

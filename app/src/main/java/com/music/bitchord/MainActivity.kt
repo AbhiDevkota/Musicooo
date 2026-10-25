@@ -635,6 +635,8 @@ private fun BitChordApp(
      * question has to be answered by whoever opened the menu.
      */
     var menuFromPlayer by remember { mutableStateOf(false) }
+    /** Whether the track menu was opened from the History screen. */
+    var menuFromHistory by remember { mutableStateOf(false) }
     /**
      * The row or card that was held to open the track menu, or null when it
      * was opened any other way. Non-null lifts that item into
@@ -2730,7 +2732,10 @@ private fun BitChordApp(
                                 onSongClick = { songs, index ->
                                     playFrom(songs, index, QueueSource(historyLabel, PlaybackSourceType.HISTORY))
                                 },
-                                onSongLongPress = openSongMenu,
+                                onSongLongPress = { song ->
+                                    menuFromHistory = true
+                                    openSongMenu(song)
+                                },
                                 onSongSwipe = onSongSwipe,
                                 onRetry = viewModel::loadHistory,
                                 contentPadding = listPadding,
@@ -4356,6 +4361,14 @@ private fun BitChordApp(
                 } else {
                     null
                 },
+                onRemoveFromHistory = if (menuFromHistory) {
+                    {
+                        songActions = null
+                        viewModel.removeFromHistory(song.videoId)
+                    }
+                } else {
+                    null
+                },
                 onOpenAlbum = { id ->
                     openPage(
                         id,
@@ -4500,7 +4513,10 @@ private fun BitChordApp(
         // A closed menu forgets where it was held, so whatever opens it next
         // — the ⋮, the player — starts from the sheet.
         LaunchedEffect(songActions == null) {
-            if (songActions == null) songMenuOrigin = null
+            if (songActions == null) {
+                songMenuOrigin = null
+                menuFromHistory = false
+            }
         }
 
         // ---- Download manager ----
