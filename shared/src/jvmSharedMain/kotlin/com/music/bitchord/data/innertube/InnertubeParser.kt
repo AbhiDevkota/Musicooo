@@ -1294,7 +1294,7 @@ object InnertubeParser {
             ?.firstNotNullOfOrNull { item ->
                 item.o("menuServiceItemRenderer")
                     ?.o("icon")
-                    ?.o("iconType")
+                    ?.s("iconType")
                     ?.takeIf { it == "DELETE" }
                     ?.let { _ ->
                         item.o("menuServiceItemRenderer")
