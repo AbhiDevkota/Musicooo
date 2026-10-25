@@ -1377,5 +1377,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Arquivo aberto</string>
+    <string name="folders">Pastas</string>
+    <string name="folder">Pasta</string>
+    <string name="no_local_folders">Nenhuma pasta com música</string>
+    <string name="offline_playlist_empty">Esta playlist ainda está vazia. Adicione músicas pelo menu delas.</string>
+    <string name="offline_liked_empty">As músicas que você curtir neste dispositivo aparecem aqui</string>
+    <string name="saved_on_this_device">Salva neste dispositivo</string>
     <string name="direct_source_stream_in_party">Desativado durante uma festa do Listen Together</string>
 </resources>

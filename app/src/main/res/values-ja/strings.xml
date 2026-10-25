@@ -1350,5 +1350,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">開いたファイル</string>
+    <string name="folders">フォルダ</string>
+    <string name="folder">フォルダ</string>
+    <string name="no_local_folders">音楽が入ったフォルダはありません</string>
+    <string name="offline_playlist_empty">このプレイリストはまだ空です。曲のメニューから追加できます。</string>
+    <string name="offline_liked_empty">このデバイスで高く評価した曲がここに表示されます</string>
+    <string name="saved_on_this_device">このデバイスに保存</string>
     <string name="direct_source_stream_in_party">Listen Together パーティー中はオフ</string>
 </resources>

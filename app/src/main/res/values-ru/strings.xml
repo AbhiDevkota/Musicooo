@@ -1404,5 +1404,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">Открытый файл</string>
+    <string name="folders">Папки</string>
+    <string name="folder">Папка</string>
+    <string name="no_local_folders">Нет папок с музыкой</string>
+    <string name="offline_playlist_empty">Этот плейлист пока пуст. Добавляйте треки из их меню.</string>
+    <string name="offline_liked_empty">Треки, которые вам понравились на этом устройстве, появятся здесь</string>
+    <string name="saved_on_this_device">Сохранено на этом устройстве</string>
     <string name="direct_source_stream_in_party">Отключено во время вечеринки Listen Together</string>
 </resources>

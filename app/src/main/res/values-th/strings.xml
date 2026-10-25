@@ -1355,5 +1355,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">ไฟล์ที่เปิด</string>
+    <string name="folders">โฟลเดอร์</string>
+    <string name="folder">โฟลเดอร์</string>
+    <string name="no_local_folders">ไม่มีโฟลเดอร์ที่มีเพลง</string>
+    <string name="offline_playlist_empty">เพลย์ลิสต์นี้ยังว่างอยู่ เพิ่มเพลงได้จากเมนูของเพลง</string>
+    <string name="offline_liked_empty">เพลงที่คุณถูกใจในอุปกรณ์นี้จะแสดงที่นี่</string>
+    <string name="saved_on_this_device">บันทึกไว้ในอุปกรณ์นี้</string>
     <string name="direct_source_stream_in_party">ปิดอยู่ขณะอยู่ในปาร์ตี้ Listen Together</string>
 </resources>

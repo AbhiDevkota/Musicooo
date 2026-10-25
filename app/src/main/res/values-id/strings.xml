@@ -1349,5 +1349,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">File yang dibuka</string>
+    <string name="folders">Folder</string>
+    <string name="folder">Folder</string>
+    <string name="no_local_folders">Tidak ada folder berisi musik</string>
+    <string name="offline_playlist_empty">Playlist ini masih kosong. Tambahkan lagu dari menunya.</string>
+    <string name="offline_liked_empty">Lagu yang kamu sukai di perangkat ini muncul di sini</string>
+    <string name="saved_on_this_device">Disimpan di perangkat ini</string>
     <string name="direct_source_stream_in_party">Nonaktif selama kamu dalam pesta Listen Together</string>
 </resources>

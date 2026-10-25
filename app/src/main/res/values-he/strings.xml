@@ -1377,5 +1377,12 @@
     <string name="no_audio_version">No audio version found for this video</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">קובץ שנפתח</string>
+    <string name="folders">תיקיות</string>
+    <string name="folder">תיקייה</string>
+    <string name="no_local_folders">אין תיקיות עם מוזיקה</string>
+    <string name="offline_playlist_empty">הפלייליסט עדיין ריק. אפשר להוסיף שירים מהתפריט שלהם.</string>
+    <string name="offline_liked_empty">שירים שאהבת במכשיר הזה יופיעו כאן</string>
+    <string name="saved_on_this_device">נשמר במכשיר הזה</string>
     <string name="direct_source_stream_in_party">כבוי בזמן מסיבת Listen Together</string>
 </resources>
