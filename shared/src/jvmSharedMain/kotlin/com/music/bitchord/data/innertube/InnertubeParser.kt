@@ -1239,7 +1239,6 @@ object InnertubeParser {
                 // matching music video is "Artist • 417M views • 2.4M likes".
                 isVideo = byline.any { it.contains("views", ignoreCase = true) },
                 isExplicit = renderer.hasExplicitBadge(),
-                feedbackToken = extractFeedbackToken(renderer),
             )
         }
         return out.values.toList()
@@ -1251,6 +1250,12 @@ object InnertubeParser {
      *   menu → menuRenderer → items[] → menuServiceItemRenderer →
      *       serviceEndpoint → feedbackEndpoint → feedbackToken
      * with navigationEndpoint and click.command as fallbacks.
+     *
+     * Safety: only plain `menuServiceItemRenderer` items are considered (not
+     * `toggleMenuServiceItemRenderer`, whose tokens drive library/like state).
+     * When several candidates exist the DELETE-icon item is preferred; if none
+     * carries that icon the first structural match is used as a fallback.  If
+     * no candidate carries a token at all, returns null (the row stays hidden).
      */
     private fun extractFeedbackToken(renderer: JsonObject): String? {
         val candidates = renderer.o("menu")
@@ -1259,8 +1264,21 @@ object InnertubeParser {
             ?.filter { it.o("menuServiceItemRenderer") != null }
             .orEmpty()
 
-        return candidates.firstNotNullOfOrNull { item ->
-            item.o("menuServiceItemRenderer")
+        // Diagnostic: log icon types of all menu items so a failed device test is
+        // easy to diagnose.  TODO remove diagnostic
+        if (candidates.isEmpty()) {
+            DebugLog.d(TAG, "extractFeedbackToken: no menu items in history row — iconTypes unknown")
+        } else {
+            val icons = candidates.mapNotNull {
+                it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType")
+            }
+            DebugLog.d(TAG, "extractFeedbackToken: history row menu iconTypes=${icons.joinToString()}")
+        }
+
+        // Helper: extract the feedback token from a single candidate via any of
+        // the three known endpoint paths.
+        fun candidateToken(item: JsonElement): String? {
+            return item.o("menuServiceItemRenderer")
                 ?.o("serviceEndpoint")
                 ?.o("feedbackEndpoint")
                 ?.s("feedbackToken")
@@ -1273,6 +1291,19 @@ object InnertubeParser {
                     ?.o("command")
                     ?.o("feedbackEndpoint")
                     ?.s("feedbackToken")
+        }
+
+        // Prefer the DELETE-icon candidate (unambiguous "Remove from history").
+        val deleteCandidate = candidates.firstOrNull {
+            it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType") == "DELETE"
+        }
+        if (deleteCandidate != null) {
+            candidateToken(deleteCandidate)?.let { return it }
+        }
+
+        // Fallback: first structural match that carries a token.
+        return candidates.firstNotNullOfOrNull { item ->
+            candidateToken(item)
         }
     }
 
@@ -1330,67 +1361,11 @@ object InnertubeParser {
         // structurally by the presence of a feedbackEndpoint — never by icon type.
         // The DELETE icon (if present) is only a tiebreaker when several candidates
         // exist.
-        val historyCandidates = row.o("menu")
-            ?.o("menuRenderer")
-            ?.a("items")
-            ?.filter { it.o("menuServiceItemRenderer") != null }
-            .orEmpty()
-
-        // Diagnostic: log icon types of all menu items so a failed device test is
-        // easy to diagnose.  TODO remove diagnostic
-        if (historyCandidates.isEmpty()) {
-            DebugLog.d(TAG, "parseSongMenu: no menu items in history row — iconTypes unknown")
-        } else {
-            val icons = historyCandidates.mapNotNull {
-                it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType")
-            }
-            DebugLog.d(TAG, "parseSongMenu: history row menu iconTypes=${icons.joinToString()}")
-        }
-
-        // Pick the first item that has a feedbackEndpoint (structural match).
-        val primary = historyCandidates.firstNotNullOfOrNull { item ->
-            item.o("menuServiceItemRenderer")
-                ?.o("serviceEndpoint")
-                ?.o("feedbackEndpoint")
-                ?.s("feedbackToken")
-                ?: item.o("menuServiceItemRenderer")
-                    ?.o("navigationEndpoint")
-                    ?.o("feedbackEndpoint")
-                    ?.s("feedbackToken")
-                ?: item.o("menuServiceItemRenderer")
-                    ?.o("click")
-                    ?.o("command")
-                    ?.o("feedbackEndpoint")
-                    ?.s("feedbackToken")
-        }
-
-        // Fallback: if no structural match, fall back to the DELETE-icon heuristic.
-        val fallback = historyCandidates.firstNotNullOfOrNull { item ->
-            item.o("menuServiceItemRenderer")
-                ?.o("icon")
-                ?.s("iconType")
-                ?.takeIf { it == "DELETE" }
-                ?.let { _ ->
-                    item.o("menuServiceItemRenderer")
-                        ?.o("navigationEndpoint")
-                        ?.o("feedbackEndpoint")
-                        ?.s("feedbackToken")
-                        ?: item.o("menuServiceItemRenderer")
-                            ?.o("click")
-                            ?.o("command")
-                            ?.o("feedbackEndpoint")
-                            ?.s("feedbackToken")
-                }
-        }
-
-        val removeFromHistoryToken = primary ?: fallback
-
         return SongMenu(
             likeStatus = likeStatus,
             inLibrary = toggle != null && !defaultAdds,
             addToLibraryToken = if (defaultAdds) defaultToken else toggledToken,
             removeFromLibraryToken = if (defaultAdds) toggledToken else defaultToken,
-            removeFromHistoryToken = removeFromHistoryToken,
         )
     }
 
