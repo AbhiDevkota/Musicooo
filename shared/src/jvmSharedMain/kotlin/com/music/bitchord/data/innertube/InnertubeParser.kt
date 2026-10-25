@@ -22,7 +22,6 @@ import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.WatchTarget
-import com.music.bitchord.data.DebugLog as DebugLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -1263,17 +1262,6 @@ object InnertubeParser {
             ?.a("items")
             ?.filter { it.o("menuServiceItemRenderer") != null }
             .orEmpty()
-
-        // Diagnostic: log icon types of all menu items so a failed device test is
-        // easy to diagnose.  TODO remove diagnostic
-        if (candidates.isEmpty()) {
-            DebugLog.d(TAG, "extractFeedbackToken: no menu items in history row — iconTypes unknown")
-        } else {
-            val icons = candidates.mapNotNull {
-                it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType")
-            }
-            DebugLog.d(TAG, "extractFeedbackToken: history row menu iconTypes=${icons.joinToString()}")
-        }
 
         // Helper: extract the feedback token from a single candidate via any of
         // the three known endpoint paths.
