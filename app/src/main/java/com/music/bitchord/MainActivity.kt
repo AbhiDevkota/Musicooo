@@ -637,8 +637,8 @@ private fun BitChordApp(
     var menuFromPlayer by remember { mutableStateOf(false) }
     /** Whether the track menu was opened from the History screen. */
     var menuFromHistory by remember { mutableStateOf(false) }
-    /** Index of the history row being removed, set when the menu opens from History. Cleared when the menu closes. */
-    var historyRemoveIndex by remember { mutableStateOf<Int?>(null) }
+    /** Feedback token for removing this history entry, set when the menu opens from History. Cleared when the menu closes. */
+    var historyRemoveToken by remember { mutableStateOf<String?>(null) }
     /**
      * The row or card that was held to open the track menu, or null when it
      * was opened any other way. Non-null lifts that item into
@@ -2736,7 +2736,7 @@ private fun BitChordApp(
                                 },
                                 onSongLongPress = { song, index ->
                                     menuFromHistory = true
-                                    historyRemoveIndex = index
+                                    historyRemoveToken = songMenu.value?.removeFromHistoryToken
                                     openSongMenu(song)
                                 },
                                 onSongSwipe = onSongSwipe,
@@ -4364,10 +4364,13 @@ private fun BitChordApp(
                 } else {
                     null
                 },
-                onRemoveFromHistory = if (menuFromHistory && historyRemoveIndex != null) {
+                onRemoveFromHistory = if (menuFromHistory && historyRemoveToken != null) {
                     {
                         songActions = null
-                        viewModel.removeFromHistory(historyRemoveIndex!!)
+                        val token = historyRemoveToken!!
+                        viewModel.removeFromHistory(token, onFailure = { _ ->
+                            Toast.makeText(context, R.string.remove_from_history_failed, Toast.LENGTH_SHORT).show()
+                        })
                     }
                 } else {
                     null
@@ -4519,7 +4522,7 @@ private fun BitChordApp(
             if (songActions == null) {
                 songMenuOrigin = null
                 menuFromHistory = false
-                historyRemoveIndex = null
+                historyRemoveToken = null
             }
         }
 

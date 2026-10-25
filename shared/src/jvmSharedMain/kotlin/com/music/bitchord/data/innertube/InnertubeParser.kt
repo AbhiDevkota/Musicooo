@@ -22,6 +22,7 @@ import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.WatchTarget
+import com.music.bitchord.data.DebugLog as DebugLog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -38,6 +39,7 @@ import java.util.Locale
  * library) — see [collectSongsDeep].
  */
 object InnertubeParser {
+    private const val TAG = "InnertubeParser"
 
     // ---- Search -------------------------------------------------------------
 
@@ -736,6 +738,8 @@ object InnertubeParser {
             // art where a catalogue track has square album cover art.
             isVideo = rowType == "video" || thumbnails.isNotSquare(),
             isExplicit = renderer.hasExplicitBadge(),
+            // Extract the "Remove from history" feedback token from the row's menu, if present.
+            feedbackToken = extractFeedbackToken(renderer),
         )
     }
 
@@ -1235,9 +1239,41 @@ object InnertubeParser {
                 // matching music video is "Artist • 417M views • 2.4M likes".
                 isVideo = byline.any { it.contains("views", ignoreCase = true) },
                 isExplicit = renderer.hasExplicitBadge(),
+                feedbackToken = extractFeedbackToken(renderer),
             )
         }
         return out.values.toList()
+    }
+
+    /**
+     * Extracts the "Remove from history" feedback token from a row's menu, if
+     * present.  The canonical path is:
+     *   menu → menuRenderer → items[] → menuServiceItemRenderer →
+     *       serviceEndpoint → feedbackEndpoint → feedbackToken
+     * with navigationEndpoint and click.command as fallbacks.
+     */
+    private fun extractFeedbackToken(renderer: JsonObject): String? {
+        val candidates = renderer.o("menu")
+            ?.o("menuRenderer")
+            ?.a("items")
+            ?.filter { it.o("menuServiceItemRenderer") != null }
+            .orEmpty()
+
+        return candidates.firstNotNullOfOrNull { item ->
+            item.o("menuServiceItemRenderer")
+                ?.o("serviceEndpoint")
+                ?.o("feedbackEndpoint")
+                ?.s("feedbackToken")
+                ?: item.o("menuServiceItemRenderer")
+                    ?.o("navigationEndpoint")
+                    ?.o("feedbackEndpoint")
+                    ?.s("feedbackToken")
+                ?: item.o("menuServiceItemRenderer")
+                    ?.o("click")
+                    ?.o("command")
+                    ?.o("feedbackEndpoint")
+                    ?.s("feedbackToken")
+        }
     }
 
     /**
@@ -1287,27 +1323,67 @@ object InnertubeParser {
         val toggledToken = toggle.feedbackToken("toggledServiceEndpoint")
 
         // A plain (non-toggle) menu item carries a "Remove from history" action
-        // with its own feedback token, reachable via menu → menuRenderer → items.
-        val removeFromHistoryToken = row.o("menu")
+        // with its own feedback token. The canonical path is:
+        //   menuServiceItemRenderer.serviceEndpoint.feedbackEndpoint.feedbackToken
+        // but the endpoint may also live under navigationEndpoint or click.command,
+        // so we check all three and pick whichever has a token.  We select items
+        // structurally by the presence of a feedbackEndpoint — never by icon type.
+        // The DELETE icon (if present) is only a tiebreaker when several candidates
+        // exist.
+        val historyCandidates = row.o("menu")
             ?.o("menuRenderer")
             ?.a("items")
-            ?.firstNotNullOfOrNull { item ->
-                item.o("menuServiceItemRenderer")
-                    ?.o("icon")
-                    ?.s("iconType")
-                    ?.takeIf { it == "DELETE" }
-                    ?.let { _ ->
-                        item.o("menuServiceItemRenderer")
-                            ?.o("navigationEndpoint")
+            ?.filter { it.o("menuServiceItemRenderer") != null }
+            .orEmpty()
+
+        // Diagnostic: log icon types of all menu items so a failed device test is
+        // easy to diagnose.  TODO remove diagnostic
+        if (historyCandidates.isEmpty()) {
+            DebugLog.d(TAG, "parseSongMenu: no menu items in history row — iconTypes unknown")
+        } else {
+            val icons = historyCandidates.mapNotNull {
+                it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType")
+            }
+            DebugLog.d(TAG, "parseSongMenu: history row menu iconTypes=${icons.joinToString()}")
+        }
+
+        // Pick the first item that has a feedbackEndpoint (structural match).
+        val primary = historyCandidates.firstNotNullOfOrNull { item ->
+            item.o("menuServiceItemRenderer")
+                ?.o("serviceEndpoint")
+                ?.o("feedbackEndpoint")
+                ?.s("feedbackToken")
+                ?: item.o("menuServiceItemRenderer")
+                    ?.o("navigationEndpoint")
+                    ?.o("feedbackEndpoint")
+                    ?.s("feedbackToken")
+                ?: item.o("menuServiceItemRenderer")
+                    ?.o("click")
+                    ?.o("command")
+                    ?.o("feedbackEndpoint")
+                    ?.s("feedbackToken")
+        }
+
+        // Fallback: if no structural match, fall back to the DELETE-icon heuristic.
+        val fallback = historyCandidates.firstNotNullOfOrNull { item ->
+            item.o("menuServiceItemRenderer")
+                ?.o("icon")
+                ?.s("iconType")
+                ?.takeIf { it == "DELETE" }
+                ?.let { _ ->
+                    item.o("menuServiceItemRenderer")
+                        ?.o("navigationEndpoint")
+                        ?.o("feedbackEndpoint")
+                        ?.s("feedbackToken")
+                        ?: item.o("menuServiceItemRenderer")
+                            ?.o("click")
+                            ?.o("command")
                             ?.o("feedbackEndpoint")
                             ?.s("feedbackToken")
-                            ?: item.o("menuServiceItemRenderer")
-                                ?.o("click")
-                                ?.o("command")
-                                ?.o("feedbackEndpoint")
-                                ?.s("feedbackToken")
-                    }
-            }
+                }
+        }
+
+        val removeFromHistoryToken = primary ?: fallback
 
         return SongMenu(
             likeStatus = likeStatus,
