@@ -1357,4 +1357,5 @@
     <string name="offline_playlist_empty">このプレイリストはまだ空です。曲のメニューから追加できます。</string>
     <string name="offline_liked_empty">このデバイスで高く評価した曲がここに表示されます</string>
     <string name="saved_on_this_device">このデバイスに保存</string>
+    <string name="direct_source_stream_in_party">Listen Together パーティー中はオフ</string>
 </resources>

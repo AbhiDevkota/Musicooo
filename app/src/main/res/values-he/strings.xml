@@ -1384,4 +1384,5 @@
     <string name="offline_playlist_empty">הפלייליסט עדיין ריק. אפשר להוסיף שירים מהתפריט שלהם.</string>
     <string name="offline_liked_empty">שירים שאהבת במכשיר הזה יופיעו כאן</string>
     <string name="saved_on_this_device">נשמר במכשיר הזה</string>
+    <string name="direct_source_stream_in_party">כבוי בזמן מסיבת Listen Together</string>
 </resources>

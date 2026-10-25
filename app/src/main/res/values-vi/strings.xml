@@ -1296,4 +1296,5 @@
     <string name="offline_playlist_empty">Danh sách phát này vẫn trống. Thêm bài hát từ menu của chúng.</string>
     <string name="offline_liked_empty">Các bài hát bạn thích trên thiết bị này sẽ hiện ở đây</string>
     <string name="saved_on_this_device">Đã lưu trên thiết bị này</string>
+    <string name="direct_source_stream_in_party">Tắt khi bạn đang trong bữa tiệc Listen Together</string>
 </resources>

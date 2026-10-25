@@ -1336,4 +1336,5 @@
     <string name="offline_playlist_empty">Bu çalma listesi henüz boş. Şarkıları menülerinden ekleyin.</string>
     <string name="offline_liked_empty">Bu cihazda beğendiğin şarkılar burada görünür</string>
     <string name="saved_on_this_device">Bu cihaza kaydedildi</string>
+    <string name="direct_source_stream_in_party">Listen Together partisi sırasında kapalı</string>
 </resources>

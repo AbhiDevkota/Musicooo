@@ -1379,4 +1379,5 @@
     <string name="offline_playlist_empty">यह प्लेलिस्ट अभी खाली है। गानों के मेनू से उन्हें जोड़ें।</string>
     <string name="offline_liked_empty">इस डिवाइस पर पसंद किए गए गाने यहाँ दिखेंगे</string>
     <string name="saved_on_this_device">इस डिवाइस पर सेव किया गया</string>
+    <string name="direct_source_stream_in_party">Listen Together पार्टी के दौरान बंद</string>
 </resources>

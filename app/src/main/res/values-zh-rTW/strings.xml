@@ -1356,4 +1356,5 @@
     <string name="offline_playlist_empty">這個播放清單還是空的。可從歌曲選單中加入。</string>
     <string name="offline_liked_empty">你在這部裝置上喜歡的歌曲會顯示在這裡</string>
     <string name="saved_on_this_device">已儲存在這部裝置上</string>
+    <string name="direct_source_stream_in_party">在 Listen Together 派對中時關閉</string>
 </resources>

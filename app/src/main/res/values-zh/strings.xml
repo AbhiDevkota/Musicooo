@@ -1356,4 +1356,5 @@
     <string name="offline_playlist_empty">此歌单还是空的。可从歌曲菜单中添加。</string>
     <string name="offline_liked_empty">你在此设备上喜欢的歌曲会显示在这里</string>
     <string name="saved_on_this_device">已保存在此设备上</string>
+    <string name="direct_source_stream_in_party">在 Listen Together 派对中时关闭</string>
 </resources>

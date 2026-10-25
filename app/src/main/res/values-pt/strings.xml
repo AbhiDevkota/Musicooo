@@ -1384,4 +1384,5 @@
     <string name="offline_playlist_empty">Esta playlist ainda está vazia. Adicione músicas pelo menu delas.</string>
     <string name="offline_liked_empty">As músicas que você curtir neste dispositivo aparecem aqui</string>
     <string name="saved_on_this_device">Salva neste dispositivo</string>
+    <string name="direct_source_stream_in_party">Desativado durante uma festa do Listen Together</string>
 </resources>

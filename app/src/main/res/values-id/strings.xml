@@ -1356,4 +1356,5 @@
     <string name="offline_playlist_empty">Playlist ini masih kosong. Tambahkan lagu dari menunya.</string>
     <string name="offline_liked_empty">Lagu yang kamu sukai di perangkat ini muncul di sini</string>
     <string name="saved_on_this_device">Disimpan di perangkat ini</string>
+    <string name="direct_source_stream_in_party">Nonaktif selama kamu dalam pesta Listen Together</string>
 </resources>

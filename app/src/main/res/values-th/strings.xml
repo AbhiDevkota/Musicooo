@@ -1362,4 +1362,5 @@
     <string name="offline_playlist_empty">เพลย์ลิสต์นี้ยังว่างอยู่ เพิ่มเพลงได้จากเมนูของเพลง</string>
     <string name="offline_liked_empty">เพลงที่คุณถูกใจในอุปกรณ์นี้จะแสดงที่นี่</string>
     <string name="saved_on_this_device">บันทึกไว้ในอุปกรณ์นี้</string>
+    <string name="direct_source_stream_in_party">ปิดอยู่ขณะอยู่ในปาร์ตี้ Listen Together</string>
 </resources>
