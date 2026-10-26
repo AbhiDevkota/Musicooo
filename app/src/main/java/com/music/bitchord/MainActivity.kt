@@ -4423,12 +4423,8 @@ private fun BitChordApp(
                 },
                 onAddToPlaylist = {
                     songActions = null
-                    if (song.localUri != null) {
-                        offlinePlaylistTarget = song
-                    } else {
-                        viewModel.loadPlaylists()
-                        playlistTarget = song
-                    }
+                    viewModel.loadPlaylists()
+                    playlistTarget = song
                 },
                 onRemoveFromPlaylist = editable?.let {
                     {
