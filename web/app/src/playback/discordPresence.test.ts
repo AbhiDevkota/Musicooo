@@ -44,4 +44,23 @@ describe('discord presence', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(calls).toHaveLength(2);
   });
+
+  it('republishes a seek that buffers before it plays again', async () => {
+    vi.useFakeTimers();
+    calls.length = 0;
+    audio = Object.assign(new EventTarget(), { currentTime: 0, duration: 200, playbackRate: 1 });
+    player.setState({ nowPlaying: { videoId: 'bcdefghijkl', title: 't', artist: 'a' }, status: 'playing' });
+    stop = startPublisher();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(calls).toHaveLength(1);
+
+    // Every seek of the element goes waiting → playing, and the push must survive it.
+    audio.currentTime = 90;
+    audio.dispatchEvent(new Event('seeked'));
+    player.setState({ status: 'buffering' });
+    await vi.advanceTimersByTimeAsync(500);
+    player.setState({ status: 'playing' });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(calls).toHaveLength(2);
+  });
 });
