@@ -502,6 +502,7 @@ private fun BitChordApp(
     // solid (see [Modifier.liquidGlass]) and the whole-page layer recording
     // below goes with them, which is the part that costs a draw pass.
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val glassSamplesBackdrop = glassActive && !reduceDynamicBlur
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
@@ -3450,9 +3451,10 @@ private fun BitChordApp(
                 }
                 // Apple's scroll edge: what passes up under the status bar and the
                 // controls is blurred — hardest at the top, none just below the
-                // controls — rather than faded out to the page colour. Under
-                // reduce dynamic blur the bottom floor's own fade stands in,
-                // turned upside down, so both edges share its curve and colour.
+                // controls — rather than faded out to the page colour. With the
+                // Progressive Blur setting off, or under reduce dynamic blur, the
+                // bottom floor's own fade stands in, turned upside down, so both
+                // edges share its curve and colour.
                 // On an artist page the photograph and logo run up under the status
                 // bar, and either across them would only muddy them. It comes in as
                 // the page scrolls past that header, when content starts passing
@@ -3480,7 +3482,7 @@ private fun BitChordApp(
                             (header * fadeRamp)).coerceIn(0f, 1f)
                     }
                 }
-                if (reduceDynamicBlur) {
+                if (reduceDynamicBlur || !progressiveBlur) {
                     BottomFadeScrim(
                         pageColor = chromePageColor,
                         modifier = Modifier

@@ -215,6 +215,7 @@ fun SettingsScreen(
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
+    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
@@ -826,6 +827,17 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setLiquidGlass(!liquidGlass) },
+                )
+            }
+            val progressiveBlurTitle = stringResource(R.string.progressive_blur)
+            // One line, like Direct Source Stream under Sources. Its own switch
+            // rather than part of Liquid Glass: it works with glass on or off,
+            // and costs frames of its own. Reduce dynamic blur turns it off.
+            row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
+                SettingsSubRow(
+                    title = progressiveBlurTitle,
+                    checked = progressiveBlur,
+                    onCheckedChange = AppSettings::setProgressiveBlur,
                 )
             }
             // Left out where the player won't honour it: a window too wide for
