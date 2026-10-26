@@ -169,6 +169,9 @@ fun HomeScreen(
         LocalArtworkMotion provides (artworkMotion && feedReady),
         LocalArtworkImages provides feedReady,
     ) {
+    // The loops also hold still while the feed is being scrolled — see
+    // LocalArtworkScrolling for why that is asked rather than provided.
+    PausedWhileScrolling(listState) {
 
     PullToRefresh(
         refreshing = refreshing,
@@ -195,7 +198,13 @@ fun HomeScreen(
             }
             if (!signedIn && onSignIn != null) {
                 item {
-                    SignInBanner(onSignIn = onSignIn, modifier = Modifier.padding(bottom = 8.dp))
+                    // Read in this item, so a scroll starting or ending
+                    // recomposes the banner alone.
+                    SignInBanner(
+                        onSignIn = onSignIn,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        motion = LocalArtworkMotion.current && !listState.isScrollInProgress,
+                    )
                 }
             }
             if (onTopPickClick != null) {
@@ -249,6 +258,7 @@ fun HomeScreen(
         }
     }
 
+    }
     }
 
     if (onLoadMore != null && state is UiState.Success) {

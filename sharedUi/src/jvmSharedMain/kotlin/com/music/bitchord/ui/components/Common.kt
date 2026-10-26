@@ -819,7 +819,16 @@ fun PullToRefresh(
  * mesh is the card, and white type is what sits on colour.
  */
 @Composable
-fun SignInBanner(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
+fun SignInBanner(
+    onSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * Whether the mesh may move. Off, it finishes the fade it is in and rests:
+     * a blurred layer re-drawn every frame is not something to leave running
+     * under a scroll, or under the player where nobody sees it.
+     */
+    motion: Boolean = true,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.98f else 1f, spring(stiffness = 900f), label = "signInScale")
@@ -837,9 +846,10 @@ fun SignInBanner(onSignIn: () -> Unit, modifier: Modifier = Modifier) {
         // A card is a few hundred dp the reader is looking straight at, which
         // is the case the mesh lets keep moving — see its `continuous` note.
         MeshGradientBackground(
-            palette = cyclingMeshPalette(WelcomeMeshPalettes),
+            palette = cyclingMeshPalette(WelcomeMeshPalettes, running = motion),
             modifier = Modifier.matchParentSize(),
             continuous = true,
+            paused = !motion,
             driftMillis = 6_000,
             blurRadius = 36.dp,
             colorFadeMillis = MESH_CYCLE_MILLIS,
