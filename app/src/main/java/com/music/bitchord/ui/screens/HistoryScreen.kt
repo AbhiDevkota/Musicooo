@@ -37,7 +37,7 @@ fun HistoryScreen(
     state: UiState<List<Song>>,
     listState: LazyListState,
     onSongClick: (List<Song>, Int) -> Unit,
-    onSongLongPress: (Song, Int) -> Unit,
+    onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
     onRetry: () -> Unit,
     contentPadding: PaddingValues,
@@ -71,7 +71,7 @@ fun HistoryScreen(
                     SongRow(
                         song = song,
                         onClick = { onSongClick(songs, index) },
-                        onLongPress = { onSongLongPress(song, index) },
+                        onLongPress = { onSongLongPress(song) },
                         onSwipeToQueue = { onSongSwipe(song) },
                         isCurrent = isCurrentRow(song),
                         isPlaying = isCurrentRow(song) && isPlaying,

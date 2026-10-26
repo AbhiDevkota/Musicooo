@@ -38,7 +38,6 @@ import java.util.Locale
  * library) — see [collectSongsDeep].
  */
 object InnertubeParser {
-    private const val TAG = "InnertubeParser"
 
     // ---- Search -------------------------------------------------------------
 
@@ -1244,56 +1243,21 @@ object InnertubeParser {
     }
 
     /**
-     * Extracts the "Remove from history" feedback token from a row's menu, if
-     * present.  The canonical path is:
-     *   menu → menuRenderer → items[] → menuServiceItemRenderer →
-     *       serviceEndpoint → feedbackEndpoint → feedbackToken
-     * with navigationEndpoint and click.command as fallbacks.
-     *
-     * Safety: only plain `menuServiceItemRenderer` items are considered (not
-     * `toggleMenuServiceItemRenderer`, whose tokens drive library/like state).
-     * When several candidates exist the DELETE-icon item is preferred; if none
-     * carries that icon the first structural match is used as a fallback.  If
-     * no candidate carries a token at all, returns null (the row stays hidden).
+     * The "Remove from history" feedback token on a history row's menu, or
+     * null. The same plain menu items also carry other feedback actions —
+     * "Don't recommend this", for one — so only the item wearing the DELETE
+     * icon is taken; sending a stranger's token would quietly do something
+     * else to the account.
      */
-    private fun extractFeedbackToken(renderer: JsonObject): String? {
-        val candidates = renderer.o("menu")
+    private fun extractFeedbackToken(renderer: JsonObject): String? =
+        renderer.o("menu")
             ?.o("menuRenderer")
             ?.a("items")
-            ?.filter { it.o("menuServiceItemRenderer") != null }
-            .orEmpty()
-
-        // Helper: extract the feedback token from a single candidate via any of
-        // the three known endpoint paths.
-        fun candidateToken(item: JsonElement): String? {
-            return item.o("menuServiceItemRenderer")
-                ?.o("serviceEndpoint")
-                ?.o("feedbackEndpoint")
-                ?.s("feedbackToken")
-                ?: item.o("menuServiceItemRenderer")
-                    ?.o("navigationEndpoint")
-                    ?.o("feedbackEndpoint")
-                    ?.s("feedbackToken")
-                ?: item.o("menuServiceItemRenderer")
-                    ?.o("click")
-                    ?.o("command")
-                    ?.o("feedbackEndpoint")
-                    ?.s("feedbackToken")
-        }
-
-        // Prefer the DELETE-icon candidate (unambiguous "Remove from history").
-        val deleteCandidate = candidates.firstOrNull {
-            it.o("menuServiceItemRenderer")?.o("icon")?.s("iconType") == "DELETE"
-        }
-        if (deleteCandidate != null) {
-            candidateToken(deleteCandidate)?.let { return it }
-        }
-
-        // Fallback: first structural match that carries a token.
-        return candidates.firstNotNullOfOrNull { item ->
-            candidateToken(item)
-        }
-    }
+            ?.firstNotNullOfOrNull { item ->
+                val service = item.o("menuServiceItemRenderer") ?: return@firstNotNullOfOrNull null
+                if (service.o("icon")?.s("iconType") != "DELETE") return@firstNotNullOfOrNull null
+                service.o("serviceEndpoint")?.o("feedbackEndpoint")?.s("feedbackToken")
+            }
 
     /**
      * The account's own state for one track, read off the watch queue's row
@@ -1341,14 +1305,6 @@ object InnertubeParser {
         val defaultToken = toggle.feedbackToken("defaultServiceEndpoint")
         val toggledToken = toggle.feedbackToken("toggledServiceEndpoint")
 
-        // A plain (non-toggle) menu item carries a "Remove from history" action
-        // with its own feedback token. The canonical path is:
-        //   menuServiceItemRenderer.serviceEndpoint.feedbackEndpoint.feedbackToken
-        // but the endpoint may also live under navigationEndpoint or click.command,
-        // so we check all three and pick whichever has a token.  We select items
-        // structurally by the presence of a feedbackEndpoint — never by icon type.
-        // The DELETE icon (if present) is only a tiebreaker when several candidates
-        // exist.
         return SongMenu(
             likeStatus = likeStatus,
             inLibrary = toggle != null && !defaultAdds,

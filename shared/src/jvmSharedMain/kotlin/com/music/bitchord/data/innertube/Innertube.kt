@@ -1099,12 +1099,6 @@ object Innertube {
         }
     }
 
-    /** Removes a track from the account's listening history on YouTube Music via the feedback endpoint. */
-    suspend fun removeHistory(token: String) {
-        requireSession()
-        sendFeedback(token)
-    }
-
     /** A fresh client-playback-nonce, identifying one play of one track. */
     fun newCpn(): String = (1..16).map { CPN_ALPHABET.random() }.joinToString("")
 

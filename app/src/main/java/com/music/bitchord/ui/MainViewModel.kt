@@ -1979,12 +1979,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             YtMusicRepository.removeFromHistory(token).onSuccess {
                 // Optimistically remove only the first entry whose feedbackToken matches, so the list updates immediately without a loading flash
                 val current = _history.value
-                if (current is UiState.Success<*>) {
-                    @Suppress("UNCHECKED_CAST")
-                    _history.value = (current as UiState.Success<List<Song>>).let { state ->
-                        val idx = state.data.indexOfFirst { it.feedbackToken == token }
-                        if (idx >= 0) state.copy(data = state.data.filterIndexed { i, _ -> i != idx }) else state
-                    }
+                if (current is UiState.Success) {
+                    _history.value = current.copy(data = current.data.filterNot { it.feedbackToken == token })
                 }
                 // Invalidate the in-memory history cache so the next load fetches fresh data from YouTube
                 YtMusicRepository.invalidateHistoryCache()
