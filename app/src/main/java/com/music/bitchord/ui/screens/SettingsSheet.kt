@@ -829,16 +829,19 @@ fun SettingsScreen(
                     onClick = { AppSettings.setLiquidGlass(!liquidGlass) },
                 )
             }
-            val progressiveBlurTitle = stringResource(R.string.progressive_blur)
-            // One line, like Direct Source Stream under Sources. Its own switch
-            // rather than part of Liquid Glass: it works with glass on or off,
-            // and costs frames of its own. Reduce dynamic blur turns it off.
-            row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
-                SettingsSubRow(
-                    title = progressiveBlurTitle,
-                    checked = progressiveBlur,
-                    onCheckedChange = AppSettings::setProgressiveBlur,
-                )
+            // One line, like Direct Source Stream under Sources, and only while
+            // Liquid Glass is on: it qualifies the glass rather than standing on
+            // its own. Its own switch because it costs frames of its own. Reduce
+            // dynamic blur turns it off.
+            if (liquidGlass && liquidGlassSupported) {
+                val progressiveBlurTitle = stringResource(R.string.progressive_blur)
+                row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
+                    SettingsSubRow(
+                        title = progressiveBlurTitle,
+                        checked = progressiveBlur,
+                        onCheckedChange = AppSettings::setProgressiveBlur,
+                    )
+                }
             }
             // Left out where the player won't honour it: a window too wide for
             // the player to fill and too narrow to stand a page beside it keeps

@@ -3451,10 +3451,11 @@ private fun BitChordApp(
                 }
                 // Apple's scroll edge: what passes up under the status bar and the
                 // controls is blurred — hardest at the top, none just below the
-                // controls — rather than faded out to the page colour. With the
-                // Progressive Blur setting off, or under reduce dynamic blur, the
-                // bottom floor's own fade stands in, turned upside down, so both
-                // edges share its curve and colour.
+                // controls — rather than faded out to the page colour. It is a
+                // Liquid Glass option: with glass off, the Progressive Blur setting
+                // off, or under reduce dynamic blur, the bottom floor's own fade
+                // stands in, turned upside down, so both edges share its curve
+                // and colour.
                 // On an artist page the photograph and logo run up under the status
                 // bar, and either across them would only muddy them. It comes in as
                 // the page scrolls past that header, when content starts passing
@@ -3482,7 +3483,7 @@ private fun BitChordApp(
                             (header * fadeRamp)).coerceIn(0f, 1f)
                     }
                 }
-                if (reduceDynamicBlur || !progressiveBlur) {
+                if (reduceDynamicBlur || !glassActive || !progressiveBlur) {
                     BottomFadeScrim(
                         pageColor = chromePageColor,
                         modifier = Modifier
