@@ -168,8 +168,8 @@ fun FrostedTopBar(
     // the caller would recompose the whole app on each one.
     pullFraction: () -> Float = { 0f },
     /**
-     * A page control filling the bar from the leading gutter to [actions], on
-     * no surface of its own — the Search tab's field, which brings its own.
+     * A page control filling the bar from the leading gutter to [actions] — the
+     * Search tab's field — set on a pill of its own; see [AccessoryPill].
      * Root tabs have no back button there for it to collide with.
      */
     accessory: (@Composable () -> Unit)? = null,
@@ -322,7 +322,13 @@ fun FrostedTopBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (accessory != null) {
-                    Box(Modifier.weight(1f)) { accessory() }
+                    Box(Modifier.weight(1f)) {
+                        AccessoryPill(
+                            floating = useFloatingChrome,
+                            hazeState = backButtonHazeState,
+                            content = accessory,
+                        )
+                    }
                     Spacer(Modifier.width(ACCESSORY_GAP))
                 }
                 if (useFloatingChrome) {
@@ -430,6 +436,57 @@ private fun ActionsRow(modifier: Modifier, content: @Composable () -> Unit) {
         }
     }
 }
+
+/**
+ * The bar's accessory — the Search tab's field — as a squircle pill at the
+ * height of the controls beside it. On floating chrome it is cut from the same
+ * surface as those controls, its glyphs and words in the glass's content
+ * colour; on the plain bar it keeps the field's own fill. Same shape and size
+ * either way, so turning Liquid Glass off changes the material and nothing else.
+ */
+@Composable
+private fun AccessoryPill(
+    floating: Boolean,
+    hazeState: HazeState?,
+    content: @Composable () -> Unit,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glass = floating && LocalLiquidGlassEnabled.current && isGlassSupported() && !reduceDynamicBlur
+    val shape = remember { SquirclePillShape() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TOP_CONTROL_SIZE)
+            .then(
+                if (floating) {
+                    artworkPageSurface(shape = shape, hazeState = hazeState)
+                } else {
+                    Modifier
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                },
+            ),
+    ) {
+        CompositionLocalProvider(LocalSearchFieldOnSurface provides true) {
+            if (glass) {
+                val glassContent = glassContentColor()
+                MaterialTheme(
+                    colorScheme = MaterialTheme.colorScheme.copy(
+                        onBackground = glassContent,
+                        onSurfaceVariant = glassContent.copy(alpha = ACCESSORY_HINT_ALPHA),
+                        primary = glassContent,
+                    ),
+                    content = content,
+                )
+            } else {
+                content()
+            }
+        }
+    }
+}
+
+/** The field's hint and glyphs on glass, against its typed text at full strength. */
+private const val ACCESSORY_HINT_ALPHA = 0.6f
 
 /**
  * Edge padding that collapses only for the profile-only state.
