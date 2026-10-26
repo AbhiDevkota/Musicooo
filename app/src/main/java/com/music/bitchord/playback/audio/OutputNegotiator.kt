@@ -308,7 +308,7 @@ object OutputNegotiator {
 
         // 4. External Route Advertised Capabilities (Normal AudioTrack with framework mixing)
         // Check Float32 advertised:
-        val btCodecBitDepth = bluetoothTelemetry?.takeIf { it.isAuthoritative }?.bitDepth
+        val btCodecBitDepth = bluetoothTelemetry?.takeIf { it.isConnected && it.isAuthoritative }?.bitDepth
         val canUseFloat = AudioOutputPolicy.shouldUseFloatOutput(
             requestedMode,
             routeKind,

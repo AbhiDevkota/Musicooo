@@ -1340,9 +1340,11 @@ class PlaybackService : MediaLibraryService() {
         bluetoothTracker.start()
         scope.launch {
             // A codec change (LDAC 24-bit ↔ SBC) can flip float output on or off,
-            // which needs a sink rebuild, not just a route refresh.
+            // which needs a sink rebuild, not just a route refresh. Any other real
+            // change — codec name, sample rate — still refreshes the route, so the
+            // readout follows it; only the update timestamp is ignored.
             bluetoothTracker.telemetry
-                .map { Triple(it.isConnected, it.isAuthoritative, it.bitDepth) }
+                .map { it.copy(lastUpdatedMs = 0L) }
                 .distinctUntilChanged()
                 .collect { requestOutputReconfiguration() }
         }
