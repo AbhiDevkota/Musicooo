@@ -1145,6 +1145,8 @@
     <string name="cached_songs_empty">No cached songs yet. Songs you play from YouTube or JioSaavn will show up here.</string>
     <string name="cached_song_partial">Partial</string>
     <string name="remove_from_cache">Remove from cache</string>
+    <string name="remove_from_history">Remove from history</string>
+    <string name="remove_from_history_failed">Couldn\'t remove from history</string>
     <string name="cached_song_remove">Remove</string>
     <string name="removed_from_cache">Removed from the song cache</string>
     <string name="show_cache_folder">Show cached songs folder</string>
