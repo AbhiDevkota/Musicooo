@@ -1322,4 +1322,9 @@
     <string name="offline_liked_empty">I brani che ti piacciono su questo dispositivo compaiono qui</string>
     <string name="saved_on_this_device">Salvata su questo dispositivo</string>
     <string name="direct_source_stream_in_party">Disattivato durante una festa Listen Together</string>
+    <string name="direct_source_stream">Streaming diretto dalla fonte</string>
+    <string name="find_your_mood">Trova il tuo mood</string>
+    <string name="progressive_blur">Sfocatura progressiva</string>
+    <string name="remove_from_history">Rimuovi dalla cronologia</string>
+    <string name="remove_from_history_failed">Impossibile rimuovere dalla cronologia</string>
 </resources>

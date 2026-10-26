@@ -1355,4 +1355,9 @@
     <string name="offline_liked_empty">Las canciones que te gusten en este dispositivo aparecerán aquí</string>
     <string name="saved_on_this_device">Guardada en este dispositivo</string>
     <string name="direct_source_stream_in_party">Desactivado mientras estás en una fiesta de Listen Together</string>
+    <string name="direct_source_stream">Transmisión directa desde la fuente</string>
+    <string name="find_your_mood">Encuentra tu estado de ánimo</string>
+    <string name="progressive_blur">Desenfoque progresivo</string>
+    <string name="remove_from_history">Quitar del historial</string>
+    <string name="remove_from_history_failed">No se pudo quitar del historial</string>
 </resources>

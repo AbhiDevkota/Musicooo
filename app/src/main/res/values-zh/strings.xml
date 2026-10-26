@@ -1360,4 +1360,9 @@
     <string name="offline_liked_empty">你在此设备上喜欢的歌曲会显示在这里</string>
     <string name="saved_on_this_device">已保存在此设备上</string>
     <string name="direct_source_stream_in_party">在 Listen Together 派对中时关闭</string>
+    <string name="direct_source_stream">直接从来源串流</string>
+    <string name="find_your_mood">寻找你的心情</string>
+    <string name="progressive_blur">渐进模糊</string>
+    <string name="remove_from_history">从历史记录中移除</string>
+    <string name="remove_from_history_failed">无法从历史记录中移除</string>
 </resources>
