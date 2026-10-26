@@ -432,13 +432,15 @@ internal fun LandscapeCredits(
         ) {
             Column {
                 var titleOverflowing by remember { mutableStateOf(false) }
+                val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                 MarqueeText(
                     text = song.title,
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     onOverflowChange = { titleOverflowing = it },
-                    leading = if (song.isExplicit == true) {
-                        { ExplicitBadge(Color.White) }
+                    // After the title, in the artist line's colour.
+                    trailing = if (song.isExplicit == true) {
+                        { ExplicitBadge(artistColor) }
                     } else {
                         null
                     },
@@ -451,7 +453,7 @@ internal fun LandscapeCredits(
                         artistCredits(song.artist, song.artists, song.artistId)
                     },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W500),
-                    color = LocalPlayerTint.current.copy(alpha = 0.55f),
+                    color = artistColor,
                     // A title that's also scrolling gets to go first — starting
                     // together reads as clutter, so the artist waits a beat.
                     startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,

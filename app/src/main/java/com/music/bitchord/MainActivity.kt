@@ -235,6 +235,7 @@ import com.music.bitchord.playback.setQueueDragActive
 import com.music.bitchord.ui.MainViewModel
 import com.music.bitchord.ui.SearchSource
 import com.music.bitchord.ui.components.BottomFadeScrim
+import com.music.bitchord.ui.components.TopFadeBlur
 import com.music.bitchord.ui.components.FloatingBarsTapGuard
 import com.music.bitchord.ui.components.BottomTab
 import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
@@ -504,6 +505,7 @@ private fun BitChordApp(
     // solid (see [Modifier.liquidGlass]) and the whole-page layer recording
     // below goes with them, which is the part that costs a draw pass.
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val glassSamplesBackdrop = glassActive && !reduceDynamicBlur
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
@@ -3507,12 +3509,15 @@ private fun BitChordApp(
                 } else {
                     MaterialTheme.colorScheme.background
                 }
-                // This is the bottom floor itself turned upside down, not a
-                // separately maintained approximation. Both edges therefore
-                // share the same curve, height and page-aware colour — including
-                // the white theme background in light mode.
+                // Apple's scroll edge: what passes up under the status bar and the
+                // controls is blurred — hardest at the top, none just below the
+                // controls — rather than faded out to the page colour. It is a
+                // Liquid Glass option: with glass off, the Progressive Blur setting
+                // off, or under reduce dynamic blur, the bottom floor's own fade
+                // stands in, turned upside down, so both edges share its curve
+                // and colour.
                 // On an artist page the photograph and logo run up under the status
-                // bar, and a fade across them would only muddy them. It comes in as
+                // bar, and either across them would only muddy them. It comes in as
                 // the page scrolls past that header, when content starts passing
                 // under the bar and needs the cover.
                 //
@@ -3538,13 +3543,23 @@ private fun BitChordApp(
                             (header * fadeRamp)).coerceIn(0f, 1f)
                     }
                 }
-                BottomFadeScrim(
-                    pageColor = chromePageColor,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .rotate(180f)
-                        .graphicsLayer { alpha = topFadeAlpha },
-                )
+                if (reduceDynamicBlur || !glassActive || !progressiveBlur) {
+                    BottomFadeScrim(
+                        pageColor = chromePageColor,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .rotate(180f)
+                            .graphicsLayer { alpha = topFadeAlpha },
+                    )
+                } else {
+                    TopFadeBlur(
+                        hazeState = hazeState,
+                        pageColor = chromePageColor,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .graphicsLayer { alpha = topFadeAlpha },
+                    )
+                }
 
                 FrostedTopBar(
                     title = when (route) {

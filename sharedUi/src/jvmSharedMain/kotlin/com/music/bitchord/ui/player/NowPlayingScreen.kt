@@ -7,6 +7,8 @@ import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.constrain
 import androidx.compose.ui.unit.Constraints
+import com.music.bitchord.ui.graphics.FADE_CURVE_STOPS
+import com.music.bitchord.ui.graphics.smootherStep
 import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.sharedui.resources.*
 
@@ -3044,16 +3046,14 @@ fun NowPlayingScreen(
                                     drawContent()
                                     val shown = sleeveShown()
                                     if (shown > 0f) {
-                                        // Eased (smoothstep) rather than linear: a linear
-                                        // fade has a visible corner where it starts and
-                                        // where it ends.
                                         drawRect(
+                                            // Along smootherstep, not a straight ramp,
+                                            // so neither end of the dissolve shows as a line.
                                             brush = Brush.verticalGradient(
-                                                0.00f to Color.Black,
-                                                0.25f to Color.Black.copy(alpha = 1f - shown * 0.156f),
-                                                0.50f to Color.Black.copy(alpha = 1f - shown * 0.5f),
-                                                0.75f to Color.Black.copy(alpha = 1f - shown * 0.844f),
-                                                1.00f to Color.Black.copy(alpha = 1f - shown),
+                                                colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                                    val t = i / FADE_CURVE_STOPS.toFloat()
+                                                    t to Color.Black.copy(alpha = 1f - shown * smootherStep(t))
+                                                },
                                                 startY = size.height * (1f - HERO_FADE_FRACTION),
                                                 endY = size.height,
                                             ),
@@ -3435,6 +3435,7 @@ fun NowPlayingScreen(
                                     label = "playerCredits",
                                 ) {
                                     val scrolling = scrolls()
+                                    val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                                     Column {
                                         MarqueeText(
                                             text = song.title,
@@ -3443,8 +3444,10 @@ fun NowPlayingScreen(
                                             ),
                                             color = Color.White,
                                             enabled = scrolling,
-                                            leading = if (song.isExplicit == true) {
-                                                { ExplicitBadge(color = Color.White) }
+                                            // After the title, in the artist line's
+                                            // colour, as Apple sets it.
+                                            trailing = if (song.isExplicit == true) {
+                                                { ExplicitBadge(color = artistColor) }
                                             } else {
                                                 null
                                             },
@@ -3462,7 +3465,7 @@ fun NowPlayingScreen(
                                                 fontWeight = FontWeight.W500,
                                                 fontSize = 20.sp,
                                             ),
-                                            color = LocalPlayerTint.current.copy(alpha = 0.55f),
+                                            color = artistColor,
                                             enabled = scrolling,
                                             // A title that's also scrolling gets to go first —
                                             // starting together reads as clutter, so the artist

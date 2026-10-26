@@ -135,6 +135,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.languageDisplayNameRes
 import com.music.bitchord.ui.components.MessageState
@@ -214,6 +215,7 @@ fun SettingsScreen(
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
+    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
@@ -831,6 +833,20 @@ fun SettingsScreen(
                     },
                     onClick = { AppSettings.setLiquidGlass(!liquidGlass) },
                 )
+            }
+            // One line, like Direct Source Stream under Sources, and only while
+            // Liquid Glass is on: it qualifies the glass rather than standing on
+            // its own. Its own switch because it costs frames of its own. Reduce
+            // dynamic blur turns it off.
+            if (liquidGlass && liquidGlassSupported) {
+                val progressiveBlurTitle = stringResource(R.string.progressive_blur)
+                row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
+                    SettingsSubRow(
+                        title = progressiveBlurTitle,
+                        checked = progressiveBlur,
+                        onCheckedChange = AppSettings::setProgressiveBlur,
+                    )
+                }
             }
             // Left out where the player won't honour it: a window too wide for
             // the player to fill and too narrow to stand a page beside it keeps
@@ -2691,7 +2707,10 @@ internal fun DestructiveRow(
     }
 }
 
-/** Sliding pill selector, for the handful of settings with two or three states. */
+/**
+ * Sliding pill selector, for the handful of settings with two or three states —
+ * and the Search tab's source switcher. See [PillSegmentedControl].
+ */
 @Composable
 internal fun SegmentedControl(
     options: List<String>,
@@ -2700,60 +2719,5 @@ internal fun SegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val haptics = LocalHapticFeedback.current
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.outline)
-            // Enough of a margin for the track to read as a track. At 2dp the
-            // selected pill sat all but flush against the container's own edge,
-            // so the two rounded rectangles merged into one shape and the
-            // control stopped looking like something with a position in it.
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        options.forEachIndexed { index, label ->
-            val chosen = index == selectedIndex
-            val pill by animateColorAsState(
-                targetValue = if (chosen) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    Color.Transparent
-                },
-                animationSpec = tween(160),
-                label = "segmentPill",
-            )
-            val labelColor by animateColorAsState(
-                targetValue = if (chosen) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                animationSpec = tween(160),
-                label = "segmentLabel",
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(pill)
-                    .clickable(enabled = enabled) {
-                        if (!chosen) {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelect(index)
-                        }
-                    }
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = labelColor,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
+    PillSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
 }

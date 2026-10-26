@@ -2796,7 +2796,7 @@ private fun CurrentLyricLine(
                 .padding(vertical = 4.dp),
         ) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
@@ -2869,7 +2869,7 @@ private fun CurrentLyricLine(
     ) {
         if (instrumental) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
