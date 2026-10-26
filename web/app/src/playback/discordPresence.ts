@@ -36,7 +36,7 @@ function nowPlaying(): DiscordNowPlaying | null {
   };
 }
 
-function startPublisher(): () => void {
+export function startPublisher(): () => void {
   /** What was last sent: a track (and the moment it was pushed for), or a clear. */
   let sent: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,7 +76,8 @@ function startPublisher(): () => void {
   bindAudio();
 
   const offPlayer = usePlayer.subscribe((state, before) => {
-    if (state.deck !== before.deck) bindAudio();
+    // The decks are made on the first play, and a crossfade swaps them: follow the element, not the counter.
+    if (getAudio() !== audio) bindAudio();
     if (state.nowPlaying?.videoId !== before.nowPlaying?.videoId || state.status !== before.status) {
       // Resuming after a pause is a fresh push: the old timestamps are stale.
       soon(before.status === 'paused' && state.status === 'playing');
