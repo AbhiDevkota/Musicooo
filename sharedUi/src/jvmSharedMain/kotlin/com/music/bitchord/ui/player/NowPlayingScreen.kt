@@ -133,12 +133,14 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
@@ -2828,6 +2830,13 @@ fun NowPlayingScreen(
                             -(statusBarTop.roundToPx() + topStrip.roundToPx() + ART_BOX_TOP_PAD.roundToPx())
                         }
                         val boxWidthPx = constraints.maxWidth
+                        // The sleeve's rects are in left-to-right pixels, but
+                        // [artStart] is an inset from the start edge, as the card's
+                        // slot and the title row take it. Right to left, the card and
+                        // the header thumbnail are measured in from the right.
+                        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                        fun fromStart(start: Float, width: Float): Float =
+                            if (rtl) boxWidthPx - start - width else start
                         // How far the expanded sleeve is the banner rather than the
                         // card. Zero until there is a banner to be, which is to say
                         // until [heroHeight] and the player's width have been measured.
@@ -2843,7 +2852,10 @@ fun NowPlayingScreen(
                         fun cardRect(): Rect = with(density) {
                             val side = artSize().roundToPx().toFloat()
                             val square = Rect(
-                                offset = Offset(artStart().roundToPx().toFloat(), artTop().roundToPx().toFloat()),
+                                offset = Offset(
+                                    fromStart(artStart().roundToPx().toFloat(), side),
+                                    artTop().roundToPx().toFloat(),
+                                ),
                                 size = Size(side, side),
                             )
                             if (!videoMode) return@with square
@@ -2870,7 +2882,7 @@ fun NowPlayingScreen(
                                 )
                             }
                             val thumbSide = with(density) { THUMB_SIZE.roundToPx().toFloat() }
-                            val thumb = Rect(Offset.Zero, Size(thumbSide, thumbSide))
+                            val thumb = Rect(Offset(fromStart(0f, thumbSide), 0f), Size(thumbSide, thumbSide))
                             return lerp(card, lerp(banner, thumb, p()), share)
                         }
                         // The box's left edge in the player — the gutter, which the two
@@ -2938,10 +2950,14 @@ fun NowPlayingScreen(
                             modifier = Modifier
                                 // Measured and placed at layout time rather than in
                                 // composition, so the collapse costs a layout pass and
-                                // not a recomposition per frame. Reports no size of its
-                                // own: the banner is wider than this box, and a child
-                                // measured past its constraints gets re-centred on them.
-                                .layout { measurable, _ ->
+                                // not a recomposition per frame. Reports no height and
+                                // only the box's width: the banner is wider than this
+                                // box, and a child measured past its constraints gets
+                                // re-centred on them. The width is so a right-to-left
+                                // layout still places this at the box's left edge — a
+                                // zero-wide node lands on its right, and the rect below,
+                                // in left-to-right pixels, would start from there.
+                                .layout { measurable, constraints ->
                                     // Stashed for the tile inside, which is measured
                                     // within this, and for the player's own draw.
                                     val mini = miniInBox()
@@ -2953,7 +2969,7 @@ fun NowPlayingScreen(
                                     val placeable = measurable.measure(
                                         Constraints.fixed(rect.width.roundToInt(), rect.height.roundToInt()),
                                     )
-                                    layout(0, 0) {
+                                    layout(constraints.maxWidth, 0) {
                                         val x = rect.left.roundToInt()
                                         val y = rect.top.roundToInt()
                                         dockFrame.portalLeft = (boxLeftPx + x).toFloat()
@@ -3074,13 +3090,15 @@ fun NowPlayingScreen(
                             // cover, which hides it the moment there is one.
                             Box(
                                 modifier = Modifier
-                                    .layout { measurable, _ ->
+                                    // As wide as the sleeve, for the same reason the
+                                    // sleeve is as wide as its box: right to left.
+                                    .layout { measurable, constraints ->
                                         val card = towardsDock(cardRect(), dockFrame.miniInBox)
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(
                                             Constraints.fixed(card.width.roundToInt(), card.height.roundToInt()),
                                         )
-                                        layout(0, 0) {
+                                        layout(constraints.maxWidth, 0) {
                                             placeable.place(
                                                 (card.left - sleeve.left).roundToInt(),
                                                 (card.top - sleeve.top).roundToInt(),

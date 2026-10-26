@@ -18,7 +18,6 @@ import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -89,6 +88,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Color
@@ -570,8 +570,7 @@ internal fun VolumeRow(
  *
  * The capsule swaps: output and party normally, the three playback modes while
  * the queue is up, since that is when they are what you are about to reach for.
- * With the queue up the lyrics glyph steps aside and the capsule slides over
- * into its place, leaving the queue glyph — lit — as the way back.
+ * It stays centred between the two glyphs either way.
  */
 @Composable
 internal fun PlayerActionRow(
@@ -596,26 +595,11 @@ internal fun PlayerActionRow(
         // swap, and the lyrics and queue glyphs would slide with it.
         val widestRow = BOTTOM_ACTION_SIZE * 2 + pillWidth(3)
         val edgeInset = ((maxWidth - widestRow) / 4).coerceAtLeast(0.dp)
-        // 0 with the capsule centred between lyrics and queue, 1 with it moved
-        // over to where the lyrics glyph sits. Read only while placing, so the
-        // slide relays out the row and recomposes nothing.
-        val toStart = animateFloatAsState(
-            targetValue = if (queueOpen) 1f else 0f,
-            animationSpec = tween(PILL_SLIDE_MS, easing = FastOutSlowInEasing),
-            label = "playerBottomPillSlide",
-        )
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
-            contentAlignment = Alignment.CenterStart,
+            contentAlignment = Alignment.Center,
         ) {
-            // Gone while the queue is up: the playback modes take its place, and
-            // the queue glyph, lit, is how you get back.
-            AnimatedVisibility(
-                visible = !queueOpen,
-                enter = fadeIn(tween(180, delayMillis = 120)),
-                exit = fadeOut(tween(120)),
-                modifier = Modifier.align(Alignment.CenterStart),
-            ) {
+            Box(Modifier.align(Alignment.CenterStart)) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -626,19 +610,6 @@ internal fun PlayerActionRow(
                 )
             }
             AnimatedContent(
-                // Laid out across the whole row and placed by hand: centred, as
-                // it was, at 0, flush with the lyrics glyph's left edge at 1.
-                // Centred off the capsule's *current* width, so it stays centred
-                // through the two-to-three resize on its way over rather than
-                // stepping when the size settles. Nothing in the spare width
-                // takes touches, so the glyphs either side still get theirs.
-                modifier = Modifier.layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints.copy(minWidth = 0))
-                    layout(constraints.maxWidth, placeable.height) {
-                        val centred = (constraints.maxWidth - placeable.width) / 2f
-                        placeable.place((centred * (1f - toStart.value)).roundToInt(), 0)
-                    }
-                },
                 targetState = queueOpen,
                 transitionSpec = {
                     (fadeIn(tween(180, delayMillis = 140)) togetherWith fadeOut(tween(140)))
@@ -827,19 +798,21 @@ private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 private val BOTTOM_ACTION_SIZE = 44.dp
 
 /**
+ * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
+ * three quarters of it, its corners about a fifth, and it is the tint at a
+ * little over half strength so the artwork still colours it.
+ */
+private val BOTTOM_ACTIVE_TILE_SIZE = 35.dp
+private val BOTTOM_ACTIVE_TILE_CORNER = 7.dp
+private const val BOTTOM_ACTIVE_TILE_ALPHA = 0.62f
+
+/**
  * One half of the output capsule — wider than it is tall, so the capsule reads
  * as a capsule rather than as two circles that have been pushed together.
  */
 // The count reserve is kept on both halves, so entering a party never makes
 // the capsule lopsided or shifts the queue control beside it.
 private val PILL_SEGMENT_WIDTH = 64.dp
-
-/**
- * How long the capsule takes to cross from the middle of the row to the lyrics
- * glyph's place as the queue opens, and back. Long enough to cover the content
- * swap and the resize, so it lands after both rather than before.
- */
-private const val PILL_SLIDE_MS = 320
 
 /**
  * Optical sizes, not equal ones.
@@ -1242,12 +1215,33 @@ private fun BottomGlyph(
     // costs no recomposition. Starts a full window in the past so the first tap
     // is never the one that gets swallowed.
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
+    val tileColor = LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
     Box(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
-            .clip(CircleShape)
-            .background(
-                if (highlighted) LocalPlayerTint.current.copy(alpha = 0.20f) else Color.Transparent,
+            // Lit, Apple's way: a rounded tile with the glyph cut out of it, the
+            // artwork showing through. The glyph is drawn first and the tile over
+            // it with SrcOut, which keeps the tile only where the glyph is not.
+            // Offscreen only while lit, so an unlit glyph costs no extra layer.
+            .then(
+                if (highlighted) {
+                    Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val side = BOTTOM_ACTIVE_TILE_SIZE.toPx()
+                            val corner = BOTTOM_ACTIVE_TILE_CORNER.toPx()
+                            drawRoundRect(
+                                color = tileColor,
+                                topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
+                                size = Size(side, side),
+                                cornerRadius = CornerRadius(corner, corner),
+                                blendMode = BlendMode.SrcOut,
+                            )
+                        }
+                } else {
+                    Modifier
+                },
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
