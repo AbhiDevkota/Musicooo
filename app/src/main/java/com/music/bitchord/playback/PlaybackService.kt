@@ -1355,9 +1355,14 @@ class PlaybackService : MediaLibraryService() {
 
         bluetoothTracker.start()
         scope.launch {
-            bluetoothTracker.telemetry.collect {
-                applyOutputRoute()
-            }
+            // A codec change (LDAC 24-bit ↔ SBC) can flip float output on or off,
+            // which needs a sink rebuild, not just a route refresh. Any other real
+            // change — codec name, sample rate — still refreshes the route, so the
+            // readout follows it; only the update timestamp is ignored.
+            bluetoothTracker.telemetry
+                .map { it.copy(lastUpdatedMs = 0L) }
+                .distinctUntilChanged()
+                .collect { requestOutputReconfiguration() }
         }
 
         val streamResolver = ResolvingDataSource.Resolver { dataSpec ->
@@ -6794,7 +6799,15 @@ class PlaybackService : MediaLibraryService() {
             requestedMode = AppSettings.outputPcmMode.value,
             routeKind = routeKind,
             advertisesPcmFloat = advertisesFloat || directFloatSupported,
+            bluetoothCodecBitDepth = bluetoothCodecBitDepth(routeKind),
         )
+    }
+
+    /** The negotiated A2DP bit depth, only when Android actually reported it. */
+    private fun bluetoothCodecBitDepth(routeKind: AudioRouting.Kind): Int? {
+        if (routeKind != AudioRouting.Kind.BLUETOOTH) return null
+        val telemetry = bluetoothTracker.telemetry.value
+        return telemetry.bitDepth.takeIf { telemetry.isConnected && telemetry.isAuthoritative }
     }
 
     /** Runs [body] against both players, in whichever roles they currently hold. */
