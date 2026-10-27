@@ -1228,6 +1228,7 @@
     <string name="source_needs_lossless_output">Perlu output lossless · gunakan perangkat yang mendukung lossless</string>
     <string name="source_needs_lossless_bt_codec">Perlu output lossless · Bluetooth memakai %1$s; gunakan perangkat yang mendukung lossless</string>
     <string name="source_needs_lossless_bt_unknown">Perlu output lossless · codec Bluetooth yang dipakai tidak bisa diketahui</string>
+    <string name="source_downloads_on">Unduhan diizinkan</string>
     <string name="source_downloads_off">Hanya streaming</string>
     <string name="lossless_output_permission">Periksa codec Bluetooth</string>
     <string name="lossless_output_permission_detail">Izinkan Perangkat di sekitar agar headphone LDAC atau LHDC bisa membuka addon lossless</string>
@@ -1365,4 +1366,10 @@
     <string name="progressive_blur">Blur progresif</string>
     <string name="remove_from_history">Hapus dari riwayat</string>
     <string name="remove_from_history_failed">Tidak dapat menghapus dari riwayat</string>
+    <string name="addon_blocked_title">Tidak dapat memutar lagu ini</string>
+    <string name="addon_blocked_quality">Kualitas audio di %1$s diatur ke %2$s. Lagu dari %3$s hanya diputar dalam Lossless — ubah di Pengaturan → Kualitas audio untuk memutar lagu ini.</string>
+    <string name="addon_blocked_watch">Musik diputar melalui jam tangan Anda, yang membatasi audio di bawah Lossless. Lagu dari %1$s akan diputar lagi setelah ponsel Anda mengambil alih musik.</string>
+    <string name="download_addon_left_out_title">Mengunduh tanpa %1$s</string>
+    <string name="download_addon_not_allowed">%1$s tidak mengizinkan unduhan, jadi lagu Anda disimpan dari sumber Anda yang lain.</string>
+    <string name="download_addon_needs_lossless_output">%1$s hanya menyajikan musik saat headphone kabel, USB, atau kelas LDAC terhubung. Unduhan melewatinya sampai ada yang terhubung, jadi lagu Anda disimpan dari sumber Anda yang lain.</string>
 </resources>

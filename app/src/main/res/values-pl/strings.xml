@@ -1291,6 +1291,7 @@
     <string name="source_needs_lossless_output">Wymaga wyjścia bezstratnego · użyj urządzenia obsługującego dźwięk bezstratny</string>
     <string name="source_needs_lossless_bt_codec">Wymaga wyjścia bezstratnego · Bluetooth używa %1$s; użyj urządzenia obsługującego dźwięk bezstratny</string>
     <string name="source_needs_lossless_bt_unknown">Wymaga wyjścia bezstratnego · nie można ustalić, jaki kodek Bluetooth jest używany</string>
+    <string name="source_downloads_on">Pobieranie dozwolone</string>
     <string name="source_downloads_off">Tylko streaming</string>
     <string name="lossless_output_permission">Sprawdź kodek Bluetooth</string>
     <string name="lossless_output_permission_detail">Zezwól na Urządzenia w pobliżu, by słuchawki LDAC lub LHDC odblokowały dodatki bezstratne</string>
@@ -1428,4 +1429,10 @@
     <string name="progressive_blur">Stopniowe rozmycie</string>
     <string name="remove_from_history">Usuń z historii</string>
     <string name="remove_from_history_failed">Nie udało się usunąć z historii</string>
+    <string name="addon_blocked_title">Nie można odtworzyć tego utworu</string>
+    <string name="addon_blocked_quality">Jakość audio przez %1$s jest ustawiona na %2$s. Utwory z %3$s grają tylko w jakości Lossless — zmień to w Ustawienia → Jakość audio, aby odtworzyć ten utwór.</string>
+    <string name="addon_blocked_watch">Muzyka gra przez zegarek, który ogranicza dźwięk poniżej Lossless. Utwory z %1$s zagrają ponownie, gdy telefon przejmie muzykę.</string>
+    <string name="download_addon_left_out_title">Pobieranie bez %1$s</string>
+    <string name="download_addon_not_allowed">%1$s nie pozwala na pobieranie, więc utwory są zapisywane z innych źródeł.</string>
+    <string name="download_addon_needs_lossless_output">%1$s udostępnia muzykę tylko przy podłączonych słuchawkach przewodowych, USB lub klasy LDAC. Pobieranie je pomija, dopóki takich nie podłączysz, więc utwory są zapisywane z innych źródeł.</string>
 </resources>

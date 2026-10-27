@@ -35,6 +35,9 @@
     <string name="addon_blocked_title">Can\'t play this song</string>
     <string name="addon_blocked_quality">Audio quality on %1$s is set to %2$s. Songs from %3$s only play at Lossless — change it in Settings → Audio quality to play this one.</string>
     <string name="addon_blocked_watch">Music is playing through your watch, which limits audio below Lossless. Songs from %1$s play again once your phone takes the music back.</string>
+    <string name="download_addon_left_out_title">Downloading without %1$s</string>
+    <string name="download_addon_not_allowed">%1$s doesn\'t allow downloads, so your songs are being saved from your other sources instead.</string>
+    <string name="download_addon_needs_lossless_output">%1$s only serves music while wired, USB or LDAC-class headphones are connected. Downloads skip it until one is, so your songs are being saved from your other sources instead.</string>
     <string name="audio_files_on_device">Audio files on device</string>
     <string name="on_device">On Device</string>
     <string name="playlists">Playlists</string>
@@ -1149,6 +1152,7 @@
     <string name="source_needs_lossless_output">Needs a lossless output · use a lossless supported device</string>
     <string name="source_needs_lossless_bt_codec">Needs a lossless output · Bluetooth is on %1$s; use a lossless supported device</string>
     <string name="source_needs_lossless_bt_unknown">Needs a lossless output · can’t tell which Bluetooth codec is in use</string>
+    <string name="source_downloads_on">Downloads allowed</string>
     <string name="source_downloads_off">Streaming only</string>
     <string name="lossless_output_permission">Check Bluetooth codec</string>
     <string name="lossless_output_permission_denied">Nearby devices permission is off</string>

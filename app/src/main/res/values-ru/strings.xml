@@ -1283,6 +1283,7 @@
     <string name="source_needs_lossless_output">Нужен выход без потерь · используйте устройство с поддержкой звука без потерь</string>
     <string name="source_needs_lossless_bt_codec">Нужен выход без потерь · Bluetooth работает на %1$s; используйте устройство с поддержкой звука без потерь</string>
     <string name="source_needs_lossless_bt_unknown">Нужен выход без потерь · не удаётся определить используемый Bluetooth-кодек</string>
+    <string name="source_downloads_on">Загрузки разрешены</string>
     <string name="source_downloads_off">Только стриминг</string>
     <string name="lossless_output_permission">Проверить Bluetooth-кодек</string>
     <string name="lossless_output_permission_detail">Разрешите доступ к устройствам поблизости, чтобы наушники LDAC или LHDC открыли аддоны без потерь</string>
@@ -1420,4 +1421,10 @@
     <string name="progressive_blur">Плавное размытие</string>
     <string name="remove_from_history">Удалить из истории</string>
     <string name="remove_from_history_failed">Не удалось удалить из истории</string>
+    <string name="addon_blocked_title">Не удаётся воспроизвести этот трек</string>
+    <string name="addon_blocked_quality">Качество звука через %1$s установлено на «%2$s». Треки из %3$s воспроизводятся только без потерь — измените это в Настройки → Качество звука, чтобы воспроизвести этот трек.</string>
+    <string name="addon_blocked_watch">Музыка играет через часы, которые ограничивают звук ниже качества без потерь. Треки из %1$s снова заиграют, когда телефон вернёт себе воспроизведение.</string>
+    <string name="download_addon_left_out_title">Загрузка без %1$s</string>
+    <string name="download_addon_not_allowed">%1$s не разрешает загрузки, поэтому треки сохраняются из других ваших источников.</string>
+    <string name="download_addon_needs_lossless_output">%1$s отдаёт музыку, только когда подключены проводные, USB или LDAC-наушники. Пока их нет, загрузки его пропускают, поэтому треки сохраняются из других ваших источников.</string>
 </resources>

@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -708,8 +713,40 @@ fun InfoAlert(
     title: String,
     description: String,
     onDismiss: () -> Unit,
+    /**
+     * Opens the alert in a window of its own, above every other window.
+     *
+     * Needed whenever what prompted it can be on screen in another window: the
+     * full player and the track menu are both bottom-sheet dialogs, and an
+     * alert drawn in the activity's window opens *behind* them — found only
+     * once the player was closed, long after the tap it was answering.
+     */
+    inOwnWindow: Boolean = false,
 ) {
-    AlertScaffold(hazeState = hazeState, onDismiss = onDismiss) {
+    if (inOwnWindow) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+            // The scaffold draws its own flat scrim; the platform's would double it.
+            SideEffect { window?.setDimAmount(0f) }
+            InfoAlertFrame(hazeState, title, description, onDismiss, frosted = false)
+        }
+    } else {
+        InfoAlertFrame(hazeState, title, description, onDismiss, frosted = true)
+    }
+}
+
+@Composable
+private fun InfoAlertFrame(
+    hazeState: HazeState,
+    title: String,
+    description: String,
+    onDismiss: () -> Unit,
+    frosted: Boolean,
+) {
+    AlertScaffold(hazeState = hazeState, onDismiss = onDismiss, frosted = frosted) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -850,6 +887,12 @@ private fun ChoiceRow(
 internal fun AlertScaffold(
     hazeState: HazeState,
     onDismiss: () -> Unit,
+    /**
+     * False for an alert in a window of its own, where [hazeState] has nothing
+     * to blur — Haze reads only its own window. The card is then the plain
+     * surface the reduced-blur setting uses; see [InfoAlert]'s `inOwnWindow`.
+     */
+    frosted: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -871,7 +914,7 @@ internal fun AlertScaffold(
                 .width(ALERT_WIDTH)
                 .clip(shape)
                 .then(
-                    if (reduceDynamicBlur) {
+                    if (reduceDynamicBlur || !frosted) {
                         Modifier.background(MaterialTheme.colorScheme.surface)
                     } else {
                         Modifier.optimizedHazeEffect(

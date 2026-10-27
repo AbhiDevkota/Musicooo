@@ -1256,6 +1256,7 @@
     <string name="source_needs_lossless_output">דורש פלט ללא אובדן · השתמשו במכשיר שתומך באודיו ללא אובדן</string>
     <string name="source_needs_lossless_bt_codec">דורש פלט ללא אובדן · ה‑Bluetooth משתמש ב‑%1$s; השתמשו במכשיר שתומך באודיו ללא אובדן</string>
     <string name="source_needs_lossless_bt_unknown">דורש פלט ללא אובדן · לא ניתן לדעת באיזה קודק Bluetooth נעשה שימוש</string>
+    <string name="source_downloads_on">הורדות מותרות</string>
     <string name="source_downloads_off">הזרמה בלבד</string>
     <string name="lossless_output_permission">בדיקת קודק Bluetooth</string>
     <string name="lossless_output_permission_detail">אפשרו מכשירים בקרבת מקום כדי שאוזניות LDAC או LHDC יפתחו תוספים ללא אובדן</string>
@@ -1393,4 +1394,10 @@
     <string name="progressive_blur">טשטוש הדרגתי</string>
     <string name="remove_from_history">הסרה מההיסטוריה</string>
     <string name="remove_from_history_failed">לא ניתן להסיר מההיסטוריה</string>
+    <string name="addon_blocked_title">לא ניתן לנגן את השיר הזה</string>
+    <string name="addon_blocked_quality">איכות האודיו ב-%1$s מוגדרת ל-%2$s. שירים מ-%3$s מתנגנים רק ב-Lossless — יש לשנות זאת בהגדרות → איכות אודיו כדי לנגן את השיר.</string>
+    <string name="addon_blocked_watch">המוזיקה מתנגנת דרך השעון שלך, שמגביל את האודיו מתחת ל-Lossless. שירים מ-%1$s יתנגנו שוב כשהטלפון יחזור לנגן את המוזיקה.</string>
+    <string name="download_addon_left_out_title">מוריד בלי %1$s</string>
+    <string name="download_addon_not_allowed">%1$s לא מאפשר הורדות, ולכן השירים שלך נשמרים מהמקורות האחרים שלך.</string>
+    <string name="download_addon_needs_lossless_output">%1$s מספק מוזיקה רק כשמחוברות אוזניות חוטיות, USB או ברמת LDAC. ההורדות מדלגות עליו עד שיתחברו אוזניות כאלה, ולכן השירים שלך נשמרים מהמקורות האחרים שלך.</string>
 </resources>

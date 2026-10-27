@@ -1251,6 +1251,7 @@
     <string name="source_needs_lossless_output">Braucht eine verlustfreie Ausgabe · nutze ein Gerät, das Lossless unterstützt</string>
     <string name="source_needs_lossless_bt_codec">Braucht eine verlustfreie Ausgabe · Bluetooth nutzt %1$s; nutze ein Gerät, das Lossless unterstützt</string>
     <string name="source_needs_lossless_bt_unknown">Braucht eine verlustfreie Ausgabe · der Bluetooth-Codec ist nicht erkennbar</string>
+    <string name="source_downloads_on">Downloads erlaubt</string>
     <string name="source_downloads_off">Nur Streaming</string>
     <string name="lossless_output_permission">Bluetooth-Codec prüfen</string>
     <string name="lossless_output_permission_detail">Geräte in der Nähe erlauben, damit LDAC- oder LHDC-Kopfhörer Lossless-Addons freischalten</string>
@@ -1388,4 +1389,10 @@
     <string name="progressive_blur">Progressive Unschärfe</string>
     <string name="remove_from_history">Aus dem Verlauf entfernen</string>
     <string name="remove_from_history_failed">Konnte nicht aus dem Verlauf entfernt werden</string>
+    <string name="addon_blocked_title">Dieser Song kann nicht abgespielt werden</string>
+    <string name="addon_blocked_quality">Die Audioqualität über %1$s ist auf %2$s eingestellt. Songs von %3$s werden nur in Verlustfrei abgespielt – ändere das unter Einstellungen → Audioqualität, um diesen abzuspielen.</string>
+    <string name="addon_blocked_watch">Die Musik läuft über deine Uhr, die den Ton unter Verlustfrei begrenzt. Songs von %1$s spielen wieder, sobald dein Telefon die Musik zurückholt.</string>
+    <string name="download_addon_left_out_title">Download ohne %1$s</string>
+    <string name="download_addon_not_allowed">%1$s erlaubt keine Downloads, deshalb werden deine Songs aus deinen anderen Quellen gespeichert.</string>
+    <string name="download_addon_needs_lossless_output">%1$s liefert Musik nur, solange kabelgebundene, USB- oder LDAC-Kopfhörer verbunden sind. Downloads überspringen es, bis welche verbunden sind, deshalb werden deine Songs aus deinen anderen Quellen gespeichert.</string>
 </resources>

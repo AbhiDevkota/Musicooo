@@ -220,6 +220,7 @@ import com.music.bitchord.download.Downloads
 import com.music.bitchord.ui.components.BrowseActionsSheet
 import com.music.bitchord.ui.components.BrowseTarget
 import com.music.bitchord.ui.components.ConfirmationAlert
+import com.music.bitchord.ui.components.InfoAlert
 import com.music.bitchord.ui.components.DownloadManagerSheet
 import com.music.bitchord.ui.components.PlaylistPickerSheet
 import com.music.bitchord.ui.components.ReorderPlaylistPage
@@ -603,6 +604,10 @@ private fun BitChordApp(
     var confirmJioSaavn by remember { mutableStateOf(false) }
     /** An addon search row tapped while the quality setting skips its addon; see [AddonBlockedAlert]. */
     var blockedAddonSong by remember { mutableStateOf<com.music.bitchord.data.model.Song?>(null) }
+    /** An addon a download just went ahead without, and why; see [SourceRegistry.addonsLeftOutOfDownloads]. */
+    var addonLeftOutOfDownload by remember {
+        mutableStateOf<Pair<String, SourceRegistry.DownloadExclusion>?>(null)
+    }
     var editingPartyServer by remember { mutableStateOf(false) }
     var editingSignatureApi by remember { mutableStateOf(false) }
     var librarySortMenuOpen by remember { mutableStateOf(false) }
@@ -2221,6 +2226,15 @@ private fun BitChordApp(
             } else {
                 songs.forEach { Downloads.enqueue(context, it, from?.title) }
                 if (from != null) Downloads.markRequested(from.id, songs.map { it.videoId })
+            }
+            // Said once per addon and reason per session, and only for a batch
+            // that will reach the sources at all — a copy out of the song cache
+            // never asks them. Without it the addon was passed over in silence
+            // and the file simply arrived from JioSaavn or YouTube.
+            if (!songs.all { Downloads.servableFromCache(it.videoId) }) {
+                SourceRegistry.addonsLeftOutOfDownloads()
+                    .firstOrNull { (config, why) -> explainedDownloadExclusions.add("${config.id}:$why") }
+                    ?.let { (config, why) -> addonLeftOutOfDownload = config.displayName to why }
             }
         }
         // Recorded for everything that was asked for, not just what still has to
@@ -5602,8 +5616,33 @@ private fun BitChordApp(
             )
         }
 
+        addonLeftOutOfDownload?.let { (addon, why) ->
+            InfoAlert(
+                hazeState = hazeState,
+                title = stringResource(R.string.download_addon_left_out_title, addon),
+                description = when (why) {
+                    SourceRegistry.DownloadExclusion.DOWNLOADS_NOT_ALLOWED ->
+                        stringResource(R.string.download_addon_not_allowed, addon)
+                    SourceRegistry.DownloadExclusion.NEEDS_LOSSLESS_OUTPUT ->
+                        stringResource(R.string.download_addon_needs_lossless_output, addon)
+                },
+                onDismiss = { addonLeftOutOfDownload = null },
+                // A download can be asked for from the player or from either
+                // menu, and each is a window of its own over this one. Drawn
+                // here, the alert opened behind whichever it was.
+                inOwnWindow = playerRaised || songActions != null || browseActions != null,
+            )
+        }
+
     }
 }
+
+/**
+ * The addon exclusions already explained this session, as `configId:reason` —
+ * see [SourceRegistry.addonsLeftOutOfDownloads]. Process-wide rather than
+ * remembered by the composition, so turning the phone doesn't say it again.
+ */
+private val explainedDownloadExclusions = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
 /** UIKit's sheet curve: leaves at once, settles long — a sheet let go of, not pushed. */
 private val OnboardingDismissEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)

@@ -1252,6 +1252,7 @@
     <string name="source_needs_lossless_output">Nécessite une sortie sans perte · utilisez un appareil compatible sans perte</string>
     <string name="source_needs_lossless_bt_codec">Nécessite une sortie sans perte · le Bluetooth utilise %1$s ; utilisez un appareil compatible sans perte</string>
     <string name="source_needs_lossless_bt_unknown">Nécessite une sortie sans perte · impossible de savoir quel codec Bluetooth est utilisé</string>
+    <string name="source_downloads_on">Téléchargements autorisés</string>
     <string name="source_downloads_off">Streaming uniquement</string>
     <string name="lossless_output_permission">Vérifier le codec Bluetooth</string>
     <string name="lossless_output_permission_detail">Autorisez Appareils à proximité pour qu\'un casque LDAC ou LHDC débloque les modules sans perte</string>
@@ -1389,4 +1390,10 @@
     <string name="progressive_blur">Flou progressif</string>
     <string name="remove_from_history">Retirer de l\'historique</string>
     <string name="remove_from_history_failed">Impossible de retirer de l\'historique</string>
+    <string name="addon_blocked_title">Impossible de lire ce titre</string>
+    <string name="addon_blocked_quality">La qualité audio en %1$s est réglée sur %2$s. Les titres de %3$s ne sont lus qu\'en Sans perte : modifiez-la dans Paramètres → Qualité audio pour lire celui-ci.</string>
+    <string name="addon_blocked_watch">La musique passe par votre montre, qui limite l\'audio en dessous de Sans perte. Les titres de %1$s seront de nouveau lus quand votre téléphone reprendra la musique.</string>
+    <string name="download_addon_left_out_title">Téléchargement sans %1$s</string>
+    <string name="download_addon_not_allowed">%1$s n\'autorise pas les téléchargements : vos titres sont donc enregistrés depuis vos autres sources.</string>
+    <string name="download_addon_needs_lossless_output">%1$s ne diffuse de la musique que lorsqu\'un casque filaire, USB ou de classe LDAC est connecté. Les téléchargements l\'ignorent tant qu\'aucun ne l\'est : vos titres sont donc enregistrés depuis vos autres sources.</string>
 </resources>

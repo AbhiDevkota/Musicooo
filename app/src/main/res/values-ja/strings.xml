@@ -1229,6 +1229,7 @@
     <string name="source_needs_lossless_output">ロスレス出力が必要 · ロスレス対応のデバイスを使用してください</string>
     <string name="source_needs_lossless_bt_codec">ロスレス出力が必要 · Bluetoothは%1$sです。ロスレス対応のデバイスを使用してください</string>
     <string name="source_needs_lossless_bt_unknown">ロスレス出力が必要 · 使用中のBluetoothコーデックを判別できません</string>
+    <string name="source_downloads_on">ダウンロード可</string>
     <string name="source_downloads_off">ストリーミングのみ</string>
     <string name="lossless_output_permission">Bluetoothコーデックを確認</string>
     <string name="lossless_output_permission_detail">付近のデバイスを許可すると、LDACまたはLHDCのヘッドホンでロスレス専用アドオンを使えます</string>
@@ -1366,4 +1367,10 @@
     <string name="progressive_blur">段階的なぼかし</string>
     <string name="remove_from_history">履歴から削除</string>
     <string name="remove_from_history_failed">履歴から削除できませんでした</string>
+    <string name="addon_blocked_title">この曲は再生できません</string>
+    <string name="addon_blocked_quality">%1$sの音質は%2$sに設定されています。%3$sの曲はロスレスでのみ再生されます。この曲を再生するには、設定 → 音質で変更してください。</string>
+    <string name="addon_blocked_watch">音楽はウォッチ経由で再生中で、音質がロスレス未満に制限されています。スマートフォンに再生が戻ると、%1$sの曲を再び再生できます。</string>
+    <string name="download_addon_left_out_title">%1$sを使わずにダウンロード中</string>
+    <string name="download_addon_not_allowed">%1$sはダウンロードを許可していないため、曲は他のソースから保存されます。</string>
+    <string name="download_addon_needs_lossless_output">%1$sは有線、USB、またはLDACクラスのヘッドホンが接続されているときのみ音楽を提供します。接続されるまでダウンロードでは使用されないため、曲は他のソースから保存されます。</string>
 </resources>

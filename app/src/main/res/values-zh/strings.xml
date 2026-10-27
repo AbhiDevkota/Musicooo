@@ -1228,6 +1228,7 @@
     <string name="source_needs_lossless_output">需要无损输出 · 请使用支持无损的设备</string>
     <string name="source_needs_lossless_bt_codec">需要无损输出 · 蓝牙当前为 %1$s；请使用支持无损的设备</string>
     <string name="source_needs_lossless_bt_unknown">需要无损输出 · 无法识别正在使用的蓝牙编解码器</string>
+    <string name="source_downloads_on">允许下载</string>
     <string name="source_downloads_off">仅限在线播放</string>
     <string name="lossless_output_permission">检查蓝牙编解码器</string>
     <string name="lossless_output_permission_detail">允许“附近的设备”权限，LDAC 或 LHDC 耳机即可解锁仅限无损的插件</string>
@@ -1365,4 +1366,10 @@
     <string name="progressive_blur">渐进模糊</string>
     <string name="remove_from_history">从历史记录中移除</string>
     <string name="remove_from_history_failed">无法从历史记录中移除</string>
+    <string name="addon_blocked_title">无法播放这首歌</string>
+    <string name="addon_blocked_quality">%1$s 下的音频质量设为%2$s。来自 %3$s 的歌曲仅以无损播放——请在 设置 → 音频质量 中更改后再播放。</string>
+    <string name="addon_blocked_watch">音乐正通过你的手表播放，手表会将音频限制在无损以下。手机重新接管播放后，来自 %1$s 的歌曲即可再次播放。</string>
+    <string name="download_addon_left_out_title">正在下载（不使用 %1$s）</string>
+    <string name="download_addon_not_allowed">%1$s 不允许下载，因此你的歌曲将从其他来源保存。</string>
+    <string name="download_addon_needs_lossless_output">%1$s 仅在连接有线、USB 或 LDAC 级耳机时提供音乐。在连接此类耳机前，下载会跳过它，因此你的歌曲将从其他来源保存。</string>
 </resources>

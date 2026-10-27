@@ -1234,6 +1234,7 @@
     <string name="source_needs_lossless_output">ต้องใช้เอาต์พุตแบบ lossless · ใช้อุปกรณ์ที่รองรับ lossless</string>
     <string name="source_needs_lossless_bt_codec">ต้องใช้เอาต์พุตแบบ lossless · Bluetooth ใช้ %1$s อยู่ ใช้อุปกรณ์ที่รองรับ lossless</string>
     <string name="source_needs_lossless_bt_unknown">ต้องใช้เอาต์พุตแบบ lossless · ไม่ทราบว่ากำลังใช้ตัวแปลงสัญญาณ Bluetooth ใด</string>
+    <string name="source_downloads_on">อนุญาตให้ดาวน์โหลด</string>
     <string name="source_downloads_off">สตรีมมิงเท่านั้น</string>
     <string name="lossless_output_permission">ตรวจสอบตัวแปลงสัญญาณ Bluetooth</string>
     <string name="lossless_output_permission_detail">อนุญาตอุปกรณ์ใกล้เคียงเพื่อให้หูฟัง LDAC หรือ LHDC ปลดล็อกส่วนเสริมแบบ lossless</string>
@@ -1371,4 +1372,10 @@
     <string name="progressive_blur">เบลอแบบไล่ระดับ</string>
     <string name="remove_from_history">นำออกจากประวัติ</string>
     <string name="remove_from_history_failed">นำออกจากประวัติไม่ได้</string>
+    <string name="addon_blocked_title">เล่นเพลงนี้ไม่ได้</string>
+    <string name="addon_blocked_quality">คุณภาพเสียงบน %1$s ตั้งไว้ที่ %2$s เพลงจาก %3$s เล่นได้เฉพาะแบบไม่สูญเสียคุณภาพ — เปลี่ยนได้ที่ การตั้งค่า → คุณภาพเสียง เพื่อเล่นเพลงนี้</string>
+    <string name="addon_blocked_watch">เพลงกำลังเล่นผ่านนาฬิกาของคุณ ซึ่งจำกัดเสียงให้ต่ำกว่าแบบไม่สูญเสียคุณภาพ เพลงจาก %1$s จะเล่นได้อีกครั้งเมื่อโทรศัพท์กลับมาเล่นเพลง</string>
+    <string name="download_addon_left_out_title">กำลังดาวน์โหลดโดยไม่ใช้ %1$s</string>
+    <string name="download_addon_not_allowed">%1$s ไม่อนุญาตให้ดาวน์โหลด เพลงของคุณจึงถูกบันทึกจากแหล่งอื่นแทน</string>
+    <string name="download_addon_needs_lossless_output">%1$s ให้บริการเพลงเฉพาะเมื่อเชื่อมต่อหูฟังแบบมีสาย USB หรือระดับ LDAC เท่านั้น การดาวน์โหลดจะข้ามไปจนกว่าจะเชื่อมต่อ เพลงของคุณจึงถูกบันทึกจากแหล่งอื่นแทน</string>
 </resources>

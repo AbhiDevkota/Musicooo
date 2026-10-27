@@ -1344,6 +1344,62 @@ class SourcesTest {
         assertEquals("JioSaavn", source.displayName)
     }
 
+    /**
+     * A tie goes to the source ranked first, however late it answers. Arrival
+     * order used to decide it, which handed every 320-against-320 download to
+     * JioSaavn's four tenths of a second over the addon the user put first.
+     */
+    @Test
+    fun `a tie goes to the higher-ranked source rather than the quicker one`() = runBlocking {
+        val addon = FakeSource("Ricky's Addon", answerAfterMs = 150, format = StreamFormat("aac", kbps = 320))
+        val jioSaavn = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        val (source, _) = SourceResolver.bestAcross(
+            listOf(addon, jioSaavn),
+            raceTarget(),
+            StreamRequest.Best,
+            waitForAll = true,
+        )!!
+        assertEquals("Ricky's Addon", source.displayName)
+    }
+
+    /**
+     * Running out of time decides on what has answered rather than losing it.
+     * Bounded from outside, a slow addon used to take JioSaavn's answer down
+     * with it, and the download went to YouTube's Opus.
+     */
+    @Test
+    fun `a race that runs out of time keeps the answers already in hand`() = runBlocking {
+        val slow = FakeSource("Ricky's Addon", answerAfterMs = 5_000, format = StreamFormat("flac"))
+        val quick = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        val elapsed = measureTimeMillis {
+            val (source, _) = SourceResolver.bestAcross(
+                listOf(slow, quick),
+                raceTarget(),
+                StreamRequest.Lossless,
+                waitForAll = true,
+                timeoutMs = 300,
+            )!!
+            assertEquals("JioSaavn", source.displayName)
+        }
+        assertTrue("took ${elapsed}ms, so it waited out the slow source", elapsed < 2_000)
+        assertTrue("the slow source was left running", slow.cancelled)
+    }
+
+    /** A candidate the caller can't keep never wins, so it can't push out one it can. */
+    @Test
+    fun `a refined-away candidate leaves the race to the next one`() = runBlocking {
+        val unkeepable = FakeSource("Ricky's Addon", answerAfterMs = 5, format = StreamFormat("flac"))
+        val keepable = FakeSource("JioSaavn", answerAfterMs = 50, format = StreamFormat("mp4", kbps = 320))
+        val (source, _) = SourceResolver.bestAcross(
+            listOf(unkeepable, keepable),
+            raceTarget(),
+            StreamRequest.Lossless,
+            waitForAll = true,
+            refine = { candidate, stream -> stream.takeIf { candidate !== unkeepable } },
+        )!!
+        assertEquals("JioSaavn", source.displayName)
+    }
+
     // ---- Asking ------------------------------------------------------------
 
     /**

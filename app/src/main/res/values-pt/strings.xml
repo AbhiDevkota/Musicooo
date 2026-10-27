@@ -1256,6 +1256,7 @@
     <string name="source_needs_lossless_output">Precisa de uma saída sem perdas · use um dispositivo compatível com áudio sem perdas</string>
     <string name="source_needs_lossless_bt_codec">Precisa de uma saída sem perdas · o Bluetooth está em %1$s; use um dispositivo compatível com áudio sem perdas</string>
     <string name="source_needs_lossless_bt_unknown">Precisa de uma saída sem perdas · não é possível saber qual codec Bluetooth está em uso</string>
+    <string name="source_downloads_on">Downloads permitidos</string>
     <string name="source_downloads_off">Somente streaming</string>
     <string name="lossless_output_permission">Verificar codec Bluetooth</string>
     <string name="lossless_output_permission_detail">Permita Dispositivos por perto para que fones LDAC ou LHDC liberem os complementos sem perdas</string>
@@ -1393,4 +1394,10 @@
     <string name="progressive_blur">Desfoque progressivo</string>
     <string name="remove_from_history">Remover do histórico</string>
     <string name="remove_from_history_failed">Não foi possível remover do histórico</string>
+    <string name="addon_blocked_title">Não é possível tocar esta música</string>
+    <string name="addon_blocked_quality">A qualidade de áudio em %1$s está definida como %2$s. As músicas de %3$s só tocam em Sem perdas — altere em Configurações → Qualidade de áudio para tocar esta.</string>
+    <string name="addon_blocked_watch">A música está tocando pelo seu relógio, que limita o áudio abaixo de Sem perdas. As músicas de %1$s voltam a tocar quando o celular retomar a música.</string>
+    <string name="download_addon_left_out_title">Baixando sem %1$s</string>
+    <string name="download_addon_not_allowed">%1$s não permite downloads, então suas músicas estão sendo salvas das suas outras fontes.</string>
+    <string name="download_addon_needs_lossless_output">%1$s só envia música com fones com fio, USB ou de classe LDAC conectados. Os downloads o ignoram até que um esteja conectado, então suas músicas estão sendo salvas das suas outras fontes.</string>
 </resources>

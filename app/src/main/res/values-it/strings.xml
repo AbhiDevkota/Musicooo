@@ -1190,6 +1190,7 @@
     <string name="source_needs_lossless_output">Richiede un’uscita lossless · usa un dispositivo compatibile con il lossless</string>
     <string name="source_needs_lossless_bt_codec">Richiede un’uscita lossless · il Bluetooth usa %1$s; usa un dispositivo compatibile con il lossless</string>
     <string name="source_needs_lossless_bt_unknown">Richiede un’uscita lossless · impossibile sapere quale codec Bluetooth è in uso</string>
+    <string name="source_downloads_on">Download consentiti</string>
     <string name="source_downloads_off">Solo streaming</string>
     <string name="lossless_output_permission">Controlla codec Bluetooth</string>
     <string name="lossless_output_permission_detail">Consenti Dispositivi nelle vicinanze perché le cuffie LDAC o LHDC sblocchino i componenti lossless</string>
@@ -1327,4 +1328,10 @@
     <string name="progressive_blur">Sfocatura progressiva</string>
     <string name="remove_from_history">Rimuovi dalla cronologia</string>
     <string name="remove_from_history_failed">Impossibile rimuovere dalla cronologia</string>
+    <string name="addon_blocked_title">Impossibile riprodurre questo brano</string>
+    <string name="addon_blocked_quality">La qualità audio su %1$s è impostata su %2$s. I brani di %3$s si riproducono solo in Lossless: cambiala in Impostazioni → Qualità audio per riprodurre questo.</string>
+    <string name="addon_blocked_watch">La musica viene riprodotta dall\'orologio, che limita l\'audio sotto Lossless. I brani di %1$s torneranno a suonare quando il telefono riprenderà la musica.</string>
+    <string name="download_addon_left_out_title">Download senza %1$s</string>
+    <string name="download_addon_not_allowed">%1$s non consente i download, quindi i tuoi brani vengono salvati dalle altre fonti.</string>
+    <string name="download_addon_needs_lossless_output">%1$s fornisce musica solo con cuffie cablate, USB o di classe LDAC collegate. I download lo saltano finché non ne colleghi una, quindi i tuoi brani vengono salvati dalle altre fonti.</string>
 </resources>
