@@ -1024,15 +1024,20 @@ object AudioCache {
      * playback behaves the same as ever, and leave it once the track does.
      * Analysis results are kept in their own store, so the analysis-only
      * audio has done its job by then.
+     *
+     * @param keepAnalysis leaves the analysis-only copies alone, for a caller
+     *   that is only after the addon entries — a lowered quality ceiling, which
+     *   says nothing about Automix's YouTube Opus heads for the tracks ahead.
      */
-    fun dropForeignEntries(keep: Set<String>) {
+    fun dropForeignEntries(keep: Set<String>, keepAnalysis: Boolean = false) {
         if (!::cache.isInitialized) return
         scope.launch {
             var dropped = 0
             cache.keys.toList().forEach { key ->
                 val meta = runCatching { cache.getContentMetadata(key) }.getOrNull() ?: return@forEach
                 val foreign = meta.get(META_ORIGIN, null as String?) == Origin.OTHER.name
-                val analysisOnly = meta.get(META_ANALYSIS, null as String?) != null &&
+                val analysisOnly = !keepAnalysis &&
+                    meta.get(META_ANALYSIS, null as String?) != null &&
                     meta.get(META_PLAYBACK, null as String?) == null &&
                     meta.get(META_PLAYED, null as String?) == null
                 if (!foreign && !analysisOnly) return@forEach

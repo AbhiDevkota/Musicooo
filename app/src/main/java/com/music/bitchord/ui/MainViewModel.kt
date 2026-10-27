@@ -2168,6 +2168,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         SearchHistory.recordAddonQuery(q)
         addonSearchJob?.cancel()
         _searchScrollReset.value += 1
+        // Every enabled addon, including ones the connection's quality setting
+        // skips for playback: their rows are still worth seeing, and the
+        // search page dims them and says why on a tap — see `isBlocked` there.
         val addons = SourceRegistry.active().filterIsInstance<AddonSource>()
         if (addons.isEmpty()) {
             _addonResults.value = UiState.Error(text(R.string.search_addons_none))

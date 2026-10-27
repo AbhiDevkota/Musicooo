@@ -243,6 +243,22 @@ object SourceRegistry {
         return active().filter { ceiling.permits(it.kind) }
     }
 
+    /**
+     * Whether a stream [configId] served may still be played under the ceiling
+     * in force — the same test as [activeForPlayback], asked of a stream that
+     * was found earlier, under whatever ceiling applied then.
+     *
+     * Null or unknown is a yes: a stream that names no source is YouTube's own,
+     * and YouTube is permitted on every rung.
+     */
+    fun permitsForPlayback(
+        configId: String?,
+        ceiling: AudioQuality = AppSettings.effectiveAudioQuality,
+    ): Boolean {
+        val kind = configId?.let { config(it)?.kind } ?: return true
+        return ceiling.permits(kind)
+    }
+
     fun instance(configId: String): MusicSource? = instances[configId]
 
     fun config(configId: String): SourceConfig? = configs.value.firstOrNull { it.id == configId }

@@ -32,6 +32,9 @@
     <string name="search_source_youtube" translatable="false">YouTube</string>
     <string name="search_source_addons">Addons</string>
     <string name="search_addons_none">No addons are enabled. Add one in Settings → Sources.</string>
+    <string name="addon_blocked_title">Can\'t play this song</string>
+    <string name="addon_blocked_quality">Audio quality on %1$s is set to %2$s. Songs from %3$s only play at Lossless — change it in Settings → Audio quality to play this one.</string>
+    <string name="addon_blocked_watch">Music is playing through your watch, which limits audio below Lossless. Songs from %1$s play again once your phone takes the music back.</string>
     <string name="audio_files_on_device">Audio files on device</string>
     <string name="on_device">On Device</string>
     <string name="playlists">Playlists</string>

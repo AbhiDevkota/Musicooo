@@ -152,6 +152,7 @@ import kotlinx.coroutines.withContext
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.AddonBlockedAlert
 import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.ui.components.AccountProfileSelector
@@ -600,6 +601,8 @@ private fun BitChordApp(
     // and the mini player, like every other alert in the app.
     var editingSource by remember { mutableStateOf<SourceConfig?>(null) }
     var confirmJioSaavn by remember { mutableStateOf(false) }
+    /** An addon search row tapped while the quality setting skips its addon; see [AddonBlockedAlert]. */
+    var blockedAddonSong by remember { mutableStateOf<com.music.bitchord.data.model.Song?>(null) }
     var editingPartyServer by remember { mutableStateOf(false) }
     var editingSignatureApi by remember { mutableStateOf(false) }
     var librarySortMenuOpen by remember { mutableStateOf(false) }
@@ -792,6 +795,14 @@ private fun BitChordApp(
     val searchSource by viewModel.searchSource.collectAsStateWithLifecycle()
     val libraryResults by viewModel.libraryResults.collectAsStateWithLifecycle()
     val addonResults by viewModel.addonResults.collectAsStateWithLifecycle()
+    // Collected rather than read once, so addon rows in search re-dim the
+    // moment the quality setting, the connection or the watch's cap moves.
+    val addonCeiling = AppSettings.ceilingFor(
+        wifi = AppSettings.audioQualityWifi.collectAsStateWithLifecycle().value,
+        cellular = AppSettings.audioQualityCellular.collectAsStateWithLifecycle().value,
+        metered = AppSettings.meteredConnection.collectAsStateWithLifecycle().value,
+        override = AppSettings.streamCeilingOverride.collectAsStateWithLifecycle().value,
+    )
     val signedIn by viewModel.signedIn.collectAsStateWithLifecycle()
     val incomingJamInvite by JamInviteLink.pending.collectAsStateWithLifecycle()
     var activeJamInviteCode by rememberSaveable { mutableStateOf<String?>(null) }
@@ -3430,7 +3441,12 @@ private fun BitChordApp(
                                 libraryResults = libraryResults,
                                 searchingAddons = searchSource == SearchSource.ADDONS,
                                 addonResults = addonResults,
-                                addonHistory = viewModel.addonSearchHistory.collectAsStateWithLifecycle().value,
+                                isBlocked = { song ->
+                                    val configId = SourceRegistry.parseTrackKey(song.videoId)?.first
+                                    !SourceRegistry.permitsForPlayback(configId, addonCeiling)
+                                },
+                                onBlockedSongClick = { song -> blockedAddonSong = song },
+                                addonHistory =viewModel.addonSearchHistory.collectAsStateWithLifecycle().value,
                                 onAddonHistoryClick = { term ->
                                     viewModel.onQueryChange(term)
                                     viewModel.submitSearch()
@@ -5575,6 +5591,14 @@ private fun BitChordApp(
                     confirmJioSaavn = false
                 },
                 onDismiss = { confirmJioSaavn = false },
+            )
+        }
+
+        blockedAddonSong?.let { song ->
+            AddonBlockedAlert(
+                hazeState = hazeState,
+                song = song,
+                onDismiss = { blockedAddonSong = null },
             )
         }
 

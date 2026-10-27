@@ -730,6 +730,33 @@ object QualityUpgrade {
         refused.clear()
     }
 
+    /**
+     * The quality ceiling just dropped — Settings, a move onto mobile data, or
+     * the watch taking the music. Everything here that was found, or is still
+     * being looked for, under the old one stops counting.
+     *
+     *  - A live lookup still running for a [pending] track was started against
+     *    sources the new ceiling may not pay for. It is cancelled, and the
+     *    track left pending, so the second look runs [SourceResolver.upgradeFor]
+     *    afresh against the sources the new ceiling allows.
+     *  - [followUps] only ever exist to chase a lossless copy, which a lowered
+     *    ceiling is by definition no longer asking for.
+     *  - A [shelved] or [forced] stream from a source the new ceiling skips is
+     *    dropped — except a forced one in [keep]: that is the copy the player
+     *    is reading right now, and every re-open of it has to reach the same
+     *    bytes. It plays out and the next track honours the new ceiling.
+     */
+    fun onCeilingLowered(keep: Set<String>, permitted: (SourceStream) -> Boolean) {
+        pending.replaceAll { _, waiting ->
+            waiting.inFlight?.cancel()
+            waiting.copy(inFlight = null)
+        }
+        followUps.values.forEach { it.inFlight?.cancel() }
+        followUps.clear()
+        shelved.entries.removeIf { !permitted(it.value) }
+        forced.entries.removeIf { (mediaId, stream) -> mediaId !in keep && !permitted(stream) }
+    }
+
     // ── Handing the stream to the player ────────────────────────────────────
 
     /** Parks [stream] for [mediaId], to be picked up when the item is reopened. */

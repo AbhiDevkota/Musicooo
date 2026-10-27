@@ -59,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
@@ -149,6 +150,13 @@ fun SearchScreen(
     searchingAddons: Boolean = false,
     /** The Addons source's tracks for the submitted query; null until one is submitted. */
     addonResults: UiState<List<Song>>? = null,
+    /**
+     * Addon rows the connection's quality setting won't play. Shown dimmed,
+     * kept out of the queue a tap builds, and answered by [onBlockedSongClick]
+     * instead of being played.
+     */
+    isBlocked: (Song) -> Boolean = { false },
+    onBlockedSongClick: (Song) -> Unit = {},
     /** Words searched in the Addons tab before, newest first; shown while the field is empty. */
     addonHistory: List<String> = emptyList(),
     onAddonHistoryClick: (String) -> Unit = {},
@@ -265,6 +273,8 @@ fun SearchScreen(
                     onSongClick = onLibrarySongClick,
                     onSongLongPress = onSongLongPress,
                     onSongSwipe = onSongSwipe,
+                    isBlocked = if (searchingAddons) isBlocked else { _ -> false },
+                    onBlockedSongClick = onBlockedSongClick,
                 )
                 suggesting -> {
                     searchSuggestions(
@@ -430,6 +440,8 @@ private fun LazyListScope.librarySearchResults(
     onSongClick: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
+    isBlocked: (Song) -> Boolean,
+    onBlockedSongClick: (Song) -> Unit,
 ) {
     when (results) {
         null -> if (addons && query.isEmpty() && addonHistory.isNotEmpty()) {
@@ -455,11 +467,24 @@ private fun LazyListScope.librarySearchResults(
             val tracks = results.data
             val isCurrentRow = playingRowMatcher(tracks, currentSong)
             itemsIndexed(tracks, key = { index, song -> "${if (addons) "addon" else "library"}_${song.videoId}_$index" }) { index, song ->
+                val blocked = isBlocked(song)
                 SongRow(
                     song = song,
-                    onClick = { onSongClick(tracks, index) },
+                    // Dimmed rather than hidden, so the listener can see the
+                    // addon has the song and tap to learn why it won't play.
+                    modifier = if (blocked) Modifier.alpha(BLOCKED_ROW_ALPHA) else Modifier,
+                    onClick = {
+                        if (blocked) {
+                            onBlockedSongClick(song)
+                        } else {
+                            // The queue skips blocked rows, or playing through
+                            // it would stop at the first one with an error.
+                            val playable = tracks.filterNot(isBlocked)
+                            onSongClick(playable, playable.indexOfFirst { it === song })
+                        }
+                    },
                     onLongPress = { onSongLongPress(song) },
-                    onSwipeToQueue = { onSongSwipe(song) },
+                    onSwipeToQueue = { if (blocked) onBlockedSongClick(song) else onSongSwipe(song) },
                     isCurrent = isCurrentRow(song),
                     isPlaying = isPlaying && isCurrentRow(song),
                     searchPlayingStyle = true,
@@ -1062,3 +1087,6 @@ private fun SearchFilterTabs(filter: SearchFilter, onFilterChange: (SearchFilter
 
 /** Rounded, but well short of a capsule — the corner reads as a cut, not a curve. */
 private val FILTER_PILL_SHAPE = RoundedCornerShape(12.dp)
+
+/** How far an addon row the quality setting won't play is dimmed; Material's disabled level. */
+private const val BLOCKED_ROW_ALPHA = 0.38f

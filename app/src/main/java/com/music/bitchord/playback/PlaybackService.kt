@@ -133,8 +133,11 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.ListenBrainzManager
 import com.music.bitchord.data.scrobbling.ScrobbleManager
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.AudioQuality
+import com.music.bitchord.data.settings.permits
 import com.music.bitchord.data.settings.EqualizerMode
 import com.music.bitchord.data.settings.OutputPcmMode
+import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.sources.SourceResolver
 import com.music.bitchord.data.sources.SourceStream
 import com.music.bitchord.data.sources.StreamFormat
@@ -1363,6 +1366,23 @@ class PlaybackService : MediaLibraryService() {
                 .map { it.copy(lastUpdatedMs = 0L) }
                 .distinctUntilChanged()
                 .collect { requestOutputReconfiguration() }
+        }
+        scope.launch {
+            // Every resolve reads the ceiling afresh, but not everything that
+            // plays is resolved afresh — see [onCeilingLowered].
+            var previous = AppSettings.effectiveAudioQuality
+            combine(
+                AppSettings.audioQualityWifi,
+                AppSettings.audioQualityCellular,
+                AppSettings.meteredConnection,
+                AppSettings.streamCeilingOverride,
+            ) { _, _, _, _ -> AppSettings.effectiveAudioQuality }
+                .distinctUntilChanged()
+                .collect { ceiling ->
+                    val lost = SourceKind.entries.filter { previous.permits(it) && !ceiling.permits(it) }
+                    previous = ceiling
+                    if (lost.isNotEmpty()) onCeilingLowered(ceiling, lost)
+                }
         }
 
         val streamResolver = ResolvingDataSource.Resolver { dataSpec ->
@@ -4671,6 +4691,13 @@ class PlaybackService : MediaLibraryService() {
      * and quietly keep playing the old stream.
      */
     private suspend fun swapIn(mediaId: String, stream: SourceStream) {
+        // A search or a shelved proof can outlive the ceiling it was made
+        // under — see [onCeilingLowered]. Asked again here, where it decides
+        // whether the audio is cut, rather than only where it was found.
+        if (!SourceRegistry.permitsForPlayback(stream.sourceConfigId)) {
+            TrackLog.d("BitChord", "upgrade dropped: the quality ceiling no longer allows its source", about = mediaId)
+            return
+        }
         val at = withContext(Dispatchers.Main) { swapPointFor(mediaId) } ?: return
         if (at.duration > 0 && at.duration - at.position < UPGRADE_MIN_REMAINING_MS) {
             TrackLog.d("BitChord", "upgrade abandoned: only ${at.duration - at.position}ms of the track left")
@@ -4690,6 +4717,9 @@ class PlaybackService : MediaLibraryService() {
         // does, and that is where a marked URI is turned back into a stream.
         QualityUpgrade.force(mediaId, stream)
         val warmedThrough = auditionUpgrade(mediaId, at, upgradedUri, stream, alreadyFilled)
+            // The audition takes seconds, long enough for the ceiling to drop
+            // under it; treated as a failed one, so nothing is cut.
+            ?.takeIf { SourceRegistry.permitsForPlayback(stream.sourceConfigId) }
         if (warmedThrough == null) {
             // Nothing was cut, so there is nothing to put back: the listener
             // keeps the stream they already had and never learns this
@@ -6160,6 +6190,51 @@ class PlaybackService : MediaLibraryService() {
             }
             AudioCache.dropForeignEntries(keep)
         }
+    }
+
+    /**
+     * The quality ceiling just stopped paying for [lost] — the setting was
+     * lowered, the phone moved onto mobile data, or the watch took the music.
+     *
+     * [SourceRegistry.activeForPlayback] already keeps those sources out of
+     * every resolve from here on, but a lot of playback is never resolved
+     * again: read-ahead pins the next track's source ahead of time
+     * ([StreamChoice]), an upgrade search started under the old ceiling can
+     * still land ([QualityUpgrade]), and an addon's bytes sit in the cache
+     * under a key the new ceiling reads too. Each of those would keep an addon
+     * playing after the listener asked for it not to, so each is let go here.
+     *
+     * Except for what is playing. Its cache entry is half filled and only its
+     * own stream may finish it, so it plays out where it is and the new
+     * ceiling starts with the next track. The next track is spared too once
+     * the player has started loading it, for the same reason.
+     */
+    private fun onCeilingLowered(ceiling: AudioQuality, lost: List<SourceKind>) {
+        val exoPlayer = player ?: return
+        val keep = buildSet {
+            exoPlayer.currentMediaItem?.mediaId?.let(::add)
+            spare?.currentMediaItem?.mediaId?.let(::add)
+            val duration = exoPlayer.duration
+            val next = exoPlayer.nextMediaItemIndex
+            if (duration != C.TIME_UNSET && next != C.INDEX_UNSET &&
+                exoPlayer.totalBufferedDuration >= duration - exoPlayer.currentPosition
+            ) {
+                add(exoPlayer.getMediaItemAt(next).mediaId)
+            }
+        }
+        TrackLog.d(
+            "BitChord",
+            "quality ceiling now ${ceiling.name}; letting go of ${lost.joinToString { it.label }} " +
+                "except for ${keep.joinToString()}",
+        )
+        val permitted = { stream: SourceStream -> SourceRegistry.permitsForPlayback(stream.sourceConfigId) }
+        cancelStaleUpgradeJob()
+        cancelPrefetch()
+        StreamChoice.forgetWhere(keep) { !permitted(it) }
+        QualityUpgrade.onCeilingLowered(keep, permitted)
+        AudioCache.dropForeignEntries(keep, keepAnalysis = true)
+        prefetchAround(exoPlayer)
+        lookForBetterCopy(exoPlayer)
     }
 
     /**

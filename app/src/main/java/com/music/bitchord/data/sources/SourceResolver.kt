@@ -42,14 +42,13 @@ object SourceResolver {
     private const val TAG = "BitChord"
 
     /**
-     * What to ask a source for, right now.
+     * What to ask a source for, right now, from the connection's ceiling alone
+     * — see [AppSettings.effectiveAudioQuality].
      *
-     * The lossless switch is a preference, not an override — it loses to the
-     * connection's own ceiling, which is the setting someone reached for
-     * specifically to protect a data plan. A capped connection gets a capped
-     * transcode whether or not lossless is on, because the alternative is a
-     * switch in one part of Settings quietly undoing a switch in another, and
-     * the one being undone is the one attached to a bill.
+     * This only decides the *tier* a source is asked for. Which sources get
+     * asked at all is [SourceRegistry.activeForPlayback]'s question, answered
+     * off the same ceiling: below Lossless the addons are never reached, so a
+     * [StreamRequest.Best] here never lands on one.
      */
     fun requestForNow(): StreamRequest {
         val ceiling = AppSettings.effectiveAudioQuality

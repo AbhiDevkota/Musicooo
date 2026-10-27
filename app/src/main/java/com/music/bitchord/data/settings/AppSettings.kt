@@ -779,15 +779,27 @@ object AppSettings {
 
     /** The ceiling that applies to a stream started right now. */
     val effectiveAudioQuality: AudioQuality
-        get() {
-            val chosen = if (meteredConnection.value == true) {
-                audioQualityCellular.value
-            } else {
-                audioQualityWifi.value
-            }
-            val cap = streamCeilingOverride.value ?: return chosen
-            return if (chosen.ordinal > cap.ordinal) cap else chosen
-        }
+        get() = ceilingFor(
+            wifi = audioQualityWifi.value,
+            cellular = audioQualityCellular.value,
+            metered = meteredConnection.value,
+            override = streamCeilingOverride.value,
+        )
+
+    /**
+     * [effectiveAudioQuality] from values a caller already holds — a screen
+     * that collected the four flows so it recomposes when any of them moves.
+     */
+    fun ceilingFor(
+        wifi: AudioQuality,
+        cellular: AudioQuality,
+        metered: Boolean?,
+        override: AudioQuality?,
+    ): AudioQuality {
+        val chosen = if (metered == true) cellular else wifi
+        val cap = override ?: return chosen
+        return if (chosen.ordinal > cap.ordinal) cap else chosen
+    }
 
     /**
      * Whether a download may start on the connection in hand.
@@ -2021,7 +2033,6 @@ object AppSettings {
     private const val KEY_QUALITY_DOWNLOAD = "audio_quality_download"
     private const val KEY_WIFI_ONLY_DOWNLOADS = "wifi_only_downloads"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
-    private const val KEY_LOSSLESS = "lossless_audio"
     private const val KEY_CROSSFADE = "crossfade_seconds"
     private const val KEY_SMART_FADE = "smart_fade_enabled"
     private const val KEY_AUTOMIX_PERFORMANCE_MODE = "automix_performance_mode"
