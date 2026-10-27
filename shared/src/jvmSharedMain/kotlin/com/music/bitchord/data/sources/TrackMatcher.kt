@@ -513,20 +513,20 @@ object TrackMatcher {
      * Whether a bracketed aside is the same title in another script rather
      * than packaging around it.
      *
-     * True when one core is CJK-only, the other is Latin, and either core
-     * appears verbatim in the other's aside (single word) or the aside
-     * joins to it (spaced CJK). Same-script asides never qualify.
+     * True when one core is CJK-only, the other is Latin, and the other's
+     * aside is that core in full (spaced CJK joins back to it). Same-script
+     * asides never qualify.
      */
     internal fun isTranslationMatch(wanted: TitleParts, got: TitleParts): Boolean {
         val wantedCJK = containsCJKChar(wanted.core) && !hasFilingLatin(wanted.core)
         val gotCJK = containsCJKChar(got.core) && !hasFilingLatin(got.core)
         val wantedLatin = hasFilingLatin(wanted.core)
         val gotLatin = hasFilingLatin(got.core)
-        // Either core appearing in the other's aside covers both orders:
-        // Latin in the CJK row's brackets, and CJK in the Latin row's brackets.
+        // Checking both asides covers both orders: Latin in the CJK row's
+        // brackets, and CJK in the Latin row's brackets. The aside must be
+        // the whole title — one word of "(Racing Into The Night)" is not the
+        // song "Night".
         if ((wantedCJK && gotLatin) || (gotCJK && wantedLatin)) {
-            if (got.core in wanted.context) return true
-            if (wanted.core in got.context) return true
             if (wanted.context.joinToString("") == got.core) return true
             if (got.context.joinToString("") == wanted.core) return true
         }

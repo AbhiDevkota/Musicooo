@@ -1478,6 +1478,15 @@ class SourcesTest {
                 durationSec = 247,
             ),
         )
+        // One word of a longer aside is not the whole title.
+        assertFalse(
+            matches(
+                song("Night", "Singer", "4:20"),
+                title = "夜に駆ける (Racing Into The Night)",
+                artist = "Singer",
+                durationSec = 260,
+            ),
+        )
     }
 
     /** The take marker may live on the release: title "KALYANI" + album "KALYANI (Remix)". */

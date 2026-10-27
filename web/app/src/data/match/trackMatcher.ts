@@ -321,8 +321,8 @@ function containsCJKChar(text: string): boolean {
 /**
  * Whether a bracketed aside is the same title in another script rather
  * than packaging around it. True when one core is CJK-only, the other is
- * Latin, and either core appears in the other's aside. Same-script asides
- * never qualify.
+ * Latin, and the other's aside is that core in full (one word of a longer
+ * aside is not enough). Same-script asides never qualify.
  */
 export function isTranslationMatch(wanted: TitleParts, got: TitleParts): boolean {
   const wantedCJK = containsCJKChar(wanted.core) && !hasFilingLatin(wanted.core);
@@ -330,8 +330,6 @@ export function isTranslationMatch(wanted: TitleParts, got: TitleParts): boolean
   const wantedLatin = hasFilingLatin(wanted.core);
   const gotLatin = hasFilingLatin(got.core);
   if ((wantedCJK && gotLatin) || (gotCJK && wantedLatin)) {
-    if (wanted.context.has(got.core)) return true;
-    if (got.context.has(wanted.core)) return true;
     if ([...wanted.context].join('') === got.core) return true;
     if ([...got.context].join('') === wanted.core) return true;
   }
