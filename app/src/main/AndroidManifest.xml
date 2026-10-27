@@ -24,6 +24,14 @@
       Everything else in the app works without it.
     -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!--
+      BLUETOOTH_CONNECT's predecessor, granted at install: what reads a paired
+      device's class below API 31, so the player can draw a speaker for a
+      speaker. See AudioRouting.formOf.
+    -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
 
     <!--
       In-app updates: handing a downloaded APK to the system installer. The
@@ -227,6 +235,24 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!--
+              "Open with" for an audio file: a file manager, a downloads list, a
+              tapped attachment. Typed rather than matched on extension, which
+              is what every sender actually fills in — and the two Ogg/FLAC
+              spellings are there because some file managers still type those
+              files as applications. Answered by MusicLink.LocalFile.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+                <data android:mimeType="application/x-flac" />
             </intent-filter>
         </activity>
 

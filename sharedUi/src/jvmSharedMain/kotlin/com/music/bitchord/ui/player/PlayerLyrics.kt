@@ -26,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -114,6 +115,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
@@ -1781,6 +1783,12 @@ internal fun LyricsPanel(
     onPickLine: (Int) -> Unit = {},
     /** Tap while picking: add or drop that line. */
     onTogglePick: (Int) -> Unit = {},
+    /**
+     * Holds the sung line in the middle of the panel rather than at its top.
+     * For the wide layouts — TV, landscape, tablet — where a column of lyrics
+     * read from its top edge leaves most of the screen below the words.
+     */
+    centerFocus: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val panelPlaying = isPlaying && active
@@ -1922,6 +1930,20 @@ internal fun LyricsPanel(
     // every line while the reader's place in the song is unchanged, and a reset
     // here would snap the panel back to the top mid-read.
     var placed by remember(trackKey) { mutableStateOf(false) }
+    // Unsynced text has no line to hold anywhere, and centred it would only
+    // open with half a screen of nothing above the first verse.
+    val centered = centerFocus && isSynced
+    // Where a row [size] tall has to sit, in the list's own item offsets, to be
+    // the line being read: its top on the top padding, or its middle on the
+    // middle of the viewport.
+    val focusOffset: (Int) -> Int = { size ->
+        if (!centered) {
+            0
+        } else {
+            val info = listState.layoutInfo
+            (info.viewportStartOffset + info.viewportEndOffset) / 2 - size / 2
+        }
+    }
     // Nothing resets [browsing] off [controlsOpen] any more. It used to, so
     // that tapping the controls back resumed following — but the controls now
     // also come back by scrolling up, and clearing the flag there handed the
@@ -1934,12 +1956,24 @@ internal fun LyricsPanel(
         if (active && isSynced && !browsing &&
             focusLine >= 0 && focusLine in lines.indices
         ) {
-            snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
-            // Keep the same top anchor whether the playback controls are visible or hidden.
+            // Centred, the top padding is half the viewport, and it only exists
+            // a frame after the viewport does. Placing against the frame before
+            // it lands would leave the line that whole padding off centre.
+            snapshotFlow { listState.layoutInfo }.first {
+                it.viewportSize.height > 0 && (!centered || it.beforeContentPadding > 0)
+            }
+            // Keep the same anchor whether the playback controls are visible or hidden.
             val visible = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == focusLine }
             when {
                 !placed -> {
-                    listState.scrollToItem(focusLine, scrollOffset = 0)
+                    listState.scrollToItem(focusLine, scrollOffset = -focusOffset(0))
+                    // The row's height is only known once it is laid out, and
+                    // centring needs half of it.
+                    if (centered) {
+                        listState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { it.index == focusLine }
+                            ?.let { listState.scrollBy((it.offset - focusOffset(it.size)).toFloat()) }
+                    }
                     placed = true
                 }
                 // Already on screen, which is the ordinary case of handing over
@@ -1948,20 +1982,35 @@ internal fun LyricsPanel(
                 // list's default spring.
                 visible != null -> {
                     val span = scrollLead(lines, clock.longValue).toInt()
-                    run = ScrollRun(run.id + 1, visible.offset.toFloat(), span)
+                    val distance = (visible.offset - focusOffset(visible.size)).toFloat()
+                    run = ScrollRun(run.id + 1, distance, span)
                     // The same curve the rows catch up on. Two different
                     // curves and a row with no delay at all still trails the
                     // list it is sitting in, which is most of the way to
                     // looking like the panel cannot keep up with itself.
                     listState.animateScrollBy(
-                        value = visible.offset.toFloat(),
+                        value = distance,
                         animationSpec = tween(durationMillis = span, easing = LYRIC_EASING),
                     )
                 }
                 // Somewhere off screen — after a seek, or a long instrumental
                 // scrolled past. How far is not known without laying the rows
                 // out, so this hands back to the list's own staged scroll.
-                else -> listState.animateScrollToItem(focusLine, scrollOffset = 0)
+                else -> {
+                    listState.animateScrollToItem(focusLine, scrollOffset = -focusOffset(0))
+                    // That lands the row's top on the middle; the last half
+                    // line is settled once its height is known.
+                    if (centered) {
+                        listState.layoutInfo.visibleItemsInfo
+                            .firstOrNull { it.index == focusLine }
+                            ?.let {
+                                listState.animateScrollBy(
+                                    value = (it.offset - focusOffset(it.size)).toFloat(),
+                                    animationSpec = tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+                                )
+                            }
+                    }
+                }
             }
         }
     }
@@ -1999,8 +2048,14 @@ internal fun LyricsPanel(
         // Each row carries GLOW_ROOM of its own inset for the halo, so the
         // list hands that much back — otherwise the lines would sit a glow's
         // width further apart and further in than they used to.
+        // Centred, half the viewport above the first line, so that it too can
+        // be brought to the middle.
         contentPadding = PaddingValues(
-            top = 40.dp - GLOW_ROOM,
+            top = if (centered) {
+                with(LocalDensity.current) { viewportHeight.toDp() } * 0.5f
+            } else {
+                40.dp - GLOW_ROOM
+            },
             bottom = with(LocalDensity.current) { viewportHeight.toDp() } * 0.8f,
             start = PLAYER_GUTTER - GLOW_ROOM,
             end = PLAYER_GUTTER - GLOW_ROOM,
@@ -2712,11 +2767,20 @@ private fun LyricLine.withoutBracketPunctuation(): LyricLine = copy(
 
 private fun String.stripParens(): String = replace("(", "").replace(")", "").trim()
 
+/** The strip's fixed line box — about what Latin type at 16sp makes of itself. */
+private val STRIP_LINE_HEIGHT = 20.sp
+
+/** How much of a line's own length it spends fading out at the end, clamped to this range. */
+private const val LYRIC_FADE_FRACTION = 0.28f
+private const val LYRIC_FADE_MIN_MS = 160f
+private const val LYRIC_FADE_MAX_MS = 700f
+
 /**
  * The single lyric line above the scrubber.
  *
- * Transitions between lines use [AnimatedContent] with vertical slide and
- * fade, respecting [PlayerSettings.reduceAnimation].
+ * The line fades out as it nears its end, and the next one slides up in its
+ * place — [AnimatedContent] carries the slide, respecting
+ * [PlayerSettings.reduceAnimation].
  */
 @Composable
 private fun CurrentLyricLine(
@@ -2729,6 +2793,16 @@ private fun CurrentLyricLine(
     modifier: Modifier = Modifier,
 ) {
     val isSynced = remember(lines) { lines.any { it.timeMs > 0L } }
+    // One line box whatever the script: left to the font, a Devanagari or
+    // Gurmukhi line is taller than a Latin one and the credits and artwork
+    // above this strip shift up and down as lines change language.
+    val stripStyle = MaterialTheme.typography.titleMedium.copy(
+        lineHeight = STRIP_LINE_HEIGHT,
+        lineHeightStyle = LineHeightStyle(
+            alignment = LineHeightStyle.Alignment.Center,
+            trim = LineHeightStyle.Trim.None,
+        ),
+    )
     if (!isSynced) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -2738,7 +2812,7 @@ private fun CurrentLyricLine(
                 .padding(vertical = 4.dp),
         ) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
@@ -2746,7 +2820,7 @@ private fun CurrentLyricLine(
             Spacer(Modifier.width(6.dp))
             Text(
                 text = stringResource(Res.string.open_lyrics),
-                style = MaterialTheme.typography.titleMedium,
+                style = stripStyle,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -2811,7 +2885,7 @@ private fun CurrentLyricLine(
     ) {
         if (instrumental) {
             Icon(
-                imageVector = BitChordIcons.MusicNote,
+                imageVector = BitChordIcons.Instrumental,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp),
@@ -2827,8 +2901,10 @@ private fun CurrentLyricLine(
                         SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> snap() })
                     )
                 } else {
-                    (fadeIn(animationSpec = tween(duration, easing = FastOutSlowInEasing)) +
-                        slideInVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> (height * 0.35f).toInt() })
+                    // The arriving line is not faded in: each line's own dynamic
+                    // fade (see the content below) has already taken the old line
+                    // out, so the new one slides straight up at full strength.
+                    slideInVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> (height * 0.35f).toInt() }
                         .togetherWith(
                             fadeOut(animationSpec = tween(duration, easing = FastOutSlowInEasing)) +
                                 slideOutVertically(animationSpec = tween(duration, easing = FastOutSlowInEasing)) { height -> -(height * 0.35f).toInt() }
@@ -2839,24 +2915,42 @@ private fun CurrentLyricLine(
             },
             label = "currentLyricTransition",
             modifier = Modifier.weight(1f, fill = false),
-        ) { (_, lineItem, lineText) ->
+        ) { (itemIndex, lineItem, lineText) ->
             val itemInstrumental = lineItem == null || lineItem.isGap
             val swept = lineItem?.takeIf { !itemInstrumental && it.isWordSynced }
+            // Each line carries its own fade, read against its own end: the line
+            // leaving the strip is already faded out and stays that way while it
+            // slides off, and the one arriving is at full strength from its
+            // first frame. A single fade on the row would hand the old line the
+            // new line's alpha the instant the index changed.
+            val fading = Modifier.graphicsLayer {
+                if (itemInstrumental) return@graphicsLayer
+                val start = lines.getOrNull(itemIndex)?.timeMs ?: 0L
+                val end = lines.getOrNull(itemIndex + 1)?.timeMs
+                    ?: durationMs.takeIf { it > start }
+                    ?: (start + 4_000L)
+                val fade = ((end - start) * LYRIC_FADE_FRACTION)
+                    .coerceIn(LYRIC_FADE_MIN_MS, LYRIC_FADE_MAX_MS)
+                val remaining = (end - clock.longValue).toFloat()
+                alpha = 0.78f * (remaining / fade).coerceIn(0f, 1f)
+            }
             if (swept != null) {
                 SweptLyricLine(
                     line = swept,
                     clock = clock,
-                    style = voiceStyle(MaterialTheme.typography.titleMedium, text, alignEnd = false, laneLocked = false),
+                    style = voiceStyle(stripStyle, text, alignEnd = false, laneLocked = false),
                     dimAlpha = UNSUNG_ALPHA_STRIP,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     rise = false,
+                    modifier = fading,
                 )
             } else {
                 Text(
+                    modifier = fading,
                     text = lineText,
                     style = voiceStyle(
-                        MaterialTheme.typography.titleMedium.copy(
+                        stripStyle.copy(
                             color = if (itemInstrumental) Color.White.copy(alpha = 0.5f) else Color.White
                         ),
                         lineText,
