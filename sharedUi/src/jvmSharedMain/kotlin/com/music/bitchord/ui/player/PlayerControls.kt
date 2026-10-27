@@ -18,7 +18,6 @@ import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -83,11 +82,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Color
@@ -109,6 +110,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.music.bitchord.ui.components.LINE_FADE
+import com.music.bitchord.ui.graphics.fadingEdges
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
@@ -277,7 +280,15 @@ internal fun PlayerScrubber(
 private fun MixingLabel(pulse: MixPulse, modifier: Modifier = Modifier) {
     Text(
         text = stringResource(Res.string.mixing),
-        modifier = modifier.graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) },
+        modifier = modifier
+            // Opens the mix view. Plain text that takes taps: no padding, no
+            // ripple, so it lays out exactly as the label always did and
+            // nothing around it moves when it appears.
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+            ) { MixViewRequest.open = true }
+            .graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) },
         style = MaterialTheme.typography.labelMedium.copy(
             fontWeight = FontWeight.Medium,
             fontSize = (MaterialTheme.typography.labelMedium.fontSize.value + BADGE_SIZE_BUMP).sp,
@@ -358,6 +369,7 @@ internal fun SleeveNerdStats(song: Song, modifier: Modifier = Modifier) {
     val nerdStats by NerdStats.current.collectAsStateWithLifecycle()
     val smartFadeOn by PlayerSettings.smartFadeEnabled.collectAsStateWithLifecycle()
     val smartAnalysis by PlayerSettings.smartAnalysis.collectAsStateWithLifecycle()
+    val automixDetail by PlayerSettings.automixDetail.collectAsStateWithLifecycle()
     // A party doesn't mix, and doesn't analyse for one either — see
     // [com.music.bitchord.playback.CrossfadeController]. So the two flows above
     // simply stop moving there, and the stats line has to say why rather than
@@ -410,6 +422,9 @@ internal fun SleeveNerdStats(song: Song, modifier: Modifier = Modifier) {
                     inParty -> stringResource(Res.string.automix_stopped_in_party)
                     song.isVideoOrigin ->
                         stringResource(Res.string.automix_not_supported_video)
+                    // The detailed line once the controller has one: each song's
+                    // grid, then the planned mix — the loops and what cleared them.
+                    automixDetail != null -> automixDetail!!
                     else -> stringResource(
                         Res.string.automix_analysis_status,
                         smartAnalysis.current.localizedLabel(),
@@ -421,7 +436,9 @@ internal fun SleeveNerdStats(song: Song, modifier: Modifier = Modifier) {
                 // the audio, this one describes the app, and the ranking
                 // should show.
                 color = Color.White.copy(alpha = 0.5f),
-                maxLines = 1,
+                // The detailed line runs long on a phone: a second line rather
+                // than an ellipsis through the part that says what the mix is.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
@@ -553,8 +570,7 @@ internal fun VolumeRow(
  *
  * The capsule swaps: output and party normally, the three playback modes while
  * the queue is up, since that is when they are what you are about to reach for.
- * With the queue up the lyrics glyph steps aside and the capsule slides over
- * into its place, leaving the queue glyph — lit — as the way back.
+ * It stays centred between the two glyphs either way.
  */
 @Composable
 internal fun PlayerActionRow(
@@ -579,26 +595,11 @@ internal fun PlayerActionRow(
         // swap, and the lyrics and queue glyphs would slide with it.
         val widestRow = BOTTOM_ACTION_SIZE * 2 + pillWidth(3)
         val edgeInset = ((maxWidth - widestRow) / 4).coerceAtLeast(0.dp)
-        // 0 with the capsule centred between lyrics and queue, 1 with it moved
-        // over to where the lyrics glyph sits. Read only while placing, so the
-        // slide relays out the row and recomposes nothing.
-        val toStart = animateFloatAsState(
-            targetValue = if (queueOpen) 1f else 0f,
-            animationSpec = tween(PILL_SLIDE_MS, easing = FastOutSlowInEasing),
-            label = "playerBottomPillSlide",
-        )
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
-            contentAlignment = Alignment.CenterStart,
+            contentAlignment = Alignment.Center,
         ) {
-            // Gone while the queue is up: the playback modes take its place, and
-            // the queue glyph, lit, is how you get back.
-            AnimatedVisibility(
-                visible = !queueOpen,
-                enter = fadeIn(tween(180, delayMillis = 120)),
-                exit = fadeOut(tween(120)),
-                modifier = Modifier.align(Alignment.CenterStart),
-            ) {
+            Box(Modifier.align(Alignment.CenterStart)) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -609,19 +610,6 @@ internal fun PlayerActionRow(
                 )
             }
             AnimatedContent(
-                // Laid out across the whole row and placed by hand: centred, as
-                // it was, at 0, flush with the lyrics glyph's left edge at 1.
-                // Centred off the capsule's *current* width, so it stays centred
-                // through the two-to-three resize on its way over rather than
-                // stepping when the size settles. Nothing in the spare width
-                // takes touches, so the glyphs either side still get theirs.
-                modifier = Modifier.layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints.copy(minWidth = 0))
-                    layout(constraints.maxWidth, placeable.height) {
-                        val centred = (constraints.maxWidth - placeable.width) / 2f
-                        placeable.place((centred * (1f - toStart.value)).roundToInt(), 0)
-                    }
-                },
                 targetState = queueOpen,
                 transitionSpec = {
                     (fadeIn(tween(180, delayMillis = 140)) togetherWith fadeOut(tween(140)))
@@ -810,19 +798,21 @@ private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 private val BOTTOM_ACTION_SIZE = 44.dp
 
 /**
+ * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
+ * three quarters of it, its corners about a fifth, and it is the tint at a
+ * little over half strength so the artwork still colours it.
+ */
+private val BOTTOM_ACTIVE_TILE_SIZE = 35.dp
+private val BOTTOM_ACTIVE_TILE_CORNER = 7.dp
+private const val BOTTOM_ACTIVE_TILE_ALPHA = 0.62f
+
+/**
  * One half of the output capsule — wider than it is tall, so the capsule reads
  * as a capsule rather than as two circles that have been pushed together.
  */
 // The count reserve is kept on both halves, so entering a party never makes
 // the capsule lopsided or shifts the queue control beside it.
 private val PILL_SEGMENT_WIDTH = 64.dp
-
-/**
- * How long the capsule takes to cross from the middle of the row to the lyrics
- * glyph's place as the queue opens, and back. Long enough to cover the content
- * swap and the resize, so it lands after both rather than before.
- */
-private const val PILL_SLIDE_MS = 320
 
 /**
  * Optical sizes, not equal ones.
@@ -1225,12 +1215,33 @@ private fun BottomGlyph(
     // costs no recomposition. Starts a full window in the past so the first tap
     // is never the one that gets swallowed.
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
+    val tileColor = LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
     Box(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
-            .clip(CircleShape)
-            .background(
-                if (highlighted) LocalPlayerTint.current.copy(alpha = 0.20f) else Color.Transparent,
+            // Lit, Apple's way: a rounded tile with the glyph cut out of it, the
+            // artwork showing through. The glyph is drawn first and the tile over
+            // it with SrcOut, which keeps the tile only where the glyph is not.
+            // Offscreen only while lit, so an unlit glyph costs no extra layer.
+            .then(
+                if (highlighted) {
+                    Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val side = BOTTOM_ACTIVE_TILE_SIZE.toPx()
+                            val corner = BOTTOM_ACTIVE_TILE_CORNER.toPx()
+                            drawRoundRect(
+                                color = tileColor,
+                                topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
+                                size = Size(side, side),
+                                cornerRadius = CornerRadius(corner, corner),
+                                blendMode = BlendMode.SrcOut,
+                            )
+                        }
+                } else {
+                    Modifier
+                },
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -1312,8 +1323,13 @@ internal const val MARQUEE_ARTIST_STAGGER_MS = 3_000L
  * before going again. [onOverflowChange] reports whether this line is scrolling
  * at all, so a sibling line can decide whether it needs to stagger behind it.
  *
- * With [enabled] false the line is a plain ellipsised one — no copies, no
- * animation, nothing left running off screen.
+ * A line too long for its width fades out at its end rather than stopping at
+ * a hard edge, as Apple's does, and once it is crawling at its start too — see
+ * [marqueeFade]. [trailing] sits after the line, outside the crawl, where
+ * Apple puts the explicit badge.
+ *
+ * With [enabled] false the line holds still at its start — no copies, no
+ * animation, nothing left running off screen — and only fades at its end.
  */
 @Composable
 internal fun MarqueeText(
@@ -1323,38 +1339,24 @@ internal fun MarqueeText(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     startDelayMillis: Long = 0L,
-    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
     onOverflowChange: (Boolean) -> Unit = {},
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (leading != null) {
-            leading()
-            Spacer(Modifier.width(6.dp))
-        }
-        if (!enabled) {
-            Text(
-                text = text,
-                style = style,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            return@Row
-        }
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
             val maxWidthPx = constraints.maxWidth
             val layout = remember(text, style, maxWidthPx) {
                 textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
             }
             val overflowing = layout.size.width > maxWidthPx
-            LaunchedEffect(overflowing) { onOverflowChange(overflowing) }
+            val crawls = enabled && overflowing
+            LaunchedEffect(crawls) { onOverflowChange(crawls) }
 
             // One whole copy plus the gap behind it: that is the distance at
             // which the second copy is sitting exactly where the first was.
-            val travelPx = if (overflowing) {
+            val travelPx = if (crawls) {
                 layout.size.width + with(density) { MARQUEE_GAP.roundToPx() }
             } else {
                 0
@@ -1383,19 +1385,47 @@ internal fun MarqueeText(
                 // the text is truncated during its own measurement and sliding
                 // it sideways just moves an already-cut string.
                 modifier = Modifier
+                    .marqueeFade(overflowing, travelPx) { offsetX.value }
                     .wrapContentWidth(align = Alignment.Start, unbounded = true)
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MarqueeLine(text = text, style = style, color = color)
-                if (overflowing) {
+                if (crawls) {
                     Spacer(Modifier.width(MARQUEE_GAP))
                     MarqueeLine(text = text, style = style, color = color)
                 }
             }
         }
+        if (trailing != null) {
+            Spacer(Modifier.width(6.dp))
+            trailing()
+        }
     }
 }
+
+/**
+ * A marquee line's fades, where it [overflows] its box: out at its end always,
+ * and at its start while it is away from its resting place — in over the first
+ * fade's width of a pass of [travelPx] and back out over the last, by when the
+ * copy chasing it has arrived where it started. [offset] is read as it draws.
+ */
+private fun Modifier.marqueeFade(overflows: Boolean, travelPx: Int, offset: () -> Float): Modifier =
+    if (!overflows) {
+        this
+    } else {
+        composed {
+            val fadePx = with(LocalDensity.current) { LINE_FADE.toPx() }
+            fadingEdges(
+                LINE_FADE,
+                start = {
+                    val moved = -offset()
+                    minOf(moved, travelPx - moved) / fadePx
+                },
+                end = { 1f },
+            )
+        }
+    }
 
 /** One copy of a marquee's line, laid out at its full width rather than clipped. */
 @Composable
@@ -1454,10 +1484,6 @@ internal fun ArtistCreditsMarquee(
     val segments = remember(text, credits) { creditSegments(text, credits) }
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (!enabled) {
-            CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
-            return@Row
-        }
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
             val maxWidthPx = constraints.maxWidth
             // Measured as one string, exactly as the single-line version measured
@@ -1467,7 +1493,8 @@ internal fun ArtistCreditsMarquee(
                 textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
             }
             val overflowing = layout.size.width > maxWidthPx
-            val travelPx = if (overflowing) {
+            val crawls = enabled && overflowing
+            val travelPx = if (crawls) {
                 layout.size.width + with(density) { MARQUEE_GAP.roundToPx() }
             } else {
                 0
@@ -1491,12 +1518,13 @@ internal fun ArtistCreditsMarquee(
 
             Row(
                 modifier = Modifier
+                    .marqueeFade(overflowing, travelPx) { offsetX.value }
                     .wrapContentWidth(align = Alignment.Start, unbounded = true)
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
-                if (overflowing) {
+                if (crawls) {
                     Spacer(Modifier.width(MARQUEE_GAP))
                     CreditLine(segments = segments, style = style, color = color, onOpenArtist = onOpenArtist)
                 }
