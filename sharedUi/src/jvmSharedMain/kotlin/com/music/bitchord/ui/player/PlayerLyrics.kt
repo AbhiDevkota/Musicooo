@@ -106,13 +106,13 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
+import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
@@ -177,17 +177,12 @@ private fun textDirectionFor(text: String): androidx.compose.ui.text.style.TextD
     else androidx.compose.ui.text.style.TextDirection.Ltr
 }
 
-private val PersianLyricFont = FontFamily(Font(Res.font.vazirmatn_regular))
-
-/** Use Vazirmatn for Persian/Arabic-script lyrics without changing Latin lyrics. */
-private fun lyricFontStyle(style: TextStyle, text: String): TextStyle {
-    val usesArabicScript = text.any { ch ->
-        val code = ch.code
-        code in 0x0600..0x06FF || code in 0x0750..0x077F ||
-            code in 0x08A0..0x08FF || code in 0xFB50..0xFDFF ||
-            code in 0xFE70..0xFEFF
-    }
-    return if (usesArabicScript) style.copy(fontFamily = PersianLyricFont) else style
+/** Whether [text] carries Arabic-script letters (Persian, Arabic, Urdu…). */
+private fun usesArabicScript(text: String): Boolean = text.any { ch ->
+    val code = ch.code
+    code in 0x0600..0x06FF || code in 0x0750..0x077F ||
+        code in 0x08A0..0x08FF || code in 0xFB50..0xFDFF ||
+        code in 0xFE70..0xFEFF
 }
 
 /** Whether this text should align to the right end of its box. */
@@ -2565,7 +2560,12 @@ private fun PanelVoice(
     rise: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val lyricStyle = remember(style, line.text) { lyricFontStyle(style, line.text) }
+    // Vazirmatn for Persian/Arabic-script lines; Latin lines keep the player's font.
+    val arabicScript = remember(line.text) { usesArabicScript(line.text) }
+    val lyricStyle = if (arabicScript) {
+        val vazirmatn = Font(Res.font.vazirmatn_regular)
+        remember(style, vazirmatn) { style.copy(fontFamily = FontFamily(vazirmatn)) }
+    } else style
     // The line being sung is white; every other one — sung or still to come —
     // takes the sleeve's tint, as the rest of the player's secondary text does
     // (see [LocalPlayerTint]). Faded across the handover rather than cut, so a
