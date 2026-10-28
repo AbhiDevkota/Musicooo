@@ -3,7 +3,6 @@ package com.music.bitchord.ui.player
 import com.music.bitchord.wear.WearBridge
 import android.content.Context
 import android.database.ContentObserver
-import android.media.AudioFormat
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +22,8 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LastPlayerScreen
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.AudioRouting
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
+import com.music.bitchord.playback.audio.bitperfect.DacVolume
 import com.music.bitchord.playback.cast.CastController
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.CoroutineScope
@@ -153,9 +154,13 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     }
 
     override val outputFormat: StateFlow<OutputFormatUi> by lazy {
-        AudioOutputStatus.current
-            .map { it.toOutputFormat() }
-            .stateIn(scope, SharingStarted.Eagerly, AudioOutputStatus.current.value.toOutputFormat())
+        combine(AudioOutputStatus.current, BitPerfectOutput.status) { status, bitPerfect ->
+            status.toOutputFormat(bitPerfect)
+        }.stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            AudioOutputStatus.current.value.toOutputFormat(BitPerfectOutput.status.value),
+        )
     }
 
     override val party: StateFlow<PartyUi> by lazy {
@@ -222,23 +227,20 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     ) = AndroidLyricsShareSheet(hazeState = hazeState, request = request, onDismiss = onDismiss)
 }
 
-private fun AudioOutputStatus.Snapshot.toOutputFormat(): OutputFormatUi {
-    val encoding = AudioOutputStatus.encodingLabel(this)
-    val rate = actualSampleRateHz?.takeIf { it > 0 }
+/**
+ * The output's format line, and whether the track is reaching the DAC
+ * bit-perfect. On the exclusive output the format is the one written to
+ * the DAC, not the ordinary AudioTrack's, which is idle meanwhile.
+ */
+private fun AudioOutputStatus.Snapshot.toOutputFormat(bitPerfect: BitPerfectOutput.Status): OutputFormatUi {
+    val encoding = if (bitPerfect.active) "${bitPerfect.outputBits}-bit PCM" else AudioOutputStatus.encodingLabel(this)
+    val rate = (if (bitPerfect.active) bitPerfect.sampleRateHz else actualSampleRateHz)?.takeIf { it > 0 }
     val summary = if (rate == null) {
         encoding
     } else {
         "$encoding · ${"%.1f".format(Locale.ROOT, rate / 1000f).removeSuffix(".0")} kHz"
     }
-    // What the route is *capable* of, read off the negotiated AudioTrack.
-    val carriesHiRes = when (actualEncoding) {
-        AudioFormat.ENCODING_PCM_24BIT_PACKED,
-        AudioFormat.ENCODING_PCM_32BIT,
-        AudioFormat.ENCODING_PCM_FLOAT,
-        -> true
-        else -> (actualSampleRateHz ?: 0) > 48_000
-    }
-    return OutputFormatUi(summary = summary, carriesHiRes = carriesHiRes)
+    return OutputFormatUi(summary = summary, bitPerfect = bitPerfect.active && bitPerfect.exact)
 }
 
 private fun ListenTogether.State.toPartyUi() = PartyUi(
@@ -250,8 +252,8 @@ private fun ListenTogether.State.toPartyUi() = PartyUi(
 )
 
 /**
- * The volume bar's level: the receiver's while the music is on one, the music
- * stream's otherwise. The two are different numbers on different devices, and
+ * The volume bar's level: the receiver's while the music is on one, the DAC's
+ * own while direct USB output drives it, the music stream's otherwise. The two are different numbers on different devices, and
  * the bar must never show one while moving the other.
  */
 private class CastAwareVolume(
@@ -263,10 +265,14 @@ private class CastAwareVolume(
         CastController.volume,
         CastController.state.map { it.casting },
         WearBridge.watchOutput,
-    ) { phone, receiver, casting, watch ->
+        DacVolume.level,
+    ) { phone, receiver, casting, watch, dac ->
         when {
             casting -> receiver
             watch.active -> watch.volume
+            // Direct USB: the music stream no longer reaches the DAC, so its
+            // own hardware volume is the only one that means anything.
+            dac != null -> dac
             else -> phone
         }
     }
@@ -276,6 +282,7 @@ private class CastAwareVolume(
         when {
             CastController.state.value.casting -> CastController.setVolume(level)
             WearBridge.watchOutput.value.active -> WearBridge.setWatchVolume(level)
+            DacVolume.level.value != null -> DacVolume.set(level)
             else -> system.set(level)
         }
     }
