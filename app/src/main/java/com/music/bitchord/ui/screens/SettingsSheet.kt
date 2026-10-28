@@ -112,6 +112,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChanged
+import kotlin.math.abs
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -602,27 +609,25 @@ fun SettingsScreen(
         ) {
             val outputPrecisionTitle = stringResource(R.string.output_precision)
             row(outputPrecisionTitle, "pcm", "bit depth", "sample rate", "dac") {
-                BypassedByBitPerfect(bitPerfectReady) {
-                    SettingsRow(
-                        icon = Icons.Rounded.GraphicEq,
-                        title = outputPrecisionTitle,
-                        subtitle = buildString {
-                            append(outputStatus.sink)
-                            append(" · ")
-                            append(outputStatus.deviceName)
-                            (outputStatus.actualSampleRateHz ?: outputStatus.sampleRatesHz.firstOrNull())
-                                ?.let { append(" · ${it / 1000.0} kHz") }
-                            append(" · ")
-                            append(AudioOutputStatus.encodingLabel(outputStatus))
-                        },
-                    )
-                    SegmentedControl(
-                        options = OutputPcmMode.entries.map(OutputPcmMode::label),
-                        selectedIndex = OutputPcmMode.entries.indexOf(outputPcmMode),
-                        onSelect = { AppSettings.setOutputPcmMode(OutputPcmMode.entries[it]) },
-                        modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET, bottom = 14.dp),
-                    )
-                }
+                SettingsRow(
+                    icon = Icons.Rounded.GraphicEq,
+                    title = outputPrecisionTitle,
+                    subtitle = buildString {
+                        append(outputStatus.sink)
+                        append(" · ")
+                        append(outputStatus.deviceName)
+                        (outputStatus.actualSampleRateHz ?: outputStatus.sampleRatesHz.firstOrNull())
+                            ?.let { append(" · ${it / 1000.0} kHz") }
+                        append(" · ")
+                        append(AudioOutputStatus.encodingLabel(outputStatus))
+                    },
+                )
+                SegmentedControl(
+                    options = OutputPcmMode.entries.map(OutputPcmMode::label),
+                    selectedIndex = OutputPcmMode.entries.indexOf(outputPcmMode),
+                    onSelect = { AppSettings.setOutputPcmMode(OutputPcmMode.entries[it]) },
+                    modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET, bottom = 14.dp),
+                )
             }
             val preferUsbDacTitle = stringResource(R.string.prefer_usb_dac)
             row(preferUsbDacTitle, "headphone", "output") {
@@ -2347,6 +2352,12 @@ private fun AutomixPerformanceSheet(
  * A setting the bit-perfect output bypasses, faded and closed to touch while
  * that output is ready. With the mode on but its DAC unplugged the setting
  * works, and looks it.
+ *
+ * Only the touches that would change something are taken, so the page still
+ * scrolls when a swipe starts on one of these rows: the press and the
+ * release (no ripple, no click, no switch flip) and a sideways drag (no
+ * slider). A vertical drag is left alone, and the list's scrolling still
+ * starts from a press that was taken, so it scrolls as from any other row.
  */
 @Composable
 private fun BypassedByBitPerfect(bypassed: Boolean, content: @Composable () -> Unit) {
@@ -2356,12 +2367,26 @@ private fun BypassedByBitPerfect(bypassed: Boolean, content: @Composable () -> U
             .alpha(alpha)
             .then(
                 if (bypassed) {
-                    // Taken before any row sees it, so nothing underneath reacts.
                     Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
-                            }
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).consume()
+                            var sideways: Boolean? = null
+                            var travel = Offset.Zero
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                event.changes.forEach { change ->
+                                    when {
+                                        change.changedToUpIgnoreConsumed() -> change.consume()
+                                        change.positionChanged() -> {
+                                            travel += change.positionChange()
+                                            if (sideways == null && travel.getDistance() > viewConfiguration.touchSlop / 2) {
+                                                sideways = abs(travel.x) > abs(travel.y)
+                                            }
+                                            if (sideways == true) change.consume()
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
                         }
                     }
                 } else {

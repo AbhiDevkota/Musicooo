@@ -123,7 +123,21 @@ internal object BitPerfectOutput {
                         it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET
                 } == true
         }
-        _ready.value = attached || _status.value.active
+        this.attached = attached
+        recomputeReady()
+    }
+
+    @Volatile private var attached = false
+
+    /**
+     * Re-derived whenever any of its inputs moves — the mode, the attached
+     * device, or the output opening and closing — rather than only on device
+     * events. Computed once at the moment the mode went off, it caught the
+     * stream that was still closing and stayed true with the mode off.
+     */
+    private fun recomputeReady() {
+        _ready.value = AppSettings.bitPerfectMode.value != BitPerfectMode.OFF &&
+            (attached || _status.value.active)
     }
 
     fun forContext(context: Context): BitPerfectOutputs {
@@ -324,15 +338,18 @@ internal object BitPerfectOutput {
         currentFailures(mode, deviceId).add(key(mode, deviceId, sampleRate, channels, sourceBits))
         Log.i(TAG, "Bit-perfect output unavailable ($reason) for $sampleRate Hz/$channels ch/$sourceBits-bit")
         _status.value = Status(fallbackReason = reason)
+        recomputeReady()
     }
 
     fun publish(status: Status) {
         _status.value = status
+        recomputeReady()
     }
 
     /** Clears an active status, leaving a fallback reason in place for the settings row. */
     fun publishIdle() {
         if (_status.value.active) _status.value = Status()
+        recomputeReady()
     }
 
     private fun currentFailures(mode: BitPerfectMode, deviceId: Int): MutableSet<String> {
