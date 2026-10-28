@@ -141,6 +141,15 @@ private val EXPANDED_WIDTH = 50.dp
 private val EDGE_GAP = 10.dp
 
 /**
+ * Room around the capsule inside its popup window. A popup's window is only
+ * as large as its content and clips whatever is drawn past it, so without
+ * this the rubber-band stretch (up to 12% of [HUD_HEIGHT]) and the shadow
+ * were cut off at the window's edge.
+ */
+private val STRETCH_ROOM = 28.dp
+private val SHADOW_ROOM = 12.dp
+
+/**
  * The DAC's volume, the way iOS shows its own: a slim capsule that springs
  * out beside the volume keys, fills from the bottom, stretches like rubber
  * when pushed past either end, widens to a draggable slider under a finger,
@@ -219,15 +228,18 @@ fun DacVolumeHud() {
     Popup(
         alignment = Alignment.TopEnd,
         offset = IntOffset(
-            x = -with(density) { EDGE_GAP.roundToPx() },
-            // Level with a phone's volume keys, about a fifth of the way down.
-            y = with(density) { (screenHeight * 0.2f).roundToPx() },
+            x = -with(density) { (EDGE_GAP - SHADOW_ROOM).roundToPx() },
+            // Level with a phone's volume keys, about a fifth of the way down;
+            // the window starts STRETCH_ROOM above the capsule itself.
+            y = with(density) { (screenHeight * 0.2f - STRETCH_ROOM).roundToPx() },
         ),
         properties = PopupProperties(focusable = false, clippingEnabled = false),
     ) {
         val heightPx = with(density) { HUD_HEIGHT.toPx() }
         Box(
             modifier = Modifier
+                .padding(vertical = STRETCH_ROOM)
+                .padding(end = SHADOW_ROOM)
                 .height(HUD_HEIGHT)
                 .width(EXPANDED_WIDTH),
             contentAlignment = Alignment.CenterEnd,
