@@ -76,6 +76,8 @@ class BitPerfectAudioSinkTest {
         override fun markFailed(sampleRate: Int, channels: Int, sourceBits: Int, reason: String) { failures++ }
         override fun publish(status: BitPerfectOutput.Status) { statuses += status }
         override fun publishIdle() = Unit
+        var pendingNormal = false
+        override fun normalOutputPending() = pendingNormal
     }
 
     private fun format(rate: Int = 44100, encoding: Int = C.ENCODING_PCM_16BIT, delay: Int = 0): Format =
@@ -333,6 +335,42 @@ class BitPerfectAudioSinkTest {
         assertTrue(router.handleBuffer(pcm16(10), 1_000, 1))
         assertEquals(1, normal.resets)
         assertEquals(1, outputs.opened.size)
+    }
+
+    /** A local 5.1 file (a Dolby track decoded to PCM, say) after a lossless stereo one. */
+    @Test
+    fun multichannelLocalTrackPlaysOnNormalOutputAfterBitPerfect() {
+        val outputs = FakeOutputs()
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.play()
+        router.configure(config(format()))
+        assertTrue(router.handleBuffer(pcm16(10), 0, 1))
+        assertTrue(router.isBitPerfect)
+
+        val surround = format().buildUpon().setChannelCount(6).build()
+        router.configure(config(surround))
+        assertFalse(router.isBitPerfect)
+        val sixChannels = ByteBuffer.allocateDirect(12 * 4).order(ByteOrder.LITTLE_ENDIAN)
+        // The stereo tail plays out on the DAC first.
+        assertFalse(router.handleBuffer(sixChannels, 1_000, 1))
+        outputs.opened.single().advance(10)
+        assertTrue(router.handleBuffer(sixChannels, 1_000, 1))
+        assertSame(surround, normal.configured)
+        assertTrue(outputs.opened.single().released)
+    }
+
+    @Test
+    fun normalOutputWaitsWhileTheDacReturnsToAndroid() {
+        val outputs = FakeOutputs().apply { available = false; pendingNormal = true }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.configure(config(format()))
+        assertFalse(router.handleBuffer(pcm16(10), 0, 1))
+        assertEquals(0, normal.buffers)
+        outputs.pendingNormal = false
+        assertTrue(router.handleBuffer(pcm16(10), 0, 1))
+        assertEquals(1, normal.buffers)
     }
 }
 

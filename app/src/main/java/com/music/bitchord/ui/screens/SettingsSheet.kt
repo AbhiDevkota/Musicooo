@@ -109,6 +109,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -245,6 +248,7 @@ fun SettingsScreen(
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
     val bitPerfectMode by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
     val bitPerfectStatus by BitPerfectOutput.status.collectAsStateWithLifecycle()
+    val bitPerfectReady by BitPerfectOutput.ready.collectAsStateWithLifecycle()
     val dacVolume by BitPerfectOutput.hardwareVolume.collectAsStateWithLifecycle()
     val usbAllowFixedVolume by AppSettings.usbAllowFixedVolume.collectAsStateWithLifecycle()
     val loudnessNormalization by AppSettings.loudnessNormalization.collectAsStateWithLifecycle()
@@ -523,30 +527,32 @@ fun SettingsScreen(
             // way — see [AppSettings.dolbyAtmos].
             val dolbyAtmosTitle = stringResource(R.string.dolby_atmos)
             row(dolbyAtmosTitle, "surround", "e-ac-3") {
-                SettingsRow(
-                    iconPainter = painterResource(R.drawable.ic_dolby_atmos),
-                    title = dolbyAtmosTitle,
-                    subtitle = stringResource(
-                        if (dolbyAtmosSupported) {
-                            R.string.dolby_atmos_subtitle
-                        } else {
-                            R.string.dolby_atmos_unavailable
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        iconPainter = painterResource(R.drawable.ic_dolby_atmos),
+                        title = dolbyAtmosTitle,
+                        subtitle = stringResource(
+                            if (dolbyAtmosSupported) {
+                                R.string.dolby_atmos_subtitle
+                            } else {
+                                R.string.dolby_atmos_unavailable
+                            },
+                        ),
+                        enabled = dolbyAtmosSupported,
+                        trailing = {
+                            Switch(
+                                checked = dolbyAtmos && dolbyAtmosSupported,
+                                onCheckedChange = AppSettings::setDolbyAtmos,
+                                enabled = dolbyAtmosSupported,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
                         },
-                    ),
-                    enabled = dolbyAtmosSupported,
-                    trailing = {
-                        Switch(
-                            checked = dolbyAtmos && dolbyAtmosSupported,
-                            onCheckedChange = AppSettings::setDolbyAtmos,
-                            enabled = dolbyAtmosSupported,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setDolbyAtmos(!dolbyAtmos) },
-                )
+                        onClick = { AppSettings.setDolbyAtmos(!dolbyAtmos) },
+                    )
+                }
             }
         }
 
@@ -589,28 +595,34 @@ fun SettingsScreen(
             }
         }
 
-        SearchableSettingsGroup(search, header = stringResource(R.string.playback)) {
+        SearchableSettingsGroup(
+            search,
+            header = stringResource(R.string.playback),
+            footer = stringResource(R.string.bit_perfect_bypassed_footer).takeIf { bitPerfectReady },
+        ) {
             val outputPrecisionTitle = stringResource(R.string.output_precision)
             row(outputPrecisionTitle, "pcm", "bit depth", "sample rate", "dac") {
-                SettingsRow(
-                    icon = Icons.Rounded.GraphicEq,
-                    title = outputPrecisionTitle,
-                    subtitle = buildString {
-                        append(outputStatus.sink)
-                        append(" · ")
-                        append(outputStatus.deviceName)
-                        (outputStatus.actualSampleRateHz ?: outputStatus.sampleRatesHz.firstOrNull())
-                            ?.let { append(" · ${it / 1000.0} kHz") }
-                        append(" · ")
-                        append(AudioOutputStatus.encodingLabel(outputStatus))
-                    },
-                )
-                SegmentedControl(
-                    options = OutputPcmMode.entries.map(OutputPcmMode::label),
-                    selectedIndex = OutputPcmMode.entries.indexOf(outputPcmMode),
-                    onSelect = { AppSettings.setOutputPcmMode(OutputPcmMode.entries[it]) },
-                    modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET, bottom = 14.dp),
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.GraphicEq,
+                        title = outputPrecisionTitle,
+                        subtitle = buildString {
+                            append(outputStatus.sink)
+                            append(" · ")
+                            append(outputStatus.deviceName)
+                            (outputStatus.actualSampleRateHz ?: outputStatus.sampleRatesHz.firstOrNull())
+                                ?.let { append(" · ${it / 1000.0} kHz") }
+                            append(" · ")
+                            append(AudioOutputStatus.encodingLabel(outputStatus))
+                        },
+                    )
+                    SegmentedControl(
+                        options = OutputPcmMode.entries.map(OutputPcmMode::label),
+                        selectedIndex = OutputPcmMode.entries.indexOf(outputPcmMode),
+                        onSelect = { AppSettings.setOutputPcmMode(OutputPcmMode.entries[it]) },
+                        modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET, bottom = 14.dp),
+                    )
+                }
             }
             val preferUsbDacTitle = stringResource(R.string.prefer_usb_dac)
             row(preferUsbDacTitle, "headphone", "output") {
@@ -623,11 +635,28 @@ fun SettingsScreen(
             }
             val bitPerfectTitle = stringResource(R.string.bit_perfect_output)
             row(bitPerfectTitle, "usb", "dac", "exclusive", "hi-res", "bitperfect") {
+                // The mode and the device it names can both be long, so they
+                // go under the title rather than beside it, where they left
+                // the title and status no room.
                 SettingsRow(
                     icon = Icons.Rounded.Usb,
                     title = bitPerfectTitle,
-                    subtitle = bitPerfectSubtitle(bitPerfectMode, bitPerfectStatus),
-                    value = bitPerfectMode.localizedLabel(),
+                    subtitleContent = {
+                        Column {
+                            Text(
+                                text = bitPerfectSubtitle(bitPerfectMode, bitPerfectStatus),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = bitPerfectMode.localizedLabel(),
+                                modifier = Modifier.padding(top = 2.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
                     onClick = { pickingBitPerfect = true },
                 )
             }
@@ -663,30 +692,34 @@ fun SettingsScreen(
             }
             val loudnessTitle = stringResource(R.string.loudness_normalization)
             row(loudnessTitle, "loudness", "volume", "normalize", "replaygain", "lufs") {
-                SettingsRow(
-                    icon = Icons.Rounded.VolumeUp,
-                    title = loudnessTitle,
-                    subtitle = stringResource(R.string.loudness_normalization_subtitle),
-                    trailing = {
-                        Switch(
-                            checked = loudnessNormalization,
-                            onCheckedChange = AppSettings::setLoudnessNormalization,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setLoudnessNormalization(!loudnessNormalization) },
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.VolumeUp,
+                        title = loudnessTitle,
+                        subtitle = stringResource(R.string.loudness_normalization_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = loudnessNormalization,
+                                onCheckedChange = AppSettings::setLoudnessNormalization,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        },
+                        onClick = { AppSettings.setLoudnessNormalization(!loudnessNormalization) },
+                    )
+                }
             }
             val loudnessSpeakerTitle = stringResource(R.string.loudness_off_on_speaker)
             row(loudnessSpeakerTitle, "loudness", "speaker", "normalize") {
-                SettingsSubRow(
-                    title = loudnessSpeakerTitle,
-                    checked = loudnessOffOnSpeaker,
-                    onCheckedChange = AppSettings::setLoudnessOffOnSpeaker,
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsSubRow(
+                        title = loudnessSpeakerTitle,
+                        checked = loudnessOffOnSpeaker,
+                        onCheckedChange = AppSettings::setLoudnessOffOnSpeaker,
+                    )
+                }
             }
             // Automix decides its own length from each pair of tracks —
             // tempo, key, structure — so it replaces the manual slider rather
@@ -694,111 +727,121 @@ fun SettingsScreen(
             if (!smartFade) {
                 val crossfadeTitle = stringResource(R.string.crossfade)
                 row(crossfadeTitle, "fade", "gapless") {
-                    SliderRow(
-                        icon = Icons.Rounded.Waves,
-                        title = crossfadeTitle,
-                        subtitle = stringResource(R.string.crossfade_subtitle),
-                        value = if (crossfade == 0) stringResource(R.string.off) else "${crossfade}s",
-                        sliderValue = crossfade.toFloat(),
-                        onSliderValue = { AppSettings.setCrossfadeSeconds(it.roundToInt()) },
-                        valueRange = 0f..12f,
-                        steps = 11,
-                    )
+                    BypassedByBitPerfect(bitPerfectReady) {
+                        SliderRow(
+                            icon = Icons.Rounded.Waves,
+                            title = crossfadeTitle,
+                            subtitle = stringResource(R.string.crossfade_subtitle),
+                            value = if (crossfade == 0) stringResource(R.string.off) else "${crossfade}s",
+                            sliderValue = crossfade.toFloat(),
+                            onSliderValue = { AppSettings.setCrossfadeSeconds(it.roundToInt()) },
+                            valueRange = 0f..12f,
+                            steps = 11,
+                        )
+                    }
                 }
             }
             val automixTitle = stringResource(R.string.automix)
             row(automixTitle, "crossfade", "smart fade", "mix") {
-                SettingsRow(
-                    icon = Icons.Rounded.AutoAwesome,
-                    title = automixTitle,
-                    subtitle = if (smartFade) {
-                        stringResource(R.string.automix_enabled_subtitle)
-                    } else {
-                        stringResource(R.string.automix_disabled_subtitle)
-                    },
-                    trailing = {
-                        Switch(
-                            checked = smartFade,
-                            onCheckedChange = AppSettings::setSmartFadeEnabled,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setSmartFadeEnabled(!smartFade) },
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.AutoAwesome,
+                        title = automixTitle,
+                        subtitle = if (smartFade) {
+                            stringResource(R.string.automix_enabled_subtitle)
+                        } else {
+                            stringResource(R.string.automix_disabled_subtitle)
+                        },
+                        trailing = {
+                            Switch(
+                                checked = smartFade,
+                                onCheckedChange = AppSettings::setSmartFadeEnabled,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        },
+                        onClick = { AppSettings.setSmartFadeEnabled(!smartFade) },
+                    )
+                }
             }
             val automixPerformanceTitle = stringResource(R.string.automix_performance)
             row(automixPerformanceTitle, "cpu", "battery") {
-                SettingsRow(
-                    icon = Icons.Rounded.Tune,
-                    title = automixPerformanceTitle,
-                    subtitle = stringResource(R.string.automix_performance_subtitle),
-                    value = automixPerformance.localizedLabel(),
-                    onClick = { pickingAutomixPerformance = true },
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.Tune,
+                        title = automixPerformanceTitle,
+                        subtitle = stringResource(R.string.automix_performance_subtitle),
+                        value = automixPerformance.localizedLabel(),
+                        onClick = { pickingAutomixPerformance = true },
+                    )
+                }
             }
             val skipSilenceTitle = stringResource(R.string.skip_silence)
             row(skipSilenceTitle, "silence") {
-                SettingsRow(
-                    icon = Icons.AutoMirrored.Rounded.VolumeOff,
-                    title = skipSilenceTitle,
-                    // Silence skipping is Media3's own processor, and
-                    // `DefaultAudioSink.configure` appends that processor list
-                    // only on its 16-bit branch — the float branch gets the
-                    // format converter and nothing else. So on a float track
-                    // this switch really does nothing, and the row says so
-                    // rather than letting someone toggle it and wonder. The
-                    // equaliser is unaffected: it runs upstream of that sink.
-                    subtitle = if (outputStatus.actualEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
-                        stringResource(R.string.skip_silence_float_subtitle)
-                    } else {
-                        stringResource(R.string.skip_silence_subtitle)
-                    },
-                    trailing = {
-                        Switch(
-                            checked = skipSilence,
-                            onCheckedChange = AppSettings::setSkipSilence,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setSkipSilence(!skipSilence) },
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.AutoMirrored.Rounded.VolumeOff,
+                        title = skipSilenceTitle,
+                        // Silence skipping is Media3's own processor, and
+                        // `DefaultAudioSink.configure` appends that processor list
+                        // only on its 16-bit branch — the float branch gets the
+                        // format converter and nothing else. So on a float track
+                        // this switch really does nothing, and the row says so
+                        // rather than letting someone toggle it and wonder. The
+                        // equaliser is unaffected: it runs upstream of that sink.
+                        subtitle = if (outputStatus.actualEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
+                            stringResource(R.string.skip_silence_float_subtitle)
+                        } else {
+                            stringResource(R.string.skip_silence_subtitle)
+                        },
+                        trailing = {
+                            Switch(
+                                checked = skipSilence,
+                                onCheckedChange = AppSettings::setSkipSilence,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        },
+                        onClick = { AppSettings.setSkipSilence(!skipSilence) },
+                    )
+                }
             }
             val spatialAudioTitle = stringResource(R.string.spatial_audio)
             row(spatialAudioTitle, "surround", "3d") {
-                SettingsRow(
-                    icon = Icons.Rounded.SurroundSound,
-                    title = spatialAudioTitle,
-                    // Widening a JOC stream would fight the object-based mix
-                    // Dolby has already spatialized, so the service holds this
-                    // off for the duration of an Atmos track — see
-                    // `PlaybackService.applySpatialAudioEnabled`. Said on the
-                    // row because the switch stays where the listener left it,
-                    // and a switch reading "on" over an effect that is not
-                    // running is the same silent lie the equaliser screen used
-                    // to tell.
-                    subtitle = if (playingDolbyAtmos) {
-                        stringResource(R.string.spatial_audio_atmos_subtitle)
-                    } else {
-                        stringResource(R.string.spatial_audio_subtitle)
-                    },
-                    trailing = {
-                        Switch(
-                            checked = spatialAudio,
-                            onCheckedChange = AppSettings::setSpatialAudio,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setSpatialAudio(!spatialAudio) },
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.SurroundSound,
+                        title = spatialAudioTitle,
+                        // Widening a JOC stream would fight the object-based mix
+                        // Dolby has already spatialized, so the service holds this
+                        // off for the duration of an Atmos track — see
+                        // `PlaybackService.applySpatialAudioEnabled`. Said on the
+                        // row because the switch stays where the listener left it,
+                        // and a switch reading "on" over an effect that is not
+                        // running is the same silent lie the equaliser screen used
+                        // to tell.
+                        subtitle = if (playingDolbyAtmos) {
+                            stringResource(R.string.spatial_audio_atmos_subtitle)
+                        } else {
+                            stringResource(R.string.spatial_audio_subtitle)
+                        },
+                        trailing = {
+                            Switch(
+                                checked = spatialAudio,
+                                onCheckedChange = AppSettings::setSpatialAudio,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        },
+                        onClick = { AppSettings.setSpatialAudio(!spatialAudio) },
+                    )
+                }
             }
             // The system panel is not listed here as well. A device with a
             // Dolby or Dirac panel has something BitChord cannot reproduce and
@@ -806,12 +849,14 @@ fun SettingsScreen(
             // screen, rather than as a second equaliser entry alongside ours.
             val equalizerTitle = stringResource(R.string.equalizer)
             row(equalizerTitle, "eq", "bass", "treble") {
-                SettingsRow(
-                    icon = Icons.Rounded.Tune,
-                    title = equalizerTitle,
-                    subtitle = stringResource(R.string.equalizer_subtitle),
-                    onClick = onEqualizer,
-                )
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = Icons.Rounded.Tune,
+                        title = equalizerTitle,
+                        subtitle = stringResource(R.string.equalizer_subtitle),
+                        onClick = onEqualizer,
+                    )
+                }
             }
         }
 
@@ -2295,6 +2340,36 @@ private fun AutomixPerformanceSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * A setting the bit-perfect output bypasses, faded and closed to touch while
+ * that output is ready. With the mode on but its DAC unplugged the setting
+ * works, and looks it.
+ */
+@Composable
+private fun BypassedByBitPerfect(bypassed: Boolean, content: @Composable () -> Unit) {
+    val alpha by animateFloatAsState(if (bypassed) 0.38f else 1f, label = "bypassed")
+    Box(
+        Modifier
+            .alpha(alpha)
+            .then(
+                if (bypassed) {
+                    // Taken before any row sees it, so nothing underneath reacts.
+                    Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        content()
     }
 }
 

@@ -42,7 +42,9 @@ import java.nio.ByteBuffer
  *
  * If the exclusive output fails — it could not open, or the route changed
  * under it — the stream continues on [normal] from the next buffer rather
- * than surfacing a playback error. Settings that both sinks must hold
+ * than surfacing a playback error. After the direct USB driver lets a DAC go,
+ * [normal] waits for Android to take it back, so nothing meant for the DAC
+ * starts on the phone's speaker in between. Settings that both sinks must hold
  * (attributes, session, volume, listener) are always given to both, so
  * whichever one is chosen next is already up to date.
  */
@@ -93,6 +95,8 @@ internal class BitPerfectRoutingSink(
             if (playing) active.play()
         }
         if (active !== bitPerfect) {
+            // Straight after direct USB, until the DAC is an Android output again.
+            if (bitPerfect.holdsNormalOutput()) return false
             return active.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
         }
         return try {

@@ -6929,6 +6929,7 @@ class PlaybackService : MediaLibraryService() {
         // mode is chosen and again whenever a DAC is attached; an answer, an
         // attach or a detach all send the playing track back to be re-routed.
         UsbDirectDevices.init(this)
+        BitPerfectOutput.watch(this)
         scope.launch {
             var available = false
             DacVolume.level.collect { level ->
@@ -6938,6 +6939,7 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         UsbDirectDevices.onChanged = {
+            BitPerfectOutput.refreshReady(this)
             scope.launch {
                 if (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
                     UsbDirectDevices.requestPermission(this@PlaybackService)
@@ -6949,6 +6951,7 @@ class PlaybackService : MediaLibraryService() {
             // The sinks decide per format, so the playing track only moves on
             // or off the exclusive output when its sink is configured again.
             AppSettings.bitPerfectMode.collect { mode ->
+                BitPerfectOutput.refreshReady(this@PlaybackService)
                 if (mode == BitPerfectMode.USB_DIRECT) UsbDirectDevices.requestPermission(this@PlaybackService)
             }
         }

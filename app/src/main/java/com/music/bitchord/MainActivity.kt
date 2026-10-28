@@ -545,7 +545,6 @@ private fun BitChordApp(
     // The DAC's own volume while direct USB output owns it; the full player
     // has its own bar for that, so the HUD stays out of its way.
     androidx.compose.runtime.SideEffect { VolumeHud.suppressed = showNowPlaying }
-    DacVolumeHud()
     // The Top Picks and mood artwork loop forever; nobody sees it with the
     // app in the background or Now Playing pulled up over the page.
     val appForeground = com.music.bitchord.ui.rememberIsForeground()
@@ -5663,6 +5662,9 @@ private fun BitChordApp(
                 onDismiss = { confirmFixedVolume = false },
             )
         }
+
+        // Over the page and its frosted bars, under nothing but the alerts.
+        DacVolumeHud(hazeState)
 
         blockedAddonSong?.let { song ->
             AddonBlockedAlert(

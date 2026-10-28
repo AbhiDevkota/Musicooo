@@ -1033,6 +1033,7 @@
     <string name="prefer_usb_dac">Prefer USB DAC</string>
 
     <string name="bit_perfect_output">Bit-perfect output</string>
+    <string name="bit_perfect_bypassed_footer">Bit-perfect output is ready, so the faded settings are bypassed and Dolby Atmos versions aren\'t requested. They work again when the DAC is disconnected or the mode is off.</string>
     <string name="bit_perfect_sheet_warning">Sends the track to the DAC unchanged. The equalizer, loudness normalization, crossfade, Automix, playback speed and BitChord\'s volume are bypassed.</string>
     <string name="bit_perfect_mode_off_subtitle">Audio goes through Android\'s mixer and BitChord\'s effects.</string>
     <string name="bit_perfect_mode_usb_android">USB DAC</string>

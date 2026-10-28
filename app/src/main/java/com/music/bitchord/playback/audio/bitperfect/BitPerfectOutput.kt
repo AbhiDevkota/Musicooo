@@ -37,6 +37,9 @@ internal interface BitPerfectOutputs {
     fun publish(status: BitPerfectOutput.Status)
 
     fun publishIdle()
+
+    /** See [BitPerfectOutput.normalOutputPending]. */
+    fun normalOutputPending(): Boolean
 }
 
 /**
@@ -56,6 +59,7 @@ internal object BitPerfectOutput {
 
     private const val TAG = "BitPerfectOutput"
     private const val NO_DEVICE = -1
+    private const val DIRECT_HANDBACK_MS = 3000L
 
     data class Status(
         val active: Boolean = false,
@@ -72,6 +76,55 @@ internal object BitPerfectOutput {
 
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
+
+    private val _ready = MutableStateFlow(false)
+
+    /**
+     * Whether the selected mode has its device attached, so lossless tracks
+     * will be going to the exclusive output: a USB DAC for either USB mode,
+     * wired headphones for the built-in DAC. What settings fade and what
+     * stops asking for Dolby Atmos follow this, not the bare mode — with the
+     * mode on and nothing plugged in, everything plays as normal and should
+     * look it.
+     */
+    val ready: StateFlow<Boolean> = _ready.asStateFlow()
+
+    private var watching = false
+
+    /** Starts following the attached devices; [refreshReady] covers the mode and USB. */
+    @Synchronized
+    fun watch(context: Context) {
+        if (watching) return
+        watching = true
+        val app = context.applicationContext
+        app.getSystemService(AudioManager::class.java)?.registerAudioDeviceCallback(
+            object : android.media.AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>) = refreshReady(app)
+                override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>) = refreshReady(app)
+            },
+            android.os.Handler(android.os.Looper.getMainLooper()),
+        )
+        refreshReady(app)
+    }
+
+    fun refreshReady(context: Context) {
+        val audio = context.getSystemService(AudioManager::class.java)
+        val attached = when (AppSettings.bitPerfectMode.value) {
+            BitPerfectMode.OFF -> false
+            BitPerfectMode.USB_ANDROID ->
+                Build.VERSION.SDK_INT >= 34 && audio?.let(MixerTransport::usbDevice) != null
+            // Android's own driver lets go of the DAC while this one streams,
+            // so it is looked for as a USB device, not an audio output.
+            BitPerfectMode.USB_DIRECT ->
+                UsbDirectDevices.manager(context)?.let(UsbDirectDevices::audioDevice) != null
+            BitPerfectMode.DAP_EXCLUSIVE -> Build.VERSION.SDK_INT >= 27 &&
+                audio?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.any {
+                    it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                        it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET
+                } == true
+        }
+        _ready.value = attached || _status.value.active
+    }
 
     fun forContext(context: Context): BitPerfectOutputs {
         val app = context.applicationContext
@@ -90,6 +143,8 @@ internal object BitPerfectOutput {
             override fun publish(status: Status) = this@BitPerfectOutput.publish(status)
 
             override fun publishIdle() = this@BitPerfectOutput.publishIdle()
+
+            override fun normalOutputPending() = normalOutputPending(app)
         }
     }
 
@@ -109,6 +164,30 @@ internal object BitPerfectOutput {
 
     private var owner: Any? = null
     private var active: BitPerfectTransport? = null
+
+    @Volatile private var directReleasedAtMs = 0L
+
+    /**
+     * Whether a track meant for normal output should wait: the direct driver
+     * has just handed the DAC back, and Android's own USB audio driver has
+     * not re-attached to it yet. Until it does the DAC is not an audio output
+     * at all, and a track started now would play from the phone's speaker —
+     * a local Dolby or multichannel file following a lossless one, say.
+     * Waits at most [DIRECT_HANDBACK_MS]; a DAC that never comes back (it was
+     * unplugged) leaves normal output to Android.
+     */
+    fun normalOutputPending(context: Context): Boolean {
+        val releasedAt = directReleasedAtMs
+        if (releasedAt == 0L) return false
+        if (android.os.SystemClock.elapsedRealtime() - releasedAt > DIRECT_HANDBACK_MS) {
+            directReleasedAtMs = 0L
+            return false
+        }
+        val usbOutput = context.getSystemService(AudioManager::class.java)
+            ?.let(MixerTransport::usbDevice) != null
+        if (usbOutput) directReleasedAtMs = 0L
+        return !usbOutput
+    }
     private val failed = HashSet<String>()
     private var failedFor: String? = null
 
@@ -207,6 +286,7 @@ internal object BitPerfectOutput {
     @Synchronized
     fun release(requester: Any) {
         if (owner !== requester) return
+        if (active is UsbDirectTransport) directReleasedAtMs = android.os.SystemClock.elapsedRealtime()
         owner = null
         active = null
         publishVolume(null)

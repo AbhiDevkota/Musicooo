@@ -100,6 +100,9 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         return outputs.canOpen(format.sampleRate, format.channelCount, bits, this)
     }
 
+    /** Whether normal output must wait for the DAC to come back to Android; see [BitPerfectOutput.normalOutputPending]. */
+    fun holdsNormalOutput(): Boolean = outputs.normalOutputPending()
+
     override fun setListener(listener: AudioSink.Listener) {
         this.listener = listener
     }

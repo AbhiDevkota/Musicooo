@@ -19,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -54,12 +55,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.playback.audio.bitperfect.DacVolume
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 import com.music.bitchord.playback.cast.CastController
 import com.music.bitchord.wear.WearBridge
 import kotlinx.coroutines.Job
@@ -141,26 +143,24 @@ private val EXPANDED_WIDTH = 50.dp
 private val EDGE_GAP = 10.dp
 
 /**
- * Room around the capsule inside its popup window. A popup's window is only
- * as large as its content and clips whatever is drawn past it, so without
- * this the rubber-band stretch (up to 12% of [HUD_HEIGHT]) and the shadow
- * were cut off at the window's edge.
- */
-private val STRETCH_ROOM = 28.dp
-private val SHADOW_ROOM = 12.dp
-
-/**
  * The DAC's volume, the way iOS shows its own: a slim capsule that springs
  * out beside the volume keys, fills from the bottom, stretches like rubber
  * when pushed past either end, widens to a draggable slider under a finger,
  * and tucks itself away again a moment after the last touch.
  *
  * Shown only while direct USB output owns the volume ([DacVolume.level] is
- * not null), and never over the full player. A [Popup], so it sits above any
- * sheet the page has open.
+ * not null), and never over the full player.
+ *
+ * Drawn in the activity's own window, over the whole page, rather than in a
+ * popup of its own: [hazeState] can only blur what is in its window, and the
+ * light frost behind the capsule is most of what makes it look like iOS. The
+ * keys that raise it reach the activity only while its window has focus, so
+ * a sheet in a window of its own never had the HUD anyway. Being full-screen
+ * also leaves the rubber-band stretch nothing to be clipped against.
  */
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-fun DacVolumeHud() {
+fun DacVolumeHud(hazeState: HazeState) {
     val level by DacVolume.level.collectAsStateWithLifecycle()
     val current = level ?: return
 
@@ -224,22 +224,17 @@ fun DacVolumeHud() {
 
     if (!present || VolumeHud.suppressed) return
 
+    val reduceBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val offscreenPx = with(density) { (EXPANDED_WIDTH + EDGE_GAP * 2).roundToPx() }
-    Popup(
-        alignment = Alignment.TopEnd,
-        offset = IntOffset(
-            x = -with(density) { (EDGE_GAP - SHADOW_ROOM).roundToPx() },
-            // Level with a phone's volume keys, about a fifth of the way down;
-            // the window starts STRETCH_ROOM above the capsule itself.
-            y = with(density) { (screenHeight * 0.2f - STRETCH_ROOM).roundToPx() },
-        ),
-        properties = PopupProperties(focusable = false, clippingEnabled = false),
-    ) {
-        val heightPx = with(density) { HUD_HEIGHT.toPx() }
+    val heightPx = with(density) { HUD_HEIGHT.toPx() }
+    // Lays out nothing but the capsule, so the page under the rest of the
+    // screen keeps every touch.
+    Box(Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .padding(vertical = STRETCH_ROOM)
-                .padding(end = SHADOW_ROOM)
+                .align(Alignment.TopEnd)
+                // Level with a phone's volume keys, about a fifth of the way down.
+                .padding(top = screenHeight * 0.2f, end = EDGE_GAP)
                 .height(HUD_HEIGHT)
                 .width(EXPANDED_WIDTH),
             contentAlignment = Alignment.CenterEnd,
@@ -258,7 +253,18 @@ fun DacVolumeHud() {
                     .fillMaxHeight()
                     .shadow(10.dp, RoundedCornerShape(percent = 50), clip = false)
                     .clip(RoundedCornerShape(percent = 50))
-                    .background(Color(0xFF1C1C1E).copy(alpha = 0.72f))
+                    .then(
+                        if (reduceBlur) {
+                            Modifier.background(Color(0xFF1C1C1E).copy(alpha = 0.82f))
+                        } else {
+                            // A light frost, as iOS draws it: the page shows
+                            // through, blurred and only slightly darkened.
+                            Modifier.optimizedHazeEffect(
+                                state = hazeState,
+                                style = HazeMaterials.ultraThin(Color(0xFF1C1C1E)),
+                            )
+                        },
+                    )
                     .border(0.5.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(percent = 50))
                     .pointerInput(Unit) {
                         var start = 0f
