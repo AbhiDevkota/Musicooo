@@ -1038,11 +1038,14 @@
     <string name="bit_perfect_mode_usb_android">USB DAC</string>
     <string name="bit_perfect_mode_usb_android_subtitle">Android 14 opens the DAC at each track\'s own rate and bit depth, without mixing or resampling.</string>
     <string name="bit_perfect_requires_android_14">Requires Android 14 or later</string>
+    <string name="bit_perfect_mode_dap_exclusive">Built-in DAC (AAudio exclusive)</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">For music players with their own DAC. Opens the headphone or line output exclusively at each track\'s own rate. Not every device grants exclusive mode.</string>
+    <string name="bit_perfect_requires_android_8_1">Requires Android 8.1 or later</string>
     <string name="bit_perfect_confirm_title">Turn on bit-perfect output?</string>
     <string name="bit_perfect_confirm_message">The DAC gets the music at full scale, and the phone\'s volume buttons may stop working. Turn the DAC or amplifier down before you play.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
     <string name="bit_perfect_status_inexact">%1$s · not exact: this source isn\'t lossless PCM</string>
-    <string name="bit_perfect_status_waiting">Waiting for a lossless track on a USB DAC</string>
+    <string name="bit_perfect_status_waiting">Waiting for a lossless track on a supported output</string>
     <string name="bit_perfect_status_unavailable">Not available for this track (%1$s)</string>
 
     <string name="loudness_normalization">Loudness normalization</string>

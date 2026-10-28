@@ -2286,6 +2286,7 @@ private fun BitPerfectMode.localizedLabel(): String = stringResource(
     when (this) {
         BitPerfectMode.OFF -> R.string.off
         BitPerfectMode.USB_ANDROID -> R.string.bit_perfect_mode_usb_android
+        BitPerfectMode.DAP_EXCLUSIVE -> R.string.bit_perfect_mode_dap_exclusive
     },
 )
 
@@ -2294,7 +2295,19 @@ private val BitPerfectMode.isSupported: Boolean
     get() = when (this) {
         BitPerfectMode.OFF -> true
         BitPerfectMode.USB_ANDROID -> Build.VERSION.SDK_INT >= 34
+        BitPerfectMode.DAP_EXCLUSIVE -> Build.VERSION.SDK_INT >= 27
     }
+
+@Composable
+private fun BitPerfectMode.description(): String = stringResource(
+    when {
+        this == BitPerfectMode.USB_ANDROID && !isSupported -> R.string.bit_perfect_requires_android_14
+        this == BitPerfectMode.DAP_EXCLUSIVE && !isSupported -> R.string.bit_perfect_requires_android_8_1
+        this == BitPerfectMode.OFF -> R.string.bit_perfect_mode_off_subtitle
+        this == BitPerfectMode.USB_ANDROID -> R.string.bit_perfect_mode_usb_android_subtitle
+        else -> R.string.bit_perfect_mode_dap_exclusive_subtitle
+    },
+)
 
 /**
  * What the exclusive output is doing now, rather than what was asked of it:
@@ -2302,8 +2315,7 @@ private val BitPerfectMode.isSupported: Boolean
  */
 @Composable
 private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.Status): String = when {
-    mode == BitPerfectMode.OFF -> stringResource(R.string.bit_perfect_mode_off_subtitle)
-    !mode.isSupported -> stringResource(R.string.bit_perfect_requires_android_14)
+    mode == BitPerfectMode.OFF || !mode.isSupported -> mode.description()
     status.active && !status.exact -> stringResource(
         R.string.bit_perfect_status_inexact,
         status.deviceName.orEmpty(),
@@ -2374,11 +2386,7 @@ private fun BitPerfectModeSheet(
                         },
                     )
                     Text(
-                        text = when {
-                            !supported -> stringResource(R.string.bit_perfect_requires_android_14)
-                            mode == BitPerfectMode.OFF -> stringResource(R.string.bit_perfect_mode_off_subtitle)
-                            else -> stringResource(R.string.bit_perfect_mode_usb_android_subtitle)
-                        },
+                        text = mode.description(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

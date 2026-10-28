@@ -72,6 +72,9 @@ enum class BitPerfectMode {
 
     /** Android 14's bit-perfect mixer for a USB DAC. */
     USB_ANDROID,
+
+    /** An AAudio exclusive stream to a built-in DAC, for digital audio players. */
+    DAP_EXCLUSIVE,
 }
 
 /**

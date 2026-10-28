@@ -50,6 +50,7 @@ internal interface BitPerfectOutputs {
 internal object BitPerfectOutput {
 
     private const val TAG = "BitPerfectOutput"
+    private const val NO_DEVICE = -1
 
     data class Status(
         val active: Boolean = false,
@@ -111,6 +112,10 @@ internal object BitPerfectOutput {
                     MixerTransport.supportedBits(manager, device, sampleRate, channels),
                 ) != null
             }
+            // Nothing short of opening a stream says whether Android will grant
+            // exclusive mode, so the first track of each format finds out.
+            BitPerfectMode.DAP_EXCLUSIVE -> Build.VERSION.SDK_INT >= 27 &&
+                key(mode, NO_DEVICE, sampleRate, channels, sourceBits) !in currentFailures(mode, NO_DEVICE)
         }
     }
 
@@ -133,6 +138,10 @@ internal object BitPerfectOutput {
                 if (Build.VERSION.SDK_INT < 34) throw BitPerfectTransportException("android_version")
                 MixerTransport.open(manager, sampleRate, channels, sourceBits)
             }
+            BitPerfectMode.DAP_EXCLUSIVE -> {
+                if (Build.VERSION.SDK_INT < 27) throw BitPerfectTransportException("android_version")
+                ExclusiveTransport.open(manager, sampleRate, channels, sourceBits)
+            }
         }
         owner = requester
         return transport
@@ -147,8 +156,11 @@ internal object BitPerfectOutput {
     @Synchronized
     fun markFailed(context: Context, sampleRate: Int, channels: Int, sourceBits: Int, reason: String) {
         val mode = AppSettings.bitPerfectMode.value
-        val manager = context.getSystemService(AudioManager::class.java)
-        val deviceId = manager?.let(MixerTransport::usbDevice)?.id ?: -1
+        val deviceId = when (mode) {
+            BitPerfectMode.USB_ANDROID ->
+                context.getSystemService(AudioManager::class.java)?.let(MixerTransport::usbDevice)?.id ?: NO_DEVICE
+            else -> NO_DEVICE
+        }
         currentFailures(mode, deviceId).add(key(mode, deviceId, sampleRate, channels, sourceBits))
         Log.i(TAG, "Bit-perfect output unavailable ($reason) for $sampleRate Hz/$channels ch/$sourceBits-bit")
         _status.value = Status(fallbackReason = reason)

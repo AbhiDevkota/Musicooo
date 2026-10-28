@@ -75,3 +75,26 @@ target_link_options(bitchord_dsd PRIVATE "-Wl,-z,max-page-size=16384")
 add_library(bitchord_dst SHARED dsd/dst/decoder.c dsd/dst/jni.cpp)
 target_compile_options(bitchord_dst PRIVATE -O3 -fno-strict-aliasing -fvisibility=hidden)
 target_link_options(bitchord_dst PRIVATE "-Wl,-z,max-page-size=16384")
+
+# Bit-perfect output (see playback/audio/bitperfect). AAudio exclusive streams
+# through Oboe, built from a pinned release with its format/rate conversion
+# compiled out: a stream that needed converting is one this library rejects.
+# Oboe is Apache-2.0; exclusive_output.cpp is adapted from Mornye (LGPL-3.0).
+include(FetchContent)
+set(OBOE_DISABLE_CONVERSION ON CACHE BOOL "" FORCE)
+FetchContent_Declare(oboe
+    URL https://github.com/google/oboe/archive/refs/tags/1.11.0.tar.gz
+    URL_HASH SHA256=0ccf2110640a2b4489f1c93a404f2978656b434d8c5dc9cb6258f9cc95c79b15)
+FetchContent_MakeAvailable(oboe)
+
+add_library(bitchord_exclusive SHARED bitperfect/exclusive_output.cpp)
+target_compile_options(bitchord_exclusive PRIVATE -O2 -Wall -Wextra -fvisibility=hidden)
+target_link_libraries(bitchord_exclusive PRIVATE oboe ${log-lib})
+# Only JNI is public: Oboe is static, and its symbols must not keep otherwise
+# unused code alive or be exported from this library.
+target_link_options(bitchord_exclusive PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,--gc-sections"
+    "-Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/bitperfect/exports.map")
+set_property(TARGET bitchord_exclusive APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/bitperfect/exports.map")
