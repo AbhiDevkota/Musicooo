@@ -2362,7 +2362,9 @@ private fun AutomixPerformanceSheet(
 @Composable
 private fun BypassedByBitPerfect(bypassed: Boolean, content: @Composable () -> Unit) {
     val alpha by animateFloatAsState(if (bypassed) 0.38f else 1f, label = "bypassed")
-    Box(
+    // A Column, not a Box: a row can be several stacked pieces (a title row
+    // and its control), and a Box would draw them over one another.
+    Column(
         Modifier
             .alpha(alpha)
             .then(
