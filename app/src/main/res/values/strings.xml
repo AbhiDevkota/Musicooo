@@ -97,6 +97,7 @@
     <string name="search_hint">Artists, Songs, Lyrics and More</string>
     <string name="voice_search_prompt">What do you want to listen to?</string>
     <string name="voice_search_unavailable">Voice search isn\'t available on this device</string>
+    <string name="voice_search_permission_denied">Microphone access is needed to search with your voice</string>
     <string name="settings_search_hint">Search settings</string>
     <string name="settings_search_empty">No settings match “%1$s”</string>
     <string name="recent_search_edit">Edit “%1$s”</string>

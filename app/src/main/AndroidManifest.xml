@@ -56,6 +56,14 @@
         android:maxSdkVersion="28" />
 
     <!--
+      Asked for the first time the search bar's microphone is used. Android's
+      speech activity holds its own recording permission today; this app's
+      grant is the one the upcoming in-app recognizer will use, and asking now
+      keeps the microphone's permission flow in one place.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
       Android 11's package visibility hides other apps' components unless they
       are named here. SpeechRecognizer.isRecognitionAvailable() asks the package
       manager for recognition services, so without this the microphone would
