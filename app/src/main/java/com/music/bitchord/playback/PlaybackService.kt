@@ -89,6 +89,7 @@ import com.music.bitchord.playback.audio.SourceDescriptor
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectAudioSink
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectRoutingSink
+import com.music.bitchord.playback.audio.bitperfect.DacVolume
 import com.music.bitchord.playback.audio.bitperfect.usb.UsbDirectDevices
 import com.music.bitchord.playback.audio.bluetooth.BluetoothAudioTracker
 import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
@@ -6928,6 +6929,14 @@ class PlaybackService : MediaLibraryService() {
         // mode is chosen and again whenever a DAC is attached; an answer, an
         // attach or a detach all send the playing track back to be re-routed.
         UsbDirectDevices.init(this)
+        scope.launch {
+            var available = false
+            DacVolume.level.collect { level ->
+                val now = level != null
+                (mediaSession?.player as? SessionPlayer)?.onDacVolumeChanged(routeChanged = now != available)
+                available = now
+            }
+        }
         UsbDirectDevices.onChanged = {
             scope.launch {
                 if (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
@@ -7738,6 +7747,53 @@ class PlaybackService : MediaLibraryService() {
 
             /** A hardware key press, as a share of the receiver's range. */
             const val VOLUME_STEP = 0.05f
+
+            /**
+             * A DAC on direct USB output, whose volume is its own hardware
+             * attenuator: remote, as far as Android's volume keys are
+             * concerned, since the music stream no longer reaches it.
+             */
+            val DAC_DEVICE: DeviceInfo = DeviceInfo.Builder(DeviceInfo.PLAYBACK_TYPE_REMOTE)
+                .setMinVolume(0)
+                .setMaxVolume(100)
+                .build()
+
+            val DEVICE_VOLUME_COMMANDS = intArrayOf(
+                Player.COMMAND_GET_DEVICE_VOLUME,
+                Player.COMMAND_SET_DEVICE_VOLUME,
+                Player.COMMAND_SET_DEVICE_VOLUME_WITH_FLAGS,
+                Player.COMMAND_ADJUST_DEVICE_VOLUME,
+                Player.COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS,
+            )
+        }
+
+        /** The DAC's own volume stands in for the device's, unless a receiver is the speaker. */
+        private val dac: Boolean get() = !cast.active && DacVolume.level.value != null
+
+        private fun dacVolume(): Int = ((DacVolume.level.value ?: 0f) * 100).roundToInt()
+
+        override fun getAvailableCommands(): Player.Commands =
+            if (dac) super.getAvailableCommands().buildUpon().addAll(*DEVICE_VOLUME_COMMANDS).build()
+            else super.getAvailableCommands()
+
+        override fun isCommandAvailable(command: Int): Boolean =
+            (dac && command in DEVICE_VOLUME_COMMANDS) || super.isCommandAvailable(command)
+
+        /**
+         * The DAC volume came or went ([routeChanged]), or moved. Told by the
+         * service, since this wrapper is replaced at every handoff.
+         */
+        fun onDacVolumeChanged(routeChanged: Boolean) {
+            if (cast.active) return
+            if (routeChanged) {
+                val commands = availableCommands
+                listeners.forEach { it.onAvailableCommandsChanged(commands) }
+                val events = Player.Events(FlagSet.Builder().add(Player.EVENT_AVAILABLE_COMMANDS_CHANGED).build())
+                listeners.forEach { it.onEvents(this, events) }
+                onRemoteRouteChanged()
+            } else {
+                onRemoteVolumeChanged()
+            }
         }
 
         override fun addListener(listener: Player.Listener) {
@@ -7812,46 +7868,78 @@ class PlaybackService : MediaLibraryService() {
 
         // The receiver is a remote output with a volume of its own, which is
         // what makes the hardware keys move it instead of the phone's.
-        override fun getDeviceInfo(): DeviceInfo = if (cast.active) CAST_DEVICE else super.getDeviceInfo()
+        override fun getDeviceInfo(): DeviceInfo = when {
+            cast.active -> CAST_DEVICE
+            dac -> DAC_DEVICE
+            else -> super.getDeviceInfo()
+        }
 
-        override fun getDeviceVolume(): Int = if (cast.active) cast.deviceVolume else super.getDeviceVolume()
+        override fun getDeviceVolume(): Int = when {
+            cast.active -> cast.deviceVolume
+            dac -> dacVolume()
+            else -> super.getDeviceVolume()
+        }
 
-        override fun isDeviceMuted(): Boolean = if (cast.active) false else super.isDeviceMuted()
+        override fun isDeviceMuted(): Boolean = if (cast.active || dac) false else super.isDeviceMuted()
 
         override fun setDeviceVolume(volume: Int, flags: Int) {
-            if (cast.active) cast.setVolume(volume / 100f) else super.setDeviceVolume(volume, flags)
+            when {
+                cast.active -> cast.setVolume(volume / 100f)
+                dac -> DacVolume.set(volume / 100f)
+                else -> super.setDeviceVolume(volume, flags)
+            }
         }
 
         @Suppress("DEPRECATION")
         override fun setDeviceVolume(volume: Int) {
-            if (cast.active) cast.setVolume(volume / 100f) else super.setDeviceVolume(volume)
+            when {
+                cast.active -> cast.setVolume(volume / 100f)
+                dac -> DacVolume.set(volume / 100f)
+                else -> super.setDeviceVolume(volume)
+            }
         }
 
         override fun increaseDeviceVolume(flags: Int) {
-            if (cast.active) nudgeReceiverVolume(+VOLUME_STEP) else super.increaseDeviceVolume(flags)
+            when {
+                cast.active -> nudgeReceiverVolume(+VOLUME_STEP)
+                dac -> DacVolume.step(+1)
+                else -> super.increaseDeviceVolume(flags)
+            }
         }
 
         @Suppress("DEPRECATION")
         override fun increaseDeviceVolume() {
-            if (cast.active) nudgeReceiverVolume(+VOLUME_STEP) else super.increaseDeviceVolume()
+            when {
+                cast.active -> nudgeReceiverVolume(+VOLUME_STEP)
+                dac -> DacVolume.step(+1)
+                else -> super.increaseDeviceVolume()
+            }
         }
 
         override fun decreaseDeviceVolume(flags: Int) {
-            if (cast.active) nudgeReceiverVolume(-VOLUME_STEP) else super.decreaseDeviceVolume(flags)
+            when {
+                cast.active -> nudgeReceiverVolume(-VOLUME_STEP)
+                dac -> DacVolume.step(-1)
+                else -> super.decreaseDeviceVolume(flags)
+            }
         }
 
         @Suppress("DEPRECATION")
         override fun decreaseDeviceVolume() {
-            if (cast.active) nudgeReceiverVolume(-VOLUME_STEP) else super.decreaseDeviceVolume()
+            when {
+                cast.active -> nudgeReceiverVolume(-VOLUME_STEP)
+                dac -> DacVolume.step(-1)
+                else -> super.decreaseDeviceVolume()
+            }
         }
 
         override fun setDeviceMuted(muted: Boolean, flags: Int) {
-            if (!cast.active) super.setDeviceMuted(muted, flags)
+            if (!cast.active && !dac) super.setDeviceMuted(muted, flags)
         }
 
         @Suppress("DEPRECATION")
         override fun setDeviceMuted(muted: Boolean) {
-            if (!cast.active) super.setDeviceMuted(muted)
+            if (!cast.active && !dac) super.setDeviceMuted(muted)
         }
 
         private fun nudgeReceiverVolume(delta: Float) =

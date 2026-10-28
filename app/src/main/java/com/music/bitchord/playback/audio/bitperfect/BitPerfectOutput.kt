@@ -191,8 +191,17 @@ internal object BitPerfectOutput {
         }
         owner = requester
         active = transport
-        _hardwareVolume.value = (transport as? UsbDirectTransport)?.volume
+        publishVolume((transport as? UsbDirectTransport)?.volume)
         return transport
+    }
+
+    /**
+     * A newer request still queued keeps [DacVolume]'s level where it was
+     * dragged to; only the last one's read-back is allowed to move it.
+     */
+    private fun publishVolume(snapshot: UsbVolume.Snapshot?) {
+        _hardwareVolume.value = snapshot
+        DacVolume.onSnapshot(snapshot)
     }
 
     @Synchronized
@@ -200,7 +209,7 @@ internal object BitPerfectOutput {
         if (owner !== requester) return
         owner = null
         active = null
-        _hardwareVolume.value = null
+        publishVolume(null)
     }
 
     /**
@@ -215,7 +224,7 @@ internal object BitPerfectOutput {
             runCatching { transport.setVolume(target) }
                 .onSuccess { snapshot ->
                     UsbDirectDevices.rememberVolume(transport.usbDeviceId, snapshot.currentDb)
-                    _hardwareVolume.value = snapshot
+                    if (pendingVolume.get() == null) publishVolume(snapshot) else _hardwareVolume.value = snapshot
                 }
                 .onFailure { Log.w(TAG, "USB volume change failed", it) }
         }

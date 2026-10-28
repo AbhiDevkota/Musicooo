@@ -23,6 +23,7 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LastPlayerScreen
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.AudioRouting
+import com.music.bitchord.playback.audio.bitperfect.DacVolume
 import com.music.bitchord.playback.cast.CastController
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.CoroutineScope
@@ -250,8 +251,8 @@ private fun ListenTogether.State.toPartyUi() = PartyUi(
 )
 
 /**
- * The volume bar's level: the receiver's while the music is on one, the music
- * stream's otherwise. The two are different numbers on different devices, and
+ * The volume bar's level: the receiver's while the music is on one, the DAC's
+ * own while direct USB output drives it, the music stream's otherwise. The two are different numbers on different devices, and
  * the bar must never show one while moving the other.
  */
 private class CastAwareVolume(
@@ -263,10 +264,14 @@ private class CastAwareVolume(
         CastController.volume,
         CastController.state.map { it.casting },
         WearBridge.watchOutput,
-    ) { phone, receiver, casting, watch ->
+        DacVolume.level,
+    ) { phone, receiver, casting, watch, dac ->
         when {
             casting -> receiver
             watch.active -> watch.volume
+            // Direct USB: the music stream no longer reaches the DAC, so its
+            // own hardware volume is the only one that means anything.
+            dac != null -> dac
             else -> phone
         }
     }
@@ -276,6 +281,7 @@ private class CastAwareVolume(
         when {
             CastController.state.value.casting -> CastController.setVolume(level)
             WearBridge.watchOutput.value.active -> WearBridge.setWatchVolume(level)
+            DacVolume.level.value != null -> DacVolume.set(level)
             else -> system.set(level)
         }
     }
