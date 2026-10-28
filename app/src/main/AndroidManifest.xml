@@ -55,6 +55,22 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!--
+      Android 11's package visibility hides other apps' components unless they
+      are named here. SpeechRecognizer.isRecognitionAvailable() asks the package
+      manager for recognition services, so without this the microphone would
+      look unsupported on a device that has one. The recognizer activity itself
+      holds RECORD_AUDIO — launching it does not ask this app for the mic.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:name=".BitChordApplication"
         android:allowBackup="true"
