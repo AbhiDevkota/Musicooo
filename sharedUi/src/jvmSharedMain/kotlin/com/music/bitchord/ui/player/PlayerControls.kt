@@ -60,6 +60,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Headphones
@@ -594,17 +595,37 @@ internal fun PlayerActionRow(
     /** Opens [ListenTogetherMembersSheet] rather than settings directly. */
     onOpenListenTogetherMembers: () -> Unit,
 ) {
+    val showPartyButton by PlayerSettings.showListenTogetherButton.collectAsStateWithLifecycle()
+    val inParty = rememberPartyBadge().inParty
+    // Just the output glyph in the middle.
+    val compact = !queueOpen && !showPartyButton && !inParty
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // Sized for the wider of the two capsules — the three-up one — in both
-        // states. Computed for whichever was on screen it would change as they
-        // swap, and the lyrics and queue glyphs would slide with it.
-        val widestRow = BOTTOM_ACTION_SIZE * 2 + pillWidth(3)
-        val edgeInset = ((maxWidth - widestRow) / 4).coerceAtLeast(0.dp)
+        // Sized for the wider of the two capsules — the three-up one — whether
+        // that or the output/party one is up, so the lyrics and queue glyphs
+        // hold still as they swap. A lone output glyph is spaced as though the
+        // two-up capsule held it — closer in, without crowding — and they part
+        // again as the queue opens to make room.
+        val edgeInset = ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(3)) / 4).coerceAtLeast(0.dp)
+        val compactInset = ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(2)) / 4).coerceAtLeast(0.dp)
+        val closeIn = compactInset - edgeInset
+        // Held as State and read only in the glyphs' placement, so the slide
+        // re-places two glyphs a frame rather than recomposing and remeasuring
+        // the row — the capsule's own animation included — on every one.
+        val compactness = animateFloatAsState(
+            targetValue = if (compact) 1f else 0f,
+            // In step with the capsule's own width change.
+            animationSpec = tween(220),
+            label = "actionRowCompact",
+        )
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = edgeInset),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.align(Alignment.CenterStart)) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset { IntOffset((closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.LyricsQuote,
                     contentDescription = stringResource(if (lyricsOpen) Res.string.close_lyrics else Res.string.open_lyrics),
@@ -680,7 +701,11 @@ internal fun PlayerActionRow(
                     )
                 }
             }
-            Box(Modifier.align(Alignment.CenterEnd)) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
+            ) {
                 BottomGlyph(
                     icon = BitChordIcons.Queue,
                     contentDescription = stringResource(Res.string.up_next),
@@ -802,6 +827,9 @@ private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 
 private val BOTTOM_ACTION_SIZE = 44.dp
 
+/** What the lyrics and queue glyphs are drawn at inside [BOTTOM_ACTION_SIZE]. */
+private val BOTTOM_ICON_SIZE = 26.dp
+
 /**
  * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
  * three quarters of it, its corners about a fifth, and it is the tint at a
@@ -905,10 +933,19 @@ private fun OutputPartyPill(
 ) {
     val badge = rememberPartyBadge()
     val shown by PlayerSettings.showListenTogetherButton.collectAsStateWithLifecycle()
-    // Hidden only outside a party: once in one, this is the way to who's in it.
-    // The output picker stays a tap away on the caption beneath the controls.
-    if (!shown && !badge.inParty) return
     val output = rememberOutputGlyph()
+    // Party half hidden only outside a party: once in one, this is the way to
+    // who's in it. Without it the output glyph stands alone, drawn like the
+    // lyrics and queue glyphs either side rather than as half a capsule.
+    if (!shown && !badge.inParty) {
+        BottomGlyph(
+            icon = output.icon,
+            iconSize = output.size * (BOTTOM_ICON_SIZE / PILL_OUTPUT_SIZE),
+            contentDescription = stringResource(Res.string.audio_output),
+            onClick = onOutput,
+        )
+        return
+    }
     Pill {
         PillSegment(
             icon = output.icon,
@@ -959,8 +996,9 @@ private fun rememberOutputGlyph(): OutputGlyph {
         watch.active -> OutputGlyph(Icons.Rounded.Watch, PILL_OUTPUT_TALL_SIZE)
         else -> when (active?.kind) {
             // No active row is the phone too — the caption under the pill
-            // says "This phone" in the same case.
-            null, AudioOutputKind.PHONE -> OutputGlyph(vectorResource(Res.drawable.ic_output_phone))
+            // says "This phone" in the same case. Cast rather than a phone:
+            // on the phone itself the button's job is to send it elsewhere.
+            null, AudioOutputKind.PHONE -> OutputGlyph(Icons.Rounded.Cast, PILL_OUTPUT_WIDE_SIZE)
             AudioOutputKind.BLUETOOTH -> when (active.form) {
                 BluetoothForm.BUDS -> OutputGlyph(vectorResource(Res.drawable.ic_output_buds))
                 BluetoothForm.SPEAKER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
@@ -1210,6 +1248,7 @@ private fun BottomGlyph(
     highlighted: Boolean = false,
     haptic: Haptic = Haptic.Tap,
     label: String? = null,
+    iconSize: Dp = BOTTOM_ICON_SIZE,
     /**
      * Shortest gap between taps that both reach [onClick]. A tap inside the
      * window of the last one is dropped whole — haptic included, so a swallowed
@@ -1272,7 +1311,7 @@ private fun BottomGlyph(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(iconSize),
             )
         } else if (label != null) {
             Text(
