@@ -15,6 +15,11 @@ import android.os.Build
 import android.util.Log
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.BitPerfectMode
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbDirectDevices
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbDirectTransport
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbVolume
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,7 +93,22 @@ internal object BitPerfectOutput {
         }
     }
 
+    /** The DAC's Feature Unit volume while direct USB output is open; null otherwise. */
+    private val _hardwareVolume = MutableStateFlow<UsbVolume.Snapshot?>(null)
+    val hardwareVolume: StateFlow<UsbVolume.Snapshot?> = _hardwareVolume.asStateFlow()
+    private val pendingVolume = AtomicReference<Double?>(null)
+    private val volumeExecutor = Executors.newSingleThreadExecutor { Thread(it, "BitChord-USB-volume") }
+
+    init {
+        // A detached DAC stops its stream at once rather than at the next write.
+        UsbDirectDevices.onDetached = { deviceId ->
+            synchronized(this) { (active as? UsbDirectTransport)?.takeIf { it.usbDeviceId == deviceId } }
+                ?.markDetached()
+        }
+    }
+
     private var owner: Any? = null
+    private var active: BitPerfectTransport? = null
     private val failed = HashSet<String>()
     private var failedFor: String? = null
 
@@ -116,6 +136,18 @@ internal object BitPerfectOutput {
             // exclusive mode, so the first track of each format finds out.
             BitPerfectMode.DAP_EXCLUSIVE -> Build.VERSION.SDK_INT >= 27 &&
                 key(mode, NO_DEVICE, sampleRate, channels, sourceBits) !in currentFailures(mode, NO_DEVICE)
+            // Permission is asked for by the service when the mode is chosen or a
+            // DAC is attached; until it is granted, tracks use normal output.
+            BitPerfectMode.USB_DIRECT -> {
+                val usb = UsbDirectDevices.manager(context) ?: return false
+                val device = UsbDirectDevices.audioDevice(usb) ?: return false
+                if (!usb.hasPermission(device)) return false
+                if (key(mode, device.deviceId, sampleRate, channels, sourceBits) in currentFailures(mode, device.deviceId)) {
+                    return false
+                }
+                val raw = UsbDirectDevices.rawDescriptors(usb, device) ?: return false
+                UsbDirectTransport.plans(raw, sampleRate, channels, sourceBits).isNotEmpty()
+            }
         }
     }
 
@@ -142,14 +174,51 @@ internal object BitPerfectOutput {
                 if (Build.VERSION.SDK_INT < 27) throw BitPerfectTransportException("android_version")
                 ExclusiveTransport.open(manager, sampleRate, channels, sourceBits)
             }
+            BitPerfectMode.USB_DIRECT -> {
+                val usb = UsbDirectDevices.manager(context) ?: throw BitPerfectTransportException("no_usb")
+                val device = UsbDirectDevices.audioDevice(usb) ?: throw BitPerfectTransportException("no_usb")
+                if (!usb.hasPermission(device)) throw BitPerfectTransportException("permission_denied")
+                UsbDirectTransport.open(
+                    manager = usb,
+                    device = device,
+                    rate = sampleRate,
+                    channels = channels,
+                    sourceBits = sourceBits,
+                    allowFixedVolume = AppSettings.usbAllowFixedVolume.value,
+                    rememberedDb = UsbDirectDevices.rememberedVolume(device.deviceId),
+                )
+            }
         }
         owner = requester
+        active = transport
+        _hardwareVolume.value = (transport as? UsbDirectTransport)?.volume
         return transport
     }
 
     @Synchronized
     fun release(requester: Any) {
-        if (owner === requester) owner = null
+        if (owner !== requester) return
+        owner = null
+        active = null
+        _hardwareVolume.value = null
+    }
+
+    /**
+     * Sets the DAC's own volume while direct USB output is open. Requests
+     * arrive as fast as a slider moves; only the latest pending one is sent.
+     */
+    fun setHardwareVolume(db: Double) {
+        if (pendingVolume.getAndSet(db) != null) return
+        volumeExecutor.execute {
+            val target = pendingVolume.getAndSet(null) ?: return@execute
+            val transport = synchronized(this) { active as? UsbDirectTransport } ?: return@execute
+            runCatching { transport.setVolume(target) }
+                .onSuccess { snapshot ->
+                    UsbDirectDevices.rememberVolume(transport.usbDeviceId, snapshot.currentDb)
+                    _hardwareVolume.value = snapshot
+                }
+                .onFailure { Log.w(TAG, "USB volume change failed", it) }
+        }
     }
 
     /** Records that this stream could not be opened on the attached device. */
@@ -159,6 +228,8 @@ internal object BitPerfectOutput {
         val deviceId = when (mode) {
             BitPerfectMode.USB_ANDROID ->
                 context.getSystemService(AudioManager::class.java)?.let(MixerTransport::usbDevice)?.id ?: NO_DEVICE
+            BitPerfectMode.USB_DIRECT ->
+                UsbDirectDevices.manager(context)?.let(UsbDirectDevices::audioDevice)?.deviceId ?: NO_DEVICE
             else -> NO_DEVICE
         }
         currentFailures(mode, deviceId).add(key(mode, deviceId, sampleRate, channels, sourceBits))

@@ -238,6 +238,8 @@ fun SettingsScreen(
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
     val bitPerfectMode by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
     val bitPerfectStatus by BitPerfectOutput.status.collectAsStateWithLifecycle()
+    val dacVolume by BitPerfectOutput.hardwareVolume.collectAsStateWithLifecycle()
+    val usbAllowFixedVolume by AppSettings.usbAllowFixedVolume.collectAsStateWithLifecycle()
     val loudnessNormalization by AppSettings.loudnessNormalization.collectAsStateWithLifecycle()
     val loudnessOffOnSpeaker by AppSettings.loudnessOffOnSpeaker.collectAsStateWithLifecycle()
     val outputStatus by AudioOutputStatus.current.collectAsStateWithLifecycle()
@@ -301,6 +303,7 @@ fun SettingsScreen(
     var pickingAutomixPerformance by remember { mutableStateOf(false) }
     var pickingBitPerfect by remember { mutableStateOf(false) }
     var confirmBitPerfect by remember { mutableStateOf<BitPerfectMode?>(null) }
+    var confirmFixedVolume by remember { mutableStateOf(false) }
     // What the last export or import did, shown on the row that did it rather
     // than as a toast: a backup is the one action here whose outcome nobody can
     // check by looking at the app afterwards. Held per direction, or an import's
@@ -622,6 +625,36 @@ fun SettingsScreen(
                     value = bitPerfectMode.localizedLabel(),
                     onClick = { pickingBitPerfect = true },
                 )
+            }
+            // The DAC's own attenuator: the only volume direct USB has, since
+            // nothing upstream may scale a sample.
+            dacVolume?.let { volume ->
+                val dacVolumeTitle = stringResource(R.string.dac_volume)
+                row(dacVolumeTitle, "volume", "usb", "dac") {
+                    SliderRow(
+                        icon = Icons.Rounded.VolumeUp,
+                        title = dacVolumeTitle,
+                        subtitle = stringResource(R.string.dac_volume_subtitle),
+                        value = "%.1f dB".format(volume.currentDb),
+                        sliderValue = volume.currentDb.toFloat(),
+                        onSliderValue = { BitPerfectOutput.setHardwareVolume(it.toDouble()) },
+                        valueRange = volume.minDb.toFloat()..volume.maxDb.toFloat(),
+                        steps = 0,
+                    )
+                }
+            }
+            if (bitPerfectMode == BitPerfectMode.USB_DIRECT) {
+                val fixedVolumeTitle = stringResource(R.string.usb_allow_fixed_volume)
+                row(fixedVolumeTitle, "volume", "usb", "dac") {
+                    SettingsSubRow(
+                        title = fixedVolumeTitle,
+                        subtitle = stringResource(R.string.usb_allow_fixed_volume_subtitle),
+                        checked = usbAllowFixedVolume,
+                        onCheckedChange = { on ->
+                            if (on) confirmFixedVolume = true else AppSettings.setUsbAllowFixedVolume(false)
+                        },
+                    )
+                }
             }
             val loudnessTitle = stringResource(R.string.loudness_normalization)
             row(loudnessTitle, "loudness", "volume", "normalize", "replaygain", "lufs") {
@@ -1744,6 +1777,27 @@ fun SettingsScreen(
         )
     }
 
+    if (confirmFixedVolume) {
+        AlertDialog(
+            onDismissRequest = { confirmFixedVolume = false },
+            title = { Text(stringResource(R.string.usb_allow_fixed_volume_confirm_title)) },
+            text = { Text(stringResource(R.string.usb_allow_fixed_volume_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmFixedVolume = false
+                    AppSettings.setUsbAllowFixedVolume(true)
+                }) {
+                    Text(stringResource(R.string.enable))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmFixedVolume = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
         AlertDialog(
@@ -2287,6 +2341,7 @@ private fun BitPerfectMode.localizedLabel(): String = stringResource(
         BitPerfectMode.OFF -> R.string.off
         BitPerfectMode.USB_ANDROID -> R.string.bit_perfect_mode_usb_android
         BitPerfectMode.DAP_EXCLUSIVE -> R.string.bit_perfect_mode_dap_exclusive
+        BitPerfectMode.USB_DIRECT -> R.string.bit_perfect_mode_usb_direct
     },
 )
 
@@ -2296,6 +2351,7 @@ private val BitPerfectMode.isSupported: Boolean
         BitPerfectMode.OFF -> true
         BitPerfectMode.USB_ANDROID -> Build.VERSION.SDK_INT >= 34
         BitPerfectMode.DAP_EXCLUSIVE -> Build.VERSION.SDK_INT >= 27
+        BitPerfectMode.USB_DIRECT -> true
     }
 
 @Composable
@@ -2305,6 +2361,7 @@ private fun BitPerfectMode.description(): String = stringResource(
         this == BitPerfectMode.DAP_EXCLUSIVE && !isSupported -> R.string.bit_perfect_requires_android_8_1
         this == BitPerfectMode.OFF -> R.string.bit_perfect_mode_off_subtitle
         this == BitPerfectMode.USB_ANDROID -> R.string.bit_perfect_mode_usb_android_subtitle
+        this == BitPerfectMode.USB_DIRECT -> R.string.bit_perfect_mode_usb_direct_subtitle
         else -> R.string.bit_perfect_mode_dap_exclusive_subtitle
     },
 )

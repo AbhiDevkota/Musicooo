@@ -91,6 +91,7 @@ import com.music.bitchord.playback.audio.SourceDescriptor
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectAudioSink
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectRoutingSink
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbDirectDevices
 import com.music.bitchord.playback.audio.bluetooth.BluetoothAudioTracker
 import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
 import com.music.bitchord.MainActivity
@@ -137,6 +138,7 @@ import com.music.bitchord.data.scrobbling.ListenBrainzManager
 import com.music.bitchord.data.scrobbling.ScrobbleManager
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.AudioQuality
+import com.music.bitchord.data.settings.BitPerfectMode
 import com.music.bitchord.data.settings.permits
 import com.music.bitchord.data.settings.EqualizerMode
 import com.music.bitchord.data.settings.OutputPcmMode
@@ -6928,10 +6930,34 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             AppSettings.outputPcmMode.drop(1).collect { requestOutputReconfiguration() }
         }
+        // Direct USB needs Android's permission to the DAC, asked for when the
+        // mode is chosen and again whenever a DAC is attached; an answer, an
+        // attach or a detach all send the playing track back to be re-routed.
+        UsbDirectDevices.init(this)
+        UsbDirectDevices.onChanged = {
+            scope.launch {
+                if (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
+                    UsbDirectDevices.requestPermission(this@PlaybackService)
+                    requestOutputReconfiguration(rebuild = true)
+                }
+            }
+        }
         scope.launch {
             // The sinks decide per format, so the playing track only moves on
             // or off the exclusive output when its sink is configured again.
+            AppSettings.bitPerfectMode.collect { mode ->
+                if (mode == BitPerfectMode.USB_DIRECT) UsbDirectDevices.requestPermission(this@PlaybackService)
+            }
+        }
+        scope.launch {
             AppSettings.bitPerfectMode.drop(1).collect { requestOutputReconfiguration(rebuild = true) }
+        }
+        scope.launch {
+            AppSettings.usbAllowFixedVolume.drop(1).collect {
+                if (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
+                    requestOutputReconfiguration(rebuild = true)
+                }
+            }
         }
         scope.launch {
             // Not applied to a player mid-transition: [CrossfadeController]
