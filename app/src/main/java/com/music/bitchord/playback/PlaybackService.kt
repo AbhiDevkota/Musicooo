@@ -17,8 +17,6 @@ import android.os.SystemClock
 import com.music.bitchord.data.TelemetryProvenance
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import com.music.bitchord.playback.audio.usb.UsbDirectManager
-import com.music.bitchord.playback.audio.usb.DirectUsbProbeResult
 import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -6631,7 +6629,6 @@ class PlaybackService : MediaLibraryService() {
 
         val activeDevice = resolveActiveOutputDevice()
         val routeKind = resolveActiveRouteKind(activeDevice)
-        val directUsbProbe = if (routeKind == AudioRouting.Kind.USB) UsbDirectManager.probe(this) else null
 
         val format = currentAudioInputFormat
         val measured by lazy(LazyThreadSafetyMode.NONE) { format?.measure() }
@@ -6660,7 +6657,6 @@ class PlaybackService : MediaLibraryService() {
             preferred = activeDevice,
             floatEnabled = shouldEnableFloatOutput(),
             routeKind = routeKind,
-            directUsbProbe = directUsbProbe,
             directSupport = directSupport,
             bluetoothTelemetry = btTelemetry,
             systemMixerRateHz = if (routeKind == AudioRouting.Kind.USB) 48000 else null,
@@ -6735,7 +6731,6 @@ class PlaybackService : MediaLibraryService() {
             channelCount = channels,
             activeDevice = activeDevice,
         )
-        val directUsbProbe = if (routeKind == AudioRouting.Kind.USB) UsbDirectManager.probe(this) else null
         val btTelemetry = if (routeKind == AudioRouting.Kind.BLUETOOTH) bluetoothTracker.telemetry.value else null
 
         val advertisedEncodings = activeDevice?.encodings?.toList() ?: emptyList()
@@ -6751,7 +6746,6 @@ class PlaybackService : MediaLibraryService() {
             advertisedEncodings = advertisedEncodings,
             advertisedSampleRates = advertisedSampleRates,
             requestedMode = AppSettings.outputPcmMode.value,
-            directUsbProbe = directUsbProbe,
             directSupport = directSupport,
             bluetoothTelemetry = btTelemetry,
             delegateSupportsFloat = shouldEnableFloatOutput(),
