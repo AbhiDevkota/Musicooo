@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,12 @@ fun SearchField(
     focusRequester: FocusRequester = remember { FocusRequester() },
     /** What the empty field says it is for — the one part that changes per screen. */
     placeholder: String = stringResource(Res.string.search_hint),
+    /**
+     * Starts the platform's voice input, or null when this device has none.
+     * Only surfaces that can act on a spoken query pass it, which keeps the
+     * microphone off the settings filter and the desktop's sidebar field.
+     */
+    onVoiceSearch: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -135,6 +142,26 @@ fun SearchField(
                 Icon(
                     Icons.Rounded.Close,
                     contentDescription = stringResource(Res.string.clear_search),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        // Voice input is the last thing in the pill, after the clear button.
+        // At the trailing edge it stays under the thumb while typing adds the
+        // clear button to its left, rather than sliding away from it.
+        if (onVoiceSearch != null) {
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onVoiceSearch),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Mic,
+                    contentDescription = stringResource(Res.string.search_voice),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
