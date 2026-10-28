@@ -820,6 +820,12 @@ object InnertubeParser {
         val browseId = endpoint.s("browseId") ?: return null
         val pageType = endpoint.o("browseEndpointContextSupportedConfigs")
             .o("browseEndpointContextMusicConfig").s("pageType").orEmpty()
+        // An upload YouTube never matched to the catalogue, billed as an
+        // "Episode" and opening an `MPED…` page. Signed out it is often what a
+        // big song's own title promotes — "tum hi ho", "o maahi" — while the
+        // real track sits in the rows below, so it doesn't get the top slot.
+        // Read off the page type rather than the word, which is translated.
+        if ("NON_MUSIC_AUDIO_TRACK" in pageType) return null
         val title = renderer.o("title").runs()
         if (title.isBlank()) return null
         val subtitle = renderer.o("subtitle").runs()
