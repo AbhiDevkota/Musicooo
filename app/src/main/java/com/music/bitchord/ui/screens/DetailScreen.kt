@@ -2030,7 +2030,11 @@ private fun SuggestedSongRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            )
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

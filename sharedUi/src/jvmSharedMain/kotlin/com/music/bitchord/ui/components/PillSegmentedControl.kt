@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.graphics.fadingEdges
+import com.music.bitchord.ui.player.PlayerSettings
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
@@ -47,6 +47,9 @@ import kotlin.math.roundToInt
  * The proportions are the Liquid Glass mode picker's, but both shapes are flat
  * fills — no backdrop is sampled — so it looks and costs the same whether
  * Liquid Glass is on or off.
+ *
+ * Every "pick one of these" in the app — Settings' choices, a folder's
+ * Songs / Albums / Artists tabs, Search's sources and its YouTube filters.
  *
  * Segments share the track evenly while every label fits its share, take what
  * their labels need and split what is left while the labels fit together, and
@@ -69,8 +72,8 @@ fun PillSegmentedControl(
     val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     val trackColor = TRACK_FILL.copy(alpha = if (light) LIGHT_TRACK_ALPHA else DARK_TRACK_ALPHA)
     val pillColor = if (light) Color.White else DARK_PILL
-    val labelColor = glassContentColor()
-    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val labelColor = if (light) Color.Black else Color.White
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val selected = selectedIndex.takeIf { it in options.indices }
 
     BoxWithConstraints(
@@ -202,7 +205,8 @@ private const val LIGHT_TRACK_ALPHA = 0.12f
 private val DARK_PILL = Color(0xFF636366)
 
 private val TRACK_PADDING = 4.dp
-private val LABEL_PADDING = 14.dp
+/** Air either side of a label: past this a segment reads as a word, not a cramped tab. */
+private val LABEL_PADDING = 18.dp
 private val LABEL_VERTICAL_PADDING = 9.dp
 private val EDGE_FADE = 28.dp
 private const val PILL_DAMPING = 0.8f

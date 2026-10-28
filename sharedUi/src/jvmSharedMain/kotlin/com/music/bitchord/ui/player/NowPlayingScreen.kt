@@ -146,6 +146,7 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.ExplicitBadge
+import com.music.bitchord.ui.components.menuAnchor
 import com.music.bitchord.ui.theme.HideStatusBar
 import com.music.bitchord.ui.theme.rememberScreenOrientation
 import com.music.bitchord.ui.theme.StatusBarIcons
@@ -746,6 +747,13 @@ fun NowPlayingScreen(
      * width comfortably clears a phone's landscape width.
      */
     windowHeight: Dp,
+    /**
+     * Whether the host's ⋯ menu is up over the player. Like the player's own
+     * drawers it pauses a canvas — see [overlayOpen]. Asked rather than
+     * passed: as a value, every open and close of the menu re-ran all of this
+     * screen, on the very frame the menu starts to grow.
+     */
+    menuOpen: () -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -989,6 +997,21 @@ fun NowPlayingScreen(
     // phone's to make, so the request is handed down and the sheet comes back
     // through [PlayerHost.LyricsShareSheet].
     var lyricsShare by remember { mutableStateOf<LyricsShareRequest?>(null) }
+    // Whether anything is up over the player: a drawer, a popup, the ⋯ menu.
+    // A canvas holds still under them, as it does for the lyrics and the
+    // queue — each blurs a still of the player, and a clip playing on behind
+    // it is decoding and compositing for nothing anyone can see.
+    //
+    // Derived, and read only where it is used: read here, opening any of them
+    // re-ran this whole screen on the frame it starts to animate in.
+    val currentMenuOpen by rememberUpdatedState(menuOpen)
+    val currentLyricsOffsetOpen by rememberUpdatedState(lyricsOffsetOpen)
+    val overlayOpen = remember {
+        derivedStateOf {
+            currentMenuOpen() || showAudioPipeline || showCast || showAudioOutput || showVideoQuality ||
+                showLyricsProviders || showListenTogetherMembers || lyricsShare != null || currentLyricsOffsetOpen
+        }
+    }
     val lyricsShareEnabled = lyricsShareAvailable
     val lyricPicker = rememberLyricsPicker(
         song = song,
@@ -1549,9 +1572,9 @@ fun NowPlayingScreen(
         }
     }
 
-    // The drawers and dialogs the player raises over itself. Mounted by
-    // whichever layout is on screen — they are overlays over the player, not
-    // part of either shape of it.
+    // The drawers and dialogs the player raises over itself. Mounted beside
+    // whichever layout is on screen, by [FrostedPlayerFrame] — they are
+    // overlays over the player, not part of any shape of it.
     val playerOverlays: @Composable () -> Unit = {
         if (showVideoQuality) {
             VideoQualitySheet(
@@ -1761,11 +1784,24 @@ fun NowPlayingScreen(
         animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
         label = "playerTint",
     )
-    CompositionLocalProvider(LocalPlayerTint provides playerTint) {
+    // The ⋯ menu's frost for the drawers and popups over the player — see
+    // [FrostedPlayerFrame], which records the player for it and draws them
+    // beside it. None under "reduce dynamic blur": the panels go opaque, and a
+    // recording nothing reads is the cost that setting exists to remove.
+    val frostOff by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val frost = if (frostOff) null else PlayerPlatform.host.rememberPlayerFrost()
+    FrostedPlayerFrame(
+        modifier = modifier,
+        tint = playerTint,
+        frost = frost,
+        // Not the host's ⋯ menu: that takes its own still, of everything.
+        overlayOpen = { overlayOpen.value && !currentMenuOpen() },
+        overlays = playerOverlays,
+    ) {
         if (landscape && videoMode) {
             val versionAligning by PlayerSettings.versionAlignmentInProgress.collectAsStateWithLifecycle()
             val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
-            Box(modifier = modifier.fillMaxSize().then(dockHost)) {
+            Box(modifier = Modifier.fillMaxSize().then(dockHost)) {
                 FullscreenVideoPlayer(
                     song = song,
                     isPlaying = isPlaying,
@@ -1808,7 +1844,6 @@ fun NowPlayingScreen(
                         )
                     },
                 )
-                playerOverlays()
             }
         } else if (landscape) {
             // Paused always wins outright over a scrub in progress — see
@@ -1871,7 +1906,7 @@ fun NowPlayingScreen(
                 }
             }
 
-            Box(modifier = modifier.fillMaxSize().then(dockHost)) {
+            Box(modifier = Modifier.fillMaxSize().then(dockHost)) {
                 LandscapePlayerLayout(
                     pane = when {
                         lyricsOpen -> PlayerPane.Lyrics
@@ -1894,7 +1929,7 @@ fun NowPlayingScreen(
                             onCanvasRenderedChange = { canvasRendered = it },
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
-                            pausedForTransition = dockMoving,
+                            pausedForTransition = dockMoving || overlayOpen.value,
                             sleeveShape = landscapeArtShape,
                             // Let go of on the way to the mini player, whose
                             // cover sits flat in its bar.
@@ -2129,11 +2164,10 @@ fun NowPlayingScreen(
                         )
                     },
                 )
-                playerOverlays()
             }
         } else {
             Box(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .onSizeChanged { playerBounds = it }
                     .then(dockHost)
@@ -2208,7 +2242,7 @@ fun NowPlayingScreen(
                             // paused from the tap, and this screen doesn't then listen
                             // for the sleeve's first frame of movement as well.
                             pausedForTransition = lyricsOpen || queueOpen || queueDragging ||
-                                collapseStarted || dockMoving,
+                                collapseStarted || dockMoving || overlayOpen.value,
                             // Spotify's 9:16 Canvas is the phone background, so it
                             // covers every edge. Other providers retain the contained
                             // portrait treatment introduced for motion cover art.
@@ -2782,7 +2816,11 @@ fun NowPlayingScreen(
                             // credits on the deck's exact reveal frame.
                             lerp(collapsedTitleTop, regularTitleTop(), playerDeckReveal.value)
                         } ?: regularTitleTop()
-                        fun titleStart(): Dp = lerp(0.dp, THUMB_SIZE + 12.dp, p())
+                        // Collapsed, the thumbnail is a music video's own shape at
+                        // the header's height, as every list shows one — see
+                        // [trackArtSize] — and the credits start past it.
+                        val thumbWidth = if (videoMode) THUMB_SIZE * (16f / 9f) else THUMB_SIZE
+                        fun titleStart(): Dp = lerp(0.dp, thumbWidth + 12.dp, p())
 
                         // How far down the *screen* the sleeve's bottom edge sits, which
                         // is where the full-bleed banner has to stop for the credits
@@ -2863,13 +2901,16 @@ fun NowPlayingScreen(
                             // player's full width at the video's shape, centred
                             // on the square's slot — the frame the sleeve flies
                             // to and from the mini player, and morphs from into
-                            // the square header thumbnail as the player collapses.
+                            // the 16:9 header thumbnail as the player collapses.
                             val height = boxWidthPx / videoAspectState.value.coerceIn(1f, 2.4f)
                             val video = Rect(
                                 offset = Offset(0f, square.center.y - height / 2f),
                                 size = Size(boxWidthPx.toFloat(), height),
                             )
-                            lerp(video, square, p())
+                            val thumbW = thumbWidth.roundToPx().toFloat()
+                            val thumbH = THUMB_SIZE.roundToPx().toFloat()
+                            val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
+                            lerp(video, thumb, p())
                         }
                         fun sleeveRect(): Rect {
                             val card = cardRect()
@@ -3195,7 +3236,7 @@ fun NowPlayingScreen(
                                         // for is paused from the tap, and then never
                                         // asks after its first frame of movement.
                                         pausedForTransition = lyricsOpen || queueOpen || queueDragging ||
-                                            collapseStarted || dockMoving,
+                                            collapseStarted || dockMoving || overlayOpen.value,
                                         onRenderedChanged = { canvasRendered = it },
                                         onFrameCaptured = {
                                             if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
@@ -3553,6 +3594,7 @@ fun NowPlayingScreen(
                                 } else {
                                     Haptic.Tap
                                 },
+                                modifier = Modifier.menuAnchor(),
                             )
                         }
 
@@ -3879,7 +3921,6 @@ fun NowPlayingScreen(
                     }
                     }
                 }
-                playerOverlays()
             }
         }
     }

@@ -134,6 +134,14 @@ interface PlayerHost {
     fun CastDialog(hazeState: HazeState, onDismiss: () -> Unit) = Unit
 
     /**
+     * The ⋯ menu's frost for the player's drawers and popups — see
+     * [PlayerFrost]. Null where the platform can't draw it, and the drawers
+     * fall back to the player's haze.
+     */
+    @Composable
+    fun rememberPlayerFrost(): PlayerFrost? = null
+
+    /**
      * Whether lines can be put on a share card here. False hides the pick mode
      * altogether rather than offering a mode with nowhere to put its result.
      */

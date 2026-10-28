@@ -2179,22 +2179,52 @@ class PlaybackService : MediaLibraryService() {
 
         val sourceSong = currentItem.toSong()
         val targetSong = targetMediaItem.toSong()
-        val smartAlignEnabled = AppSettings.smartVersionAlignment.value
+        // YouTube's own map for an officially paired cut, which needs nothing
+        // fetched or measured — so it is used whether or not smart alignment
+        // is on, and the measurement is skipped.
+        val officialMap = YtMusicRepository.versionTimeMap(sourceSong.videoId, targetSong.videoId)
+        val measureAlignment = officialMap == null && AppSettings.smartVersionAlignment.value
+        // The bar's sheen still covers the whole swap — standby buffering and
+        // the fade — for a mapped cut. Switching back to the version a switch
+        // came from has no resolve in front of it, so without this the only
+        // thing on the bar would be the fade, too short to read as a switch.
+        val holdsSwitchBar = measureAlignment || officialMap != null
 
         versionSwapJob?.cancel()
         val generation = ++versionSwapGeneration
         versionSwapJob = scope.launch(Dispatchers.Main) {
             val mediaId = targetMediaItem.mediaId
             swappingMediaId = mediaId
-            if (smartAlignEnabled) {
+            if (holdsSwitchBar) {
                 AppSettings.versionAlignmentInProgress.value = true
             }
             try {
                 val startPosition = activePlayer.currentPosition
-                val alignmentOffsetMs = if (smartAlignEnabled) {
+                val alignmentOffsetMs = if (measureAlignment) {
                     prepareVersionAlignment(sourceSong, targetSong, startPosition)
                 } else {
                     0L
+                }
+                // Where a moment of the playing cut lands in the other one. A
+                // measured offset is one shift for the whole track; YouTube's
+                // map is per stretch, so a skit mid-video maps correctly too.
+                val alignedPosition: (Long) -> Long = if (officialMap != null) {
+                    { pos -> officialMap.map(pos).coerceAtLeast(0L) }
+                } else {
+                    { pos -> (pos + alignmentOffsetMs).coerceAtLeast(0L) }
+                }
+                if (officialMap != null) {
+                    val mapped = alignedPosition(startPosition)
+                    VersionAudioAligner.publishPhase(
+                        VersionAudioAligner.beginAttempt(sourceSong.videoId, targetSong.videoId),
+                        VersionAudioAligner.CutPhase.ALIGNED,
+                        mapped - startPosition,
+                    )
+                    TrackLog.d(
+                        "BitChord",
+                        "version swap using YouTube's time map: ${startPosition}ms -> ${mapped}ms",
+                        about = sourceSong.videoId,
+                    )
                 }
 
                 if (player !== activePlayer ||
@@ -2213,7 +2243,7 @@ class PlaybackService : MediaLibraryService() {
                     (activePlayer.isPlaying || activePlayer.playbackState == Player.STATE_READY)
 
                 if (!canCrossfade || standbyPlayer == null) {
-                    val pos = (activePlayer.currentPosition + alignmentOffsetMs).coerceAtLeast(0L)
+                    val pos = alignedPosition(activePlayer.currentPosition)
                     val wasPlaying = activePlayer.playWhenReady
                     activePlayer.replaceMediaItem(currentIndex, targetMediaItem)
                     activePlayer.seekTo(currentIndex, pos)
@@ -2229,7 +2259,7 @@ class PlaybackService : MediaLibraryService() {
                     if (i == currentIndex) targetMediaItem else activePlayer.getMediaItemAt(i)
                 }
                 val wasPlaying = activePlayer.playWhenReady
-                val alignedStartPos = (activePlayer.currentPosition + alignmentOffsetMs).coerceAtLeast(0L)
+                val alignedStartPos = alignedPosition(activePlayer.currentPosition)
 
             // Reset and configure standby player
             standbyPlayer.stop()
@@ -2278,7 +2308,7 @@ class PlaybackService : MediaLibraryService() {
                 standbyPlayer.clearMediaItems()
                 standbyPlayer.volume = 1f
                 swappingMediaId = null
-                val pos = (activePlayer.currentPosition + alignmentOffsetMs).coerceAtLeast(0L)
+                val pos = alignedPosition(activePlayer.currentPosition)
                 activePlayer.replaceMediaItem(currentIndex, targetMediaItem)
                 activePlayer.seekTo(currentIndex, pos)
                 if (wasPlaying) activePlayer.play()
@@ -2294,9 +2324,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             // Sync playback position with exact live position right before starting playback on standby
-            val livePos = activePlayer.currentPosition
-            val targetLivePos = (livePos + alignmentOffsetMs).coerceAtLeast(0L)
-            standbyPlayer.seekTo(currentIndex, targetLivePos)
+            standbyPlayer.seekTo(currentIndex, alignedPosition(activePlayer.currentPosition))
 
             val willPlay = wasPlaying && activePlayer.playWhenReady
             if (willPlay) {
@@ -2317,10 +2345,7 @@ class PlaybackService : MediaLibraryService() {
                     // near-seek lands inside the buffer it already holds, so
                     // the drift accumulated above collapses to this seek's own
                     // resume time, which is the one part that cannot go.
-                    standbyPlayer.seekTo(
-                        currentIndex,
-                        (activePlayer.currentPosition + alignmentOffsetMs).coerceAtLeast(0L),
-                    )
+                    standbyPlayer.seekTo(currentIndex, alignedPosition(activePlayer.currentPosition))
                     val resyncTimeout = SystemClock.elapsedRealtime() + 300L
                     while (isActive && standbyPlayer.playbackState != Player.STATE_READY && SystemClock.elapsedRealtime() < resyncTimeout) {
                         delay(10)
@@ -2339,7 +2364,7 @@ class PlaybackService : MediaLibraryService() {
             // Smooth equal-power crossfade transition (~550ms audio morph)
             val swapCrossfadeMs = 550L
             val fadeStart = SystemClock.elapsedRealtime()
-            if (!smartAlignEnabled) {
+            if (!holdsSwitchBar) {
                 AppSettings.smartMixInProgress.value = true
             }
 
@@ -2382,7 +2407,7 @@ class PlaybackService : MediaLibraryService() {
             } finally {
                 loudnessA.setBlendTrim(1f)
                 loudnessB.setBlendTrim(1f)
-                if (!smartAlignEnabled) {
+                if (!holdsSwitchBar) {
                     AppSettings.smartMixInProgress.value = false
                 }
             }

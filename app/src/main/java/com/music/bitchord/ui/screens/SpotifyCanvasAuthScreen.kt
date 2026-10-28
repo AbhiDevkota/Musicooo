@@ -17,7 +17,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import com.music.bitchord.ui.components.IosSwitch
+import com.music.bitchord.ui.theme.stableStatusBarInsets
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -54,7 +55,9 @@ fun SpotifyCanvasAuthScreen(
                             contentDescription = stringResource(R.string.back),
                         )
                     }
-                }
+                },
+                // Kept clear of the status bar even while the player has it hidden.
+                windowInsets = stableStatusBarInsets(),
             )
         }
     ) { padding ->
@@ -141,7 +144,7 @@ private fun SpotifyCanvasSettingToggle(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(
+        IosSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
         )

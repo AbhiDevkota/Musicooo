@@ -58,6 +58,7 @@ import kotlin.math.abs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -531,7 +532,11 @@ private fun SongRowContent(
             .fillMaxWidth()
             .alpha(if (unavailable) 0.45f else 1f)
             .background(activeBackground)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            )
             .contextClick(onMore ?: onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -676,8 +681,10 @@ fun RowMoreButton(
 ) {
     Box(
         modifier = modifier
+            .leftOutOfHeldPicture()
             .hangIntoGutter(ROW_MORE_OUTSET)
             .size(36.dp)
+            .menuAnchor()
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

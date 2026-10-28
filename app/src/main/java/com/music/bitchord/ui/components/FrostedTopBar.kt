@@ -22,14 +22,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
@@ -76,6 +74,7 @@ import kotlinx.coroutines.launch
 import com.music.bitchord.R
 import com.music.bitchord.data.model.Account
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.theme.stableStatusBarInsets
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
@@ -126,10 +125,14 @@ private fun leadingInset(hasBack: Boolean): Dp = if (hasBack) BackInset else Wor
  * are all different numbers, and a fixed guess is wrong on all but one of them:
  * too tight and content is clipped under the bar, too loose and every page
  * opens on a band of empty space.
+ *
+ * The inset is read whether the status bar is showing or not: the player can
+ * hide it while it is open, and every page under the player would otherwise
+ * slide up into the space it left behind.
  */
 @Composable
 fun topBarHeight(): Dp =
-    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarContentHeight
+    stableStatusBarInsets().asPaddingValues().calculateTopPadding() + TopBarContentHeight
 
 /**
  * Where page content should start: clear of the bar, plus [TopBarContentGap].
@@ -208,7 +211,7 @@ fun FrostedTopBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+                .windowInsetsPadding(stableStatusBarInsets())
                 .height(TopBarContentHeight),
         ) {
             /* Temporarily hidden: keep the scrolling center-title implementation

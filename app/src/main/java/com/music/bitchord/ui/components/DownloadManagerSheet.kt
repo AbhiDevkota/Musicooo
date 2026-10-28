@@ -175,7 +175,7 @@ fun TopBarDownloadButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * became of it, and a way out of the ones still going.
  *
  * A list rather than a single line because the thing being reported on is a
- * batch. `SongActionsSheet`'s download row already answers "what about *this*
+ * batch. `SongActionsMenu`'s download row already answers "what about *this*
  * song" perfectly well and is the right size for that question; the question
  * here is the one it cannot answer — forty tracks were asked for, which of them
  * arrived — and that has as many answers as there were tracks.

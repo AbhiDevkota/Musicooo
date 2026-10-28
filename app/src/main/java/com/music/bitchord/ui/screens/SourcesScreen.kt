@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.icons.SfIcons
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Cloud
@@ -41,8 +41,7 @@ import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import com.music.bitchord.ui.components.IosSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -196,12 +195,7 @@ fun SourcesScreen(
             .verticalScroll(rememberScrollState())
             .padding(contentPadding),
     ) {
-        Text(
-            text = stringResource(R.string.source),
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp),
-        )
+        SettingsPageTitle(stringResource(R.string.source))
 
         SettingsGroup(
             header = stringResource(R.string.sources_order_header),
@@ -302,7 +296,7 @@ fun SourcesScreen(
         // so it takes no part in the ranking and gets its own group. The
         // editor is raised to the activity like every other alert.
         RemoteLibrarySection(
-            icon = Icons.Rounded.Cloud,
+            icon = SfIcons.Cloud,
             title = stringResource(R.string.webdav),
             description = stringResource(R.string.webdav_description),
             subtitle = if (webdavUrl.isBlank()) {
@@ -327,7 +321,7 @@ fun SourcesScreen(
         // for the same reason: it holds the listener's own files instead of
         // answering for YouTube's, so it takes no part in the ranking above.
         RemoteLibrarySection(
-            icon = Icons.Rounded.Storage,
+            icon = SfIcons.Storage,
             title = stringResource(R.string.smb),
             description = stringResource(R.string.smb_description),
             subtitle = if (smbHost.isBlank() || smbShare.isBlank()) {
@@ -359,7 +353,7 @@ fun SourcesScreen(
             footer = stringResource(R.string.upgrade_length_slack_footer),
         ) {
             SliderRow(
-                icon = Icons.Rounded.Tune,
+                icon = SfIcons.Tune,
                 title = stringResource(R.string.upgrade_length_slack),
                 subtitle = stringResource(R.string.upgrade_length_slack_subtitle),
                 value = stringResource(R.string.seconds_short, upgradeLengthSlackSeconds),
@@ -410,7 +404,7 @@ private fun RemoteLibrarySection(
         if (configured) {
             RowDivider()
             SettingsRow(
-                icon = Icons.Rounded.Dns,
+                icon = SfIcons.Dns,
                 title = if (testing) {
                     stringResource(R.string.testing)
                 } else {
@@ -439,7 +433,7 @@ private fun RemoteLibrarySection(
             )
             RowDivider()
             SettingsRow(
-                icon = Icons.Rounded.DeleteSweep,
+                icon = SfIcons.DeleteSweep,
                 title = disconnectTitle,
                 onClick = {
                     onDisconnect()
@@ -532,7 +526,7 @@ private fun ReorderableAddons(
             ) {
                 row(index + 1, config) {
                     Icon(
-                        imageVector = Icons.Rounded.DragHandle,
+                        imageVector = SfIcons.DragHandle,
                         contentDescription = stringResource(R.string.drag_to_reorder),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                         modifier = Modifier
@@ -644,7 +638,7 @@ private fun AddSourceRow(onClick: () -> Unit) {
         // the plus reads as belonging to the same column the list is indexed by.
         Spacer(Modifier.width(24.dp))
         Icon(
-            imageVector = Icons.Rounded.Add,
+            imageVector = SfIcons.Add,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(ICON_SIZE),
@@ -720,7 +714,7 @@ private fun BluetoothCodecPermissionRow() {
     ) {
         Spacer(Modifier.width(24.dp))
         Icon(
-            imageVector = Icons.Rounded.Bluetooth,
+            imageVector = SfIcons.Bluetooth,
             contentDescription = null,
             tint = if (denied) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(ICON_SIZE),
@@ -792,11 +786,11 @@ private fun SourceRow(
         Spacer(Modifier.width(6.dp))
         Icon(
             imageVector = when (config.kind) {
-                SourceKind.ADDON -> Icons.Rounded.Extension
-                SourceKind.CUSTOM_MODULE -> Icons.Rounded.Extension
-                SourceKind.MODULE -> Icons.Rounded.Extension
-                SourceKind.JIOSAAVN -> Icons.Rounded.GraphicEq // or some other icon
-                SourceKind.YOUTUBE -> Icons.Rounded.PlayCircle
+                SourceKind.ADDON -> SfIcons.Extension
+                SourceKind.CUSTOM_MODULE -> SfIcons.Extension
+                SourceKind.MODULE -> SfIcons.Extension
+                SourceKind.JIOSAAVN -> SfIcons.GraphicEq // or some other icon
+                SourceKind.YOUTUBE -> SfIcons.PlayCircle
             },
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onBackground,
@@ -866,9 +860,9 @@ private fun SourceRow(
                 ) {
                     Icon(
                         imageVector = if (config.allowDownloads) {
-                            Icons.Rounded.Download
+                            SfIcons.Download
                         } else {
-                            Icons.Rounded.FileDownloadOff
+                            SfIcons.FileDownloadOff
                         },
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -894,13 +888,9 @@ private fun SourceRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Switch(
+            IosSwitch(
                 checked = config.enabled,
                 onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    checkedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
             )
         }
         // Outside the dimming above, and last in the row. A source switched off

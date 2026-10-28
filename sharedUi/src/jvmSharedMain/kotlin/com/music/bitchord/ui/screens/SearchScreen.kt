@@ -16,8 +16,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.longPressMenuClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +35,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -88,8 +87,6 @@ import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.components.songListSkeleton
-import com.music.bitchord.ui.haptics.Haptic
-import com.music.bitchord.ui.haptics.rememberHaptics
 import java.util.Locale
 
 @Composable
@@ -249,8 +246,15 @@ fun SearchScreen(
             // they stay up for an empty or failed search too, or picking a filter
             // that finds nothing would take away the control needed to leave it.
             // They are YouTube's categories, so the Library source has none.
+            // The same selector as the sources above it and a folder's tabs, so
+            // the app has one look for "pick one of these".
             if (results != null && !suggesting && !searchingLibrary && !searchingAddons) {
-                SearchFilterTabs(filter = filter, onFilterChange = onFilterChange)
+                PillSegmentedControl(
+                    options = SearchFilter.entries.map { it.label },
+                    selectedIndex = filter.ordinal,
+                    onSelect = { onFilterChange(SearchFilter.entries[it]) },
+                    modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 6.dp),
+                )
             }
         }
 
@@ -747,7 +751,11 @@ private fun TypeaheadSongRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            )
             .contextClick(onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -938,7 +946,11 @@ private fun RecentSearchEntityRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
-                .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+                .longPressMenuClickable(
+                    onClick = onClick,
+                    onLongClick = onLongPress,
+                    liftPadding = PaddingValues(start = PAGE_GUTTER, end = 8.dp),
+                )
                 .contextClick(onLongPress)
                 .padding(start = PAGE_GUTTER, end = 8.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -999,7 +1011,11 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            )
             .contextClick(onLongPress)
             .padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1038,55 +1054,6 @@ private fun BrowseRow(item: BrowseItem, onClick: () -> Unit, onLongPress: (() ->
         }
     }
 }
-
-/**
- * Filter pills rather than a tab row: squarish rounded rectangles, the selected
- * one inverted. They scroll horizontally so a long label set never squeezes the
- * text, and the gutter padding sits inside the scroll so it scrolls with them.
- */
-@Composable
-private fun SearchFilterTabs(filter: SearchFilter, onFilterChange: (SearchFilter) -> Unit) {
-    val haptics = rememberHaptics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SearchFilter.entries.forEach { entry ->
-            val selected = entry == filter
-            Box(
-                modifier = Modifier
-                    .clip(FILTER_PILL_SHAPE)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                    // Only the pill that isn't already selected has anything to
-                    // report — re-tapping the current filter changes nothing, so
-                    // buzzing for it would be feedback for a no-op.
-                    .clickable {
-                        if (!selected) haptics.play(Haptic.Select)
-                        onFilterChange(entry)
-                    }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) MaterialTheme.colorScheme.background
-                    else MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
-}
-
-/** Rounded, but well short of a capsule — the corner reads as a cut, not a curve. */
-private val FILTER_PILL_SHAPE = RoundedCornerShape(12.dp)
 
 /** How far an addon row the quality setting won't play is dimmed; Material's disabled level. */
 private const val BLOCKED_ROW_ALPHA = 0.38f

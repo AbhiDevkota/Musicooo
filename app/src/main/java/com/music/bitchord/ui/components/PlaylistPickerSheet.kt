@@ -392,8 +392,9 @@ private fun NewPlaylistForm(
 }
 
 /**
- * The rename panel of [BrowseActionsSheet], which swaps itself out for this
- * rather than opening a dialog over itself — same reason the create form lives
+ * Renaming one of the account's playlists: what [BrowseActionsMenu]'s Rename
+ * hands on to, raised by the host as a sheet of its own — a text field and its
+ * keyboard have no place on a floating menu. Same reason the create form lives
  * inside [PlaylistPickerSheet].
  */
 @Composable

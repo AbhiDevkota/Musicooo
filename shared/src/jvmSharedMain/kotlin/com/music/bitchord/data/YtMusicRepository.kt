@@ -23,6 +23,7 @@ import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.VersionTimeMap
 import com.music.bitchord.data.model.WatchTarget
 import com.music.bitchord.data.sources.TrackMatcher
 import kotlinx.coroutines.CancellationException
@@ -50,8 +51,19 @@ object YtMusicRepository {
     // Cache for video version lookups from audio tracks (null means no video found).
     private val videoVersionCache = ConcurrentHashMap<String, Song?>()
 
+    // (from, to) -> YouTube's own alignment between two versions, kept for
+    // both directions so switching back lines up without asking again.
+    private val versionTimeMaps = ConcurrentHashMap<Pair<String, String>, VersionTimeMap>()
+
     fun cachedAudioVersion(videoId: String): Song? = audioVersionCache[videoId]
     fun cachedVideoVersion(videoId: String): Song? = videoVersionCache[videoId]
+
+    /**
+     * How a position in [fromId] maps into [toId], when YouTube Music paired
+     * the two itself and said how they line up. Null for a pair found by
+     * search, which still has to be measured.
+     */
+    fun versionTimeMap(fromId: String, toId: String): VersionTimeMap? = versionTimeMaps[fromId to toId]
 
     /**
      * The core personalised feed. It stays deliberately independent from the
@@ -385,9 +397,9 @@ object YtMusicRepository {
         }
 
     /**
-     * The catalogue (audio-only) release of a music-video upload, found the
-     * same way the "Switch to audio" toggle in the real app would land on
-     * it: searching the title and artist and taking the closest song match.
+     * The catalogue (audio-only) release of a music-video upload: YouTube
+     * Music's own pairing when it has one (see [officialVersion]), otherwise
+     * a search on the title and artist, taking the closest song match.
      * Called before a video-tagged [Song] ever reaches the queue, so
      * playback, the mini player/notification, and YouTube's own history all
      * see the audio track — never the video upload's title, art or id.
@@ -413,6 +425,10 @@ object YtMusicRepository {
     suspend fun resolveAudio(song: Song): Song {
         if (!song.isVideo) return song
         audioVersionCache[song.videoId]?.let { return it }
+        officialVersion(song, wantAudio = true)?.let { audio ->
+            audioVersionCache[song.videoId] = audio
+            return audio
+        }
         val target = TrackMatcher.targetOf(song)
         for (query in TrackMatcher.queries(target)) {
             val candidates = search(query, SearchFilter.SONGS)
@@ -450,6 +466,10 @@ object YtMusicRepository {
     suspend fun resolveVideo(song: Song): Song? {
         if (song.isVideo) return null
         videoVersionCache[song.videoId]?.let { return it }
+        officialVersion(song, wantAudio = false)?.let { video ->
+            videoVersionCache[song.videoId] = video
+            return video
+        }
         val target = TrackMatcher.targetOf(song)
         for (query in TrackMatcher.queries(target)) {
             val candidates = search(query, SearchFilter.VIDEOS)
@@ -466,6 +486,41 @@ object YtMusicRepository {
         Log.w(TAG, "video switch: no video match for '${song.title}' by '${song.artist}'")
         videoVersionCache[song.videoId] = null
         return null
+    }
+
+    /**
+     * The other version of [song] as YouTube Music pairs it — the pairing
+     * behind its own Song/Video switch — or null when it offers none. Asked
+     * before any search, because this is an answer rather than a guess: the
+     * search can land on a same-titled cover or a different release, this
+     * cannot. Its time map, when there is one, is kept for the service, so
+     * the swap seeks straight to the matching moment instead of measuring it.
+     *
+     * Signed out, YouTube pairs nothing, so the request is not made at all.
+     */
+    private suspend fun officialVersion(song: Song, wantAudio: Boolean): Song? {
+        if (Innertube.cookie == null) return null
+        val pair = try {
+            InnertubeParser.parseVersionPair(Innertube.next(song.videoId), song.videoId, wantAudio)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "version pair lookup failed for '${song.title}': ${e.message}")
+            null
+        } ?: run {
+            Log.d(TAG, "version pair: YouTube pairs nothing with '${song.title}'")
+            return null
+        }
+        pair.timeMap?.let { map ->
+            versionTimeMaps[song.videoId to pair.song.videoId] = map
+            versionTimeMaps[pair.song.videoId to song.videoId] = map.inverted()
+        }
+        Log.d(
+            TAG,
+            "version pair: '${song.title}' -> '${pair.song.title}' (${pair.song.videoId}), " +
+                "segments=${pair.timeMap?.segments?.size ?: 0}",
+        )
+        return pair.song
     }
 
     /** Signed-in profile for the settings header. Null when signed out. */

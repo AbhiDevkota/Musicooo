@@ -10,7 +10,10 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.canvas.CanvasRepository
@@ -25,6 +28,11 @@ import com.music.bitchord.playback.AudioRouting
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
 import com.music.bitchord.playback.audio.bitperfect.DacVolume
 import com.music.bitchord.playback.cast.CastController
+import com.music.bitchord.ui.components.backdrop.backdrops.SnapshotBackdrop
+import com.music.bitchord.ui.components.backdrop.backdrops.rememberSnapshotBackdrop
+import com.music.bitchord.ui.components.backdrop.backdrops.snapshotBackdropSource
+import com.music.bitchord.ui.components.isGlassSupported
+import com.music.bitchord.ui.components.menuBackdropFrost
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -214,6 +222,16 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
             isPlaying = isPlaying,
         )
 
+    // The ⋯ menu's own material: a still of the player, blurred under each
+    // panel exactly as [menuBackdropFrost] blurs it under the menu. Below
+    // Android 12 there is no RenderEffect to blur it with.
+    @Composable
+    override fun rememberPlayerFrost(): PlayerFrost? {
+        if (!isGlassSupported()) return null
+        val backdrop = rememberSnapshotBackdrop()
+        return remember(backdrop) { BackdropPlayerFrost(backdrop) }
+    }
+
     // The phone is the platform that can turn picked lyrics into a picture: a
     // bitmap, a canvas, the gallery and the chooser are all Android's here. The
     // desktop has no answer to it, so it never sees the pick mode at all.
@@ -321,4 +339,15 @@ private class MusicStreamVolume(private val context: Context) : SystemVolume {
     override fun refresh() {
         _level.value = read()
     }
+}
+
+private class BackdropPlayerFrost(private val backdrop: SnapshotBackdrop) : PlayerFrost {
+    @Composable
+    override fun Modifier.frostSource(): Modifier = snapshotBackdropSource(backdrop)
+
+    override fun capture() = backdrop.capture()
+
+    override fun release() = backdrop.release()
+
+    override fun Modifier.frostPanel(shape: Shape, fill: Color): Modifier = menuBackdropFrost(backdrop, shape, fill)
 }

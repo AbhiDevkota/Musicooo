@@ -733,6 +733,7 @@ internal fun CircleGlyph(
     onClick: () -> Unit,
     active: Boolean = false,
     haptic: Haptic = Haptic.Tap,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
     val discAlpha by animateFloatAsState(
@@ -740,7 +741,7 @@ internal fun CircleGlyph(
         label = "glyphDisc",
     )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(34.dp)
             .clip(CircleShape)
             .background(LocalPlayerTint.current.copy(alpha = discAlpha))

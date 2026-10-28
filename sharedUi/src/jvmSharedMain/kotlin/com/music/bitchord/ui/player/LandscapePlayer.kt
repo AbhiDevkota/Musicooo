@@ -61,6 +61,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import com.music.bitchord.ui.components.ExplicitBadge
+import com.music.bitchord.ui.components.menuAnchor
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.theme.stableStatusBarInsets
@@ -482,6 +483,7 @@ internal fun LandscapeCredits(
             icon = if (showRevertCue) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.MoreHoriz,
             contentDescription = stringResource(Res.string.more),
             onClick = onOpenMenu,
+            modifier = Modifier.menuAnchor(),
         )
     }
 }
