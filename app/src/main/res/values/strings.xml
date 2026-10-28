@@ -320,6 +320,8 @@
     <string name="eq_preset_custom">Custom</string>
     <string name="show_nerd_stats">Show stats for nerds</string>
     <string name="show_nerd_stats_subtitle">Codec, bitrate and sample rate on the player</string>
+    <string name="show_listen_together_button">Show Listen Together button</string>
+    <string name="show_listen_together_button_subtitle">The output and Listen Together pill under the player controls</string>
     <string name="app_icon">App icon</string>
     <string name="app_icon_default">Default</string>
     <string name="app_icon_monochrome" translatable="false">Monochrome</string>
