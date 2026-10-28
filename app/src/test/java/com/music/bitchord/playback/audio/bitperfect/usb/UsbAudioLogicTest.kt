@@ -147,6 +147,31 @@ class UsbAudioLogicTest {
         assertEquals(-70.0, UsbVolume.Volume.open(io, master).snapshot.currentDb, 0.0)
     }
 
+    /** The attenuator lives in the DAC: closing the stream must hand it back as found. */
+    @Test
+    fun restoreReturnsEveryChannelToItsLevelBeforeOpen() {
+        class Stereo(val levels: IntArray) : UsbControl {
+            override fun transfer(input: Boolean, request: Int, value: Int, index: Int, data: ByteArray) {
+                val channel = (value and 255) - 1
+                if (!input) {
+                    levels[channel] = (data[0].toInt() and 255) or (data[1].toInt() shl 8)
+                } else if (request == 2) {
+                    byteArrayOf(1, 0, 0, 0xa0.toByte(), 0, 0, 0, 1).copyInto(data, 0, 0, data.size)
+                } else {
+                    data[0] = levels[channel].toByte()
+                    data[1] = (levels[channel] shr 8).toByte()
+                }
+            }
+        }
+        val io = Stereo(intArrayOf(0, Short.MIN_VALUE.toInt()))
+        val volume = UsbVolume.Volume.open(io, UsbVolume.Feature(2, 0, true, listOf(1, 2)))
+        volume.set(io, -12.0)
+        assertEquals(-12 * 256, io.levels[0])
+        volume.restore(io)
+        assertEquals(0, io.levels[0])
+        assertEquals(Short.MIN_VALUE.toInt(), io.levels[1])
+    }
+
     @Test
     fun failedReadbackCannotReportSafeVolume() {
         try {

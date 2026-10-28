@@ -126,6 +126,8 @@ internal object UsbVolume {
     class Volume private constructor(
         private val feature: Feature,
         private val ranges: List<List<Range>>,
+        /** Each channel's level as the DAC had it before [open] attenuated it. */
+        private val original: List<Int>,
         snapshot: Snapshot,
     ) {
         var snapshot: Snapshot = snapshot
@@ -137,6 +139,14 @@ internal object UsbVolume {
             val target = floor(minOf(db, snapshot.maxDb) * 256.0).toInt()
             return setTargets(control, List(feature.channels.size) { target })
         }
+
+        /**
+         * Puts every channel back to the level it had before [open], so the
+         * DAC is left as it was found. The attenuator lives in the DAC, not in
+         * the stream, and would otherwise follow it into Android's own driver
+         * and every other app.
+         */
+        fun restore(control: UsbControl): Snapshot = setTargets(control, original)
 
         internal fun setTargets(control: UsbControl, targets: List<Int>): Snapshot {
             val index = (feature.unit shl 8) or feature.interface_
@@ -183,6 +193,7 @@ internal object UsbVolume {
                 var current = Short.MIN_VALUE.toInt()
                 var restoreLimit = Short.MAX_VALUE.toInt()
                 val startup = mutableListOf<Int>()
+                val original = mutableListOf<Int>()
                 for (channel in feature.channels) {
                     val selector = 0x200 or channel
                     val data = ByteArray(2)
@@ -190,6 +201,7 @@ internal object UsbVolume {
                     val level = s16(data, 0)
                     current = maxOf(current, level)
                     restoreLimit = minOf(restoreLimit, level)
+                    original += level
                     startup += minOf(level, STARTUP_DB * 256)
                     ranges += if (feature.uac2) {
                         control.transfer(true, UAC2_RANGE, selector, index, data)
@@ -218,6 +230,7 @@ internal object UsbVolume {
                 val volume = Volume(
                     feature,
                     ranges,
+                    original,
                     Snapshot(
                         available = true,
                         minDb = min / 256.0,

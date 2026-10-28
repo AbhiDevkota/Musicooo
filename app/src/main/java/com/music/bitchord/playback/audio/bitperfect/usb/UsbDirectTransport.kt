@@ -57,7 +57,8 @@ internal object UsbDirectNative {
  * Volume is the DAC's Feature Unit, never the samples. Before the first
  * transfer every controlled channel is brought down to at most -40 dB, and a
  * level the listener chose earlier on the same DAC is put back only as far as
- * the DAC's own knob now allows. A DAC with no usable volume control plays
+ * the DAC's own knob now allows. On release the DAC is returned to the level
+ * it had before the stream opened. A DAC with no usable volume control plays
  * only if the listener has explicitly allowed fixed-volume output.
  *
  * A failure never redirects to the phone speaker from here: the transport
@@ -125,6 +126,12 @@ internal class UsbDirectTransport private constructor(
     }
 
     override fun release() {
+        // Leave the DAC at the volume it had before this stream lowered it;
+        // the next owner, Android's driver or another app, expects that level.
+        // Pointless once it is unplugged, and a closed handle cannot be asked.
+        if (handle != 0L && failure == null) {
+            volumeControl?.let { volume -> runCatching { synchronized(volume) { volume.restore(control) } } }
+        }
         // The worker joins (cancelling and acknowledging every transfer, then
         // releasing the interfaces) before Android closes the descriptor.
         if (handle != 0L) UsbDirectNative.close(handle)

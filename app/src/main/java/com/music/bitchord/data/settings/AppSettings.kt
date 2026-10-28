@@ -59,7 +59,9 @@ enum class OutputPcmMode(val label: String) {
 }
 
 /**
- * Which exclusive output, if any, a track is sent to unchanged.
+ * Which exclusive output, if any, a track is sent to unchanged. Declared in
+ * the order the settings picker lists them; persisted by name, so the order
+ * can change freely.
  *
  * Bit-perfect output bypasses the equalizer, loudness normalization,
  * crossfade, Automix, playback speed and software volume: any of them would
@@ -70,17 +72,17 @@ enum class OutputPcmMode(val label: String) {
 enum class BitPerfectMode {
     OFF,
 
-    /** Android 14's bit-perfect mixer for a USB DAC. */
-    USB_ANDROID,
-
-    /** An AAudio exclusive stream to a built-in DAC, for digital audio players. */
-    DAP_EXCLUSIVE,
-
     /**
      * BitChord's own USB Audio Class driver on libusb: any Android version,
      * volume set on the DAC itself. Requires USB permission.
      */
     USB_DIRECT,
+
+    /** Android 14's bit-perfect mixer for a USB DAC. */
+    USB_ANDROID,
+
+    /** An AAudio exclusive stream to a built-in DAC, for digital audio players. */
+    DAP_EXCLUSIVE,
 }
 
 /**
