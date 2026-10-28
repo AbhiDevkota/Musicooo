@@ -196,6 +196,13 @@ fun SettingsScreen(
     onSpotifyCanvasAuth: () -> Unit,
     onAppLanguage: () -> Unit,
     onEditSignatureApi: () -> Unit,
+    /**
+     * Asks before [mode] is turned on: it hands volume to the DAC at full
+     * scale. Shown in the app's frosted alert, which needs the app's blur.
+     */
+    onConfirmBitPerfect: (BitPerfectMode) -> Unit,
+    /** Asks before a DAC with no settable volume may play at full scale. */
+    onConfirmFixedVolume: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -302,8 +309,6 @@ fun SettingsScreen(
     var pickingDownloadQuality by remember { mutableStateOf(false) }
     var pickingAutomixPerformance by remember { mutableStateOf(false) }
     var pickingBitPerfect by remember { mutableStateOf(false) }
-    var confirmBitPerfect by remember { mutableStateOf<BitPerfectMode?>(null) }
-    var confirmFixedVolume by remember { mutableStateOf(false) }
     // What the last export or import did, shown on the row that did it rather
     // than as a toast: a backup is the one action here whose outcome nobody can
     // check by looking at the app afterwards. Held per direction, or an import's
@@ -651,7 +656,7 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.usb_allow_fixed_volume_subtitle),
                         checked = usbAllowFixedVolume,
                         onCheckedChange = { on ->
-                            if (on) confirmFixedVolume = true else AppSettings.setUsbAllowFixedVolume(false)
+                            if (on) onConfirmFixedVolume() else AppSettings.setUsbAllowFixedVolume(false)
                         },
                     )
                 }
@@ -1750,52 +1755,10 @@ fun SettingsScreen(
                     pickingBitPerfect = false
                     // Leaving the mode needs no warning; entering it hands
                     // volume to the DAC, at full scale.
-                    if (mode == BitPerfectMode.OFF) AppSettings.setBitPerfectMode(mode) else confirmBitPerfect = mode
+                    if (mode == BitPerfectMode.OFF) AppSettings.setBitPerfectMode(mode) else onConfirmBitPerfect(mode)
                 },
             )
         }
-    }
-
-    confirmBitPerfect?.let { mode ->
-        AlertDialog(
-            onDismissRequest = { confirmBitPerfect = null },
-            title = { Text(stringResource(R.string.bit_perfect_confirm_title)) },
-            text = { Text(stringResource(R.string.bit_perfect_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmBitPerfect = null
-                    AppSettings.setBitPerfectMode(mode)
-                }) {
-                    Text(stringResource(R.string.enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmBitPerfect = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
-
-    if (confirmFixedVolume) {
-        AlertDialog(
-            onDismissRequest = { confirmFixedVolume = false },
-            title = { Text(stringResource(R.string.usb_allow_fixed_volume_confirm_title)) },
-            text = { Text(stringResource(R.string.usb_allow_fixed_volume_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmFixedVolume = false
-                    AppSettings.setUsbAllowFixedVolume(true)
-                }) {
-                    Text(stringResource(R.string.enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmFixedVolume = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
     }
 
     // Everything in the Cached songs folder goes with it, so say so first.

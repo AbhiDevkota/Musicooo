@@ -153,6 +153,7 @@ import kotlinx.coroutines.withContext
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.BitPerfectMode
 import com.music.bitchord.ui.AddonBlockedAlert
 import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
@@ -633,6 +634,8 @@ private fun BitChordApp(
     // and the mini player, like every other alert in the app.
     var editingSource by remember { mutableStateOf<SourceConfig?>(null) }
     var confirmJioSaavn by remember { mutableStateOf(false) }
+    var confirmBitPerfect by remember { mutableStateOf<BitPerfectMode?>(null) }
+    var confirmFixedVolume by remember { mutableStateOf(false) }
     /** An addon search row tapped while the quality setting skips its addon; see [AddonBlockedAlert]. */
     var blockedAddonSong by remember { mutableStateOf<com.music.bitchord.data.model.Song?>(null) }
     /** An addon a download just went ahead without, and why; see [SourceRegistry.addonsLeftOutOfDownloads]. */
@@ -3003,6 +3006,8 @@ private fun BitChordApp(
                                 onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                                 onAppLanguage = { showAppLanguage = true },
                                 onEditSignatureApi = { editingSignatureApi = true },
+                                onConfirmBitPerfect = { confirmBitPerfect = it },
+                                onConfirmFixedVolume = { confirmFixedVolume = true },
                                 contentPadding = listPadding,
                             )
                         } else if (page != null) {
@@ -5636,6 +5641,34 @@ private fun BitChordApp(
                     confirmJioSaavn = false
                 },
                 onDismiss = { confirmJioSaavn = false },
+            )
+        }
+
+        confirmBitPerfect?.let { mode ->
+            ConfirmationAlert(
+                hazeState = hazeState,
+                title = stringResource(R.string.bit_perfect_confirm_title),
+                description = stringResource(R.string.bit_perfect_confirm_message),
+                confirmLabel = stringResource(R.string.enable),
+                onConfirm = {
+                    AppSettings.setBitPerfectMode(mode)
+                    confirmBitPerfect = null
+                },
+                onDismiss = { confirmBitPerfect = null },
+            )
+        }
+
+        if (confirmFixedVolume) {
+            ConfirmationAlert(
+                hazeState = hazeState,
+                title = stringResource(R.string.usb_allow_fixed_volume_confirm_title),
+                description = stringResource(R.string.usb_allow_fixed_volume_confirm_message),
+                confirmLabel = stringResource(R.string.enable),
+                onConfirm = {
+                    AppSettings.setUsbAllowFixedVolume(true)
+                    confirmFixedVolume = false
+                },
+                onDismiss = { confirmFixedVolume = false },
             )
         }
 
