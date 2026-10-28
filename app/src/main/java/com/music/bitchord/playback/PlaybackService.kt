@@ -88,6 +88,9 @@ import com.music.bitchord.playback.audio.DirectAudioProbe
 import com.music.bitchord.playback.audio.OutputNegotiator
 import com.music.bitchord.playback.audio.PcmEncoding
 import com.music.bitchord.playback.audio.SourceDescriptor
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectAudioSink
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectRoutingSink
 import com.music.bitchord.playback.audio.bluetooth.BluetoothAudioTracker
 import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
 import com.music.bitchord.MainActivity
@@ -6558,7 +6561,7 @@ class PlaybackService : MediaLibraryService() {
             // the whole session, while the transition filter belongs to
             // one handoff and has to have the last word on it.
             val dspChain = DspChain(spatial, equalizer, transition, loudness)
-            return PrecisionAudioSink(
+            val precision = PrecisionAudioSink(
                 delegate = defaultSink,
                 dspChain = dspChain,
                 enableFloatOutput = enableFloatOutput,
@@ -6570,6 +6573,9 @@ class PlaybackService : MediaLibraryService() {
                 // cannot publish "not exact" over the playing track's verdict.
                 isAudible = { transition === activeFilter },
             )
+            // In front of everything above: a track the bit-perfect output can
+            // carry skips the DSP chain and Media3's sink altogether.
+            return BitPerfectRoutingSink(precision, BitPerfectAudioSink(BitPerfectOutput.forContext(context)))
         }
     }
 
@@ -6763,14 +6769,14 @@ class PlaybackService : MediaLibraryService() {
         return negotiation.output.encoding
     }
 
-    private fun requestOutputReconfiguration() {
+    private fun requestOutputReconfiguration(rebuild: Boolean = false) {
         outputReconfigureJob?.cancel()
         outputReconfigureJob = scope.launch {
             // Replacing two renderers during a blend would cut one half of it.
             // Wait for the short transition to settle, then swap the engine.
             while (crossfade?.isTransitioning() == true) delay(50)
             val requestedFloat = shouldEnableFloatOutput()
-            if (requestedFloat == configuredFloatOutput) {
+            if (requestedFloat == configuredFloatOutput && !rebuild) {
                 applyOutputRoute()
             } else {
                 rebuildPlayersForOutput(requestedFloat)
@@ -6921,6 +6927,11 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch {
             AppSettings.outputPcmMode.drop(1).collect { requestOutputReconfiguration() }
+        }
+        scope.launch {
+            // The sinks decide per format, so the playing track only moves on
+            // or off the exclusive output when its sink is configured again.
+            AppSettings.bitPerfectMode.drop(1).collect { requestOutputReconfiguration(rebuild = true) }
         }
         scope.launch {
             // Not applied to a player mid-transition: [CrossfadeController]

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.AudioFormat
 import android.media.audiofx.AudioEffect
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
@@ -74,6 +75,7 @@ import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SurroundSound
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.WebAssetOff
 import androidx.compose.material.icons.rounded.VolumeUp
@@ -151,7 +153,9 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.OutputPcmMode
+import com.music.bitchord.data.settings.BitPerfectMode
 import com.music.bitchord.playback.AudioOutputStatus
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.R
 import com.music.bitchord.data.sources.DeviceCodecs
@@ -232,6 +236,8 @@ fun SettingsScreen(
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
+    val bitPerfectMode by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
+    val bitPerfectStatus by BitPerfectOutput.status.collectAsStateWithLifecycle()
     val loudnessNormalization by AppSettings.loudnessNormalization.collectAsStateWithLifecycle()
     val loudnessOffOnSpeaker by AppSettings.loudnessOffOnSpeaker.collectAsStateWithLifecycle()
     val outputStatus by AudioOutputStatus.current.collectAsStateWithLifecycle()
@@ -293,6 +299,8 @@ fun SettingsScreen(
     var picking by remember { mutableStateOf<QualityTarget?>(null) }
     var pickingDownloadQuality by remember { mutableStateOf(false) }
     var pickingAutomixPerformance by remember { mutableStateOf(false) }
+    var pickingBitPerfect by remember { mutableStateOf(false) }
+    var confirmBitPerfect by remember { mutableStateOf<BitPerfectMode?>(null) }
     // What the last export or import did, shown on the row that did it rather
     // than as a toast: a backup is the one action here whose outcome nobody can
     // check by looking at the app afterwards. Held per direction, or an import's
@@ -603,6 +611,16 @@ fun SettingsScreen(
                     checked = preferUsbDac,
                     onCheckedChange = AppSettings::setPreferUsbDac,
                     badge = stringResource(R.string.connected).takeIf { outputStatus.isUsb },
+                )
+            }
+            val bitPerfectTitle = stringResource(R.string.bit_perfect_output)
+            row(bitPerfectTitle, "usb", "dac", "exclusive", "hi-res", "bitperfect") {
+                SettingsRow(
+                    icon = Icons.Rounded.Usb,
+                    title = bitPerfectTitle,
+                    subtitle = bitPerfectSubtitle(bitPerfectMode, bitPerfectStatus),
+                    value = bitPerfectMode.localizedLabel(),
+                    onClick = { pickingBitPerfect = true },
                 )
             }
             val loudnessTitle = stringResource(R.string.loudness_normalization)
@@ -1688,6 +1706,44 @@ fun SettingsScreen(
         }
     }
 
+    if (pickingBitPerfect) {
+        ModalBottomSheet(
+            onDismissRequest = { pickingBitPerfect = false },
+            containerColor = MaterialTheme.colorScheme.background,
+        ) {
+            BitPerfectModeSheet(
+                selected = bitPerfectMode,
+                onSelect = { mode ->
+                    pickingBitPerfect = false
+                    // Leaving the mode needs no warning; entering it hands
+                    // volume to the DAC, at full scale.
+                    if (mode == BitPerfectMode.OFF) AppSettings.setBitPerfectMode(mode) else confirmBitPerfect = mode
+                },
+            )
+        }
+    }
+
+    confirmBitPerfect?.let { mode ->
+        AlertDialog(
+            onDismissRequest = { confirmBitPerfect = null },
+            title = { Text(stringResource(R.string.bit_perfect_confirm_title)) },
+            text = { Text(stringResource(R.string.bit_perfect_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmBitPerfect = null
+                    AppSettings.setBitPerfectMode(mode)
+                }) {
+                    Text(stringResource(R.string.enable))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmBitPerfect = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
         AlertDialog(
@@ -2207,6 +2263,122 @@ private fun AutomixPerformanceSheet(
                                 AutomixPerformanceMode.PERFORMANCE -> R.string.automix_mode_performance_subtitle
                             },
                         ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (chosen) {
+                    Spacer(Modifier.width(12.dp))
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = stringResource(R.string.selected),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BitPerfectMode.localizedLabel(): String = stringResource(
+    when (this) {
+        BitPerfectMode.OFF -> R.string.off
+        BitPerfectMode.USB_ANDROID -> R.string.bit_perfect_mode_usb_android
+    },
+)
+
+/** Whether this phone can use [this] at all, independent of what is plugged in. */
+private val BitPerfectMode.isSupported: Boolean
+    get() = when (this) {
+        BitPerfectMode.OFF -> true
+        BitPerfectMode.USB_ANDROID -> Build.VERSION.SDK_INT >= 34
+    }
+
+/**
+ * What the exclusive output is doing now, rather than what was asked of it:
+ * a mode can be on while the playing track still goes through the mixer.
+ */
+@Composable
+private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.Status): String = when {
+    mode == BitPerfectMode.OFF -> stringResource(R.string.bit_perfect_mode_off_subtitle)
+    !mode.isSupported -> stringResource(R.string.bit_perfect_requires_android_14)
+    status.active && !status.exact -> stringResource(
+        R.string.bit_perfect_status_inexact,
+        status.deviceName.orEmpty(),
+    )
+    status.active -> stringResource(
+        R.string.bit_perfect_status_active,
+        status.deviceName.orEmpty(),
+        "%.1f".format(status.sampleRateHz / 1000.0),
+        status.outputBits,
+    )
+    status.fallbackReason != null -> stringResource(R.string.bit_perfect_status_unavailable, status.fallbackReason)
+    else -> stringResource(R.string.bit_perfect_status_waiting)
+}
+
+@Composable
+private fun BitPerfectModeSheet(
+    selected: BitPerfectMode,
+    onSelect: (BitPerfectMode) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+        Row(
+            modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Usb,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(
+                    text = stringResource(R.string.bit_perfect_output),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = stringResource(R.string.bit_perfect_sheet_warning),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+        BitPerfectMode.entries.forEach { mode ->
+            val chosen = mode == selected
+            val supported = mode.isSupported
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = supported) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelect(mode)
+                    }
+                    .padding(horizontal = 22.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = mode.localizedLabel(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (supported) {
+                            MaterialTheme.colorScheme.onBackground
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    Text(
+                        text = when {
+                            !supported -> stringResource(R.string.bit_perfect_requires_android_14)
+                            mode == BitPerfectMode.OFF -> stringResource(R.string.bit_perfect_mode_off_subtitle)
+                            else -> stringResource(R.string.bit_perfect_mode_usb_android_subtitle)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -1032,6 +1032,19 @@
 
     <string name="prefer_usb_dac">Prefer USB DAC</string>
 
+    <string name="bit_perfect_output">Bit-perfect output</string>
+    <string name="bit_perfect_sheet_warning">Sends the track to the DAC unchanged. The equalizer, loudness normalization, crossfade, Automix, playback speed and BitChord\'s volume are bypassed.</string>
+    <string name="bit_perfect_mode_off_subtitle">Audio goes through Android\'s mixer and BitChord\'s effects.</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 opens the DAC at each track\'s own rate and bit depth, without mixing or resampling.</string>
+    <string name="bit_perfect_requires_android_14">Requires Android 14 or later</string>
+    <string name="bit_perfect_confirm_title">Turn on bit-perfect output?</string>
+    <string name="bit_perfect_confirm_message">The DAC gets the music at full scale, and the phone\'s volume buttons may stop working. Turn the DAC or amplifier down before you play.</string>
+    <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
+    <string name="bit_perfect_status_inexact">%1$s · not exact: this source isn\'t lossless PCM</string>
+    <string name="bit_perfect_status_waiting">Waiting for a lossless track on a USB DAC</string>
+    <string name="bit_perfect_status_unavailable">Not available for this track (%1$s)</string>
+
     <string name="loudness_normalization">Loudness normalization</string>
 
     <string name="loudness_normalization_subtitle">Levels every track to the same loudness</string>

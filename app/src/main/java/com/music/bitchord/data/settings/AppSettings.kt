@@ -59,6 +59,22 @@ enum class OutputPcmMode(val label: String) {
 }
 
 /**
+ * Which exclusive output, if any, a track is sent to unchanged.
+ *
+ * Bit-perfect output bypasses the equalizer, loudness normalization,
+ * crossfade, Automix, playback speed and software volume: any of them would
+ * change the samples. Volume belongs to the DAC.
+ *
+ * See [com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput].
+ */
+enum class BitPerfectMode {
+    OFF,
+
+    /** Android 14's bit-perfect mixer for a USB DAC. */
+    USB_ANDROID,
+}
+
+/**
  * What to keep when a track is saved to the device.
  *
  * Deliberately not [AudioQuality]. That enum budgets a *stream*, and is priced
@@ -242,6 +258,9 @@ object AppSettings {
 
     /** Prefer an attached USB audio output over the system's normal route. */
     val preferUsbDac = MutableStateFlow(false)
+
+    /** Unprocessed output to a DAC; see [BitPerfectMode]. */
+    val bitPerfectMode = MutableStateFlow(BitPerfectMode.OFF)
 
     /**
      * Level every track to the same loudness, using YouTube's own
@@ -875,6 +894,9 @@ object AppSettings {
             )
         }.getOrDefault(OutputPcmMode.PCM_16)
         preferUsbDac.value = prefs.getBoolean(KEY_PREFER_USB_DAC, false)
+        bitPerfectMode.value = runCatching {
+            BitPerfectMode.valueOf(prefs.getString(KEY_BIT_PERFECT_MODE, null) ?: BitPerfectMode.OFF.name)
+        }.getOrDefault(BitPerfectMode.OFF)
         loudnessNormalization.value = prefs.getBoolean(KEY_LOUDNESS_NORMALIZATION, true)
         loudnessOffOnSpeaker.value = prefs.getBoolean(KEY_LOUDNESS_OFF_ON_SPEAKER, true)
         dolbyAtmos.value = prefs.getBoolean(KEY_DOLBY_ATMOS, true)
@@ -1610,6 +1632,11 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_PREFER_USB_DAC, value).apply()
     }
 
+    fun setBitPerfectMode(value: BitPerfectMode) {
+        bitPerfectMode.value = value
+        prefs.edit().putString(KEY_BIT_PERFECT_MODE, value.name).apply()
+    }
+
     fun setLoudnessOffOnSpeaker(value: Boolean) {
         loudnessOffOnSpeaker.value = value
         prefs.edit().putBoolean(KEY_LOUDNESS_OFF_ON_SPEAKER, value).apply()
@@ -2048,6 +2075,7 @@ object AppSettings {
     private const val KEY_SKIP_SILENCE = "skip_silence"
     private const val KEY_OUTPUT_PCM_MODE = "output_pcm_mode"
     private const val KEY_PREFER_USB_DAC = "prefer_usb_dac"
+    private const val KEY_BIT_PERFECT_MODE = "bit_perfect_mode"
     private const val KEY_LOUDNESS_NORMALIZATION = "loudness_normalization"
     private const val KEY_LOUDNESS_OFF_ON_SPEAKER = "loudness_off_on_speaker"
     private const val KEY_DOLBY_ATMOS = "dolby_atmos"
