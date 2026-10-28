@@ -30,7 +30,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeMute
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Icon
+import android.view.KeyEvent
+import android.view.Window
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,12 +52,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.playback.audio.bitperfect.DacVolume
+import com.music.bitchord.playback.cast.CastController
+import com.music.bitchord.wear.WearBridge
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -82,6 +89,48 @@ object VolumeHud {
 
     fun pulse(direction: Int, atLimit: Boolean) {
         _pulses.tryEmit(Pulse(direction, atLimit))
+    }
+}
+
+/**
+ * Turns a volume key into a DAC volume step while direct USB output owns the
+ * volume. Returns whether the key was taken.
+ *
+ * Every window that can hold focus has to ask this itself: a key goes to the
+ * focused window, and one that lets it through hands it to the media session,
+ * which now reports the DAC as a remote device — so Android answers with its
+ * own remote-volume panel, the one with a cast icon, instead of this app's.
+ */
+fun handleDacVolumeKey(event: KeyEvent): Boolean {
+    val code = event.keyCode
+    if (code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN) return false
+    if (DacVolume.level.value == null || CastController.state.value.casting || WearBridge.watchOutput.value.active) {
+        return false
+    }
+    if (event.action == KeyEvent.ACTION_DOWN) {
+        val direction = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
+        VolumeHud.pulse(direction, atLimit = !DacVolume.step(direction))
+    }
+    return true
+}
+
+/**
+ * [handleDacVolumeKey] for the dialog window this is composed in: the full
+ * player and any other sheet that takes focus away from the activity.
+ */
+@Composable
+fun DacVolumeKeys() {
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window ?: return
+    DisposableEffect(window) {
+        val original = window.callback
+        val intercepting = object : Window.Callback by original {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+                handleDacVolumeKey(event) || original.dispatchKeyEvent(event)
+        }
+        window.callback = intercepting
+        onDispose {
+            if (window.callback === intercepting) window.callback = original
+        }
     }
 }
 

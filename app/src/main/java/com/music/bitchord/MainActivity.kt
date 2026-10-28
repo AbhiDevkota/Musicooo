@@ -159,9 +159,9 @@ import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.ui.components.AccountProfileSelector
 import com.music.bitchord.ui.components.DacVolumeHud
+import com.music.bitchord.ui.components.DacVolumeKeys
+import com.music.bitchord.ui.components.handleDacVolumeKey
 import com.music.bitchord.ui.components.VolumeHud
-import com.music.bitchord.playback.audio.bitperfect.DacVolume
-import com.music.bitchord.wear.WearBridge
 import com.music.bitchord.ui.navigation.AppDestination
 import com.music.bitchord.ui.navigation.AppRoute
 import com.music.bitchord.ui.components.SpotifyImportAlert
@@ -451,22 +451,11 @@ class MainActivity : AppCompatActivity() {
      * it: Android's music stream no longer reaches that DAC, so the system
      * volume would change nothing anyone hears. Handled here rather than left
      * to the media session so the app's own HUD answers instead of Android's
-     * remote-volume panel; in the background the session takes them.
+     * remote-volume panel; in the background the session takes them. A sheet
+     * in a window of its own asks the same through [DacVolumeKeys].
      */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val code = event.keyCode
-        val volumeKey = code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN
-        if (volumeKey && DacVolume.level.value != null &&
-            !CastController.state.value.casting && !WearBridge.watchOutput.value.active
-        ) {
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                val direction = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
-                VolumeHud.pulse(direction, atLimit = !DacVolume.step(direction))
-            }
-            return true
-        }
-        return super.dispatchKeyEvent(event)
-    }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        handleDacVolumeKey(event) || super.dispatchKeyEvent(event)
 
     /**
      * Requests a window refresh rate without forcing a display mode or
@@ -4179,6 +4168,9 @@ private fun BitChordApp(
                 // scroll from taking the next touch meant for that list.
                 // See [PlayerSheetMotion.attachWindow].
                 val sheetWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+                // The player's window holds focus while it is up, so the volume
+                // keys reach it rather than the activity.
+                DacVolumeKeys()
                 DisposableEffect(sheetWindow, reducePlayerMotion) {
                     if (!reducePlayerMotion) playerSheetMotion.attachWindow(sheetWindow)
                     onDispose { }
