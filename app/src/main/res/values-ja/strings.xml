@@ -175,6 +175,7 @@
     <string name="italian">イタリア語</string>
     <string name="turkish">トルコ語</string>
     <string name="thai">タイ語</string>
+    <string name="korean">韓国語</string>
     <string name="show_all">すべて表示</string>
     <string name="grid_view">グリッド表示</string>
     <string name="list_view">リスト表示</string>
@@ -437,6 +438,8 @@
     <string name="signed_in_as">%1$sとしてログイン済み</string>
     <string name="signing_in">ログイン中…</string>
     <string name="sleep_timer">スリープタイマー</string>
+    <string name="sleep_timer_custom">カスタム</string>
+    <string name="start_sleep_timer">タイマーを開始</string>
     <string name="sources_no_lossless">有効なソースの中にロスレスオーディオを提供できるものがありません。トランスコードなしでロスレスファイルを再生するにはカスタムモジュールを追加してください。</string>
     <string name="sources_order_footer">ソースにトラックがない、またはアクセスできない場合、BitChordは次のソースを試します。YouTubeより上のソースは、より良いバージョンが見つかった場合にその録音を置き換えられます。</string>
     <string name="sources_order_header">ソース（この順番で試行）</string>
@@ -1037,9 +1040,7 @@
 
     <string name="settings_search_empty">No settings match “%1$s”</string>
 
-    <string name="prefer_music_only">Prefer music-only version</string>
 
-    <string name="prefer_music_only_subtitle">For music videos, show the video details while finding and loading the catalogue audio version</string>
     <string name="smart_version_alignment">スマート音声同期</string>
     <string name="smart_version_alignment_subtitle">波形を解析して、対応する再生位置を正確に合わせます</string>
 
@@ -1228,12 +1229,17 @@
     <string name="source_needs_lossless_output">ロスレス出力が必要 · ロスレス対応のデバイスを使用してください</string>
     <string name="source_needs_lossless_bt_codec">ロスレス出力が必要 · Bluetoothは%1$sです。ロスレス対応のデバイスを使用してください</string>
     <string name="source_needs_lossless_bt_unknown">ロスレス出力が必要 · 使用中のBluetoothコーデックを判別できません</string>
+    <string name="source_downloads_on">ダウンロード可</string>
     <string name="source_downloads_off">ストリーミングのみ</string>
     <string name="lossless_output_permission">Bluetoothコーデックを確認</string>
     <string name="lossless_output_permission_detail">付近のデバイスを許可すると、LDACまたはLHDCのヘッドホンでロスレス専用アドオンを使えます</string>
     <string name="cached_songs">キャッシュ済みの曲</string>
     <string name="cached_songs_subtitle">曲キャッシュ内のYouTubeとJioSaavnの曲</string>
     <string name="cached_songs_empty">キャッシュ済みの曲はまだありません。YouTubeやJioSaavnで再生した曲がここに表示されます。</string>
+    <string name="cached_song_partial">一部のみ</string>
+    <string name="remove_from_cache">キャッシュから削除</string>
+    <string name="cached_song_remove">削除</string>
+    <string name="removed_from_cache">曲のキャッシュから削除しました</string>
     <string name="show_cache_folder">キャッシュ済みの曲フォルダを表示</string>
     <string name="show_cache_folder_subtitle">曲キャッシュに保存されたYouTubeとJioSaavnの曲のフォルダをライブラリに追加します</string>
     <string name="song_cache_unlimited">無制限</string>
@@ -1288,6 +1294,10 @@
     <string name="replay_songs_end_week">があなたの1週間を彩りました。</string>
     <string name="replay_summary_end_week">週</string>
     <string name="replay_this_week">今週</string>
+    <string name="replay_period_weekly">週間</string>
+    <string name="replay_period_monthly">月間</string>
+    <string name="replay_period_yearly">年間</string>
+    <string name="replay_period_lifetime">全期間</string>
     <string name="onboarding_title">数百万曲を BitChord でストリーミング</string>
     <string name="onboarding_name_prompt">どうお呼びしましょうか?</string>
     <string name="onboarding_name_hint">あなたの名前</string>
@@ -1332,4 +1342,35 @@
     <string name="wear_os_code_hint">ペア設定コード</string>
     <string name="wear_os_done">完了</string>
     <string name="signed_by">%1$s のサイン</string>
+    <string name="song_info">曲の情報</string>
+    <string name="song_info_album">アルバム</string>
+    <string name="song_info_release_date">リリース日</string>
+    <string name="song_info_views">再生回数 / 視聴回数</string>
+    <string name="song_info_likes">高評価</string>
+    <string name="song_info_comments">コメント</string>
+    <string name="song_info_unavailable">情報なし</string>
+    <string name="song_info_error">一部の情報を読み込めませんでした。</string>
+    <string name="song_info_retry">再試行</string>
+    <string name="no_audio_version">No audio version found for this video</string>
+    <string name="no_video_version">No video version found for this song</string>
+    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="opened_file">開いたファイル</string>
+    <string name="folders">フォルダ</string>
+    <string name="folder">フォルダ</string>
+    <string name="no_local_folders">音楽が入ったフォルダはありません</string>
+    <string name="offline_playlist_empty">このプレイリストはまだ空です。曲のメニューから追加できます。</string>
+    <string name="offline_liked_empty">このデバイスで高く評価した曲がここに表示されます</string>
+    <string name="saved_on_this_device">このデバイスに保存</string>
+    <string name="direct_source_stream_in_party">Listen Together パーティー中はオフ</string>
+    <string name="direct_source_stream">ソースから直接ストリーミング</string>
+    <string name="find_your_mood">気分で探す</string>
+    <string name="progressive_blur">段階的なぼかし</string>
+    <string name="remove_from_history">履歴から削除</string>
+    <string name="remove_from_history_failed">履歴から削除できませんでした</string>
+    <string name="addon_blocked_title">この曲は再生できません</string>
+    <string name="addon_blocked_quality">%1$sの音質は%2$sに設定されています。%3$sの曲はロスレスでのみ再生されます。この曲を再生するには、設定 → 音質で変更してください。</string>
+    <string name="addon_blocked_watch">音楽はウォッチ経由で再生中で、音質がロスレス未満に制限されています。スマートフォンに再生が戻ると、%1$sの曲を再び再生できます。</string>
+    <string name="download_addon_left_out_title">%1$sを使わずにダウンロード中</string>
+    <string name="download_addon_not_allowed">%1$sはダウンロードを許可していないため、曲は他のソースから保存されます。</string>
+    <string name="download_addon_needs_lossless_output">%1$sは有線、USB、またはLDACクラスのヘッドホンが接続されているときのみ音楽を提供します。接続されるまでダウンロードでは使用されないため、曲は他のソースから保存されます。</string>
 </resources>

@@ -1344,6 +1344,62 @@ class SourcesTest {
         assertEquals("JioSaavn", source.displayName)
     }
 
+    /**
+     * A tie goes to the source ranked first, however late it answers. Arrival
+     * order used to decide it, which handed every 320-against-320 download to
+     * JioSaavn's four tenths of a second over the addon the user put first.
+     */
+    @Test
+    fun `a tie goes to the higher-ranked source rather than the quicker one`() = runBlocking {
+        val addon = FakeSource("Ricky's Addon", answerAfterMs = 150, format = StreamFormat("aac", kbps = 320))
+        val jioSaavn = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        val (source, _) = SourceResolver.bestAcross(
+            listOf(addon, jioSaavn),
+            raceTarget(),
+            StreamRequest.Best,
+            waitForAll = true,
+        )!!
+        assertEquals("Ricky's Addon", source.displayName)
+    }
+
+    /**
+     * Running out of time decides on what has answered rather than losing it.
+     * Bounded from outside, a slow addon used to take JioSaavn's answer down
+     * with it, and the download went to YouTube's Opus.
+     */
+    @Test
+    fun `a race that runs out of time keeps the answers already in hand`() = runBlocking {
+        val slow = FakeSource("Ricky's Addon", answerAfterMs = 5_000, format = StreamFormat("flac"))
+        val quick = FakeSource("JioSaavn", answerAfterMs = 5, format = StreamFormat("mp4", kbps = 320))
+        val elapsed = measureTimeMillis {
+            val (source, _) = SourceResolver.bestAcross(
+                listOf(slow, quick),
+                raceTarget(),
+                StreamRequest.Lossless,
+                waitForAll = true,
+                timeoutMs = 300,
+            )!!
+            assertEquals("JioSaavn", source.displayName)
+        }
+        assertTrue("took ${elapsed}ms, so it waited out the slow source", elapsed < 2_000)
+        assertTrue("the slow source was left running", slow.cancelled)
+    }
+
+    /** A candidate the caller can't keep never wins, so it can't push out one it can. */
+    @Test
+    fun `a refined-away candidate leaves the race to the next one`() = runBlocking {
+        val unkeepable = FakeSource("Ricky's Addon", answerAfterMs = 5, format = StreamFormat("flac"))
+        val keepable = FakeSource("JioSaavn", answerAfterMs = 50, format = StreamFormat("mp4", kbps = 320))
+        val (source, _) = SourceResolver.bestAcross(
+            listOf(unkeepable, keepable),
+            raceTarget(),
+            StreamRequest.Lossless,
+            waitForAll = true,
+            refine = { candidate, stream -> stream.takeIf { candidate !== unkeepable } },
+        )!!
+        assertEquals("JioSaavn", source.displayName)
+    }
+
     // ---- Asking ------------------------------------------------------------
 
     /**
@@ -1366,6 +1422,32 @@ class SourcesTest {
         assertEquals(
             "shape of you acoustic",
             TrackMatcher.queries(TrackMatcher.Target("Shape of You (Acoustic)", "")).single(),
+        )
+    }
+
+    @Test
+    fun `drops a Portuguese guest credit from the query`() {
+        assertEquals(
+            listOf("o mundo é mal froid", "o mundo é mal"),
+            TrackMatcher.queries(TrackMatcher.Target("O Mundo É Mal (part. Clara Lima)", "Froid")),
+        )
+        // A numbered part is the title, not a guest credit.
+        assertEquals(
+            "song part",
+            TrackMatcher.queries(TrackMatcher.Target("Song (Part 1)", "")).single(),
+        )
+        // Neither is an English title that merely starts with the word.
+        assertEquals(
+            listOf("part of me"),
+            TrackMatcher.queries(TrackMatcher.Target("Part of Me", "")),
+        )
+    }
+
+    @Test
+    fun `ignores a YouTube type label in the artist slot`() {
+        assertEquals(
+            "lud session 2",
+            TrackMatcher.queries(TrackMatcher.Target("Lud Session 2", "Música")).single(),
         )
     }
 
@@ -1420,6 +1502,45 @@ class SourcesTest {
                 title = "残響散歌",
                 artist = "Aimer",
                 durationSec = 288,
+            ),
+        )
+    }
+
+    /** A CJK head with its Latin filing in brackets is the same title, not packaging. */
+    @Test
+    fun `matches a bracketed CJK translation against its Latin filing`() {
+        assertTrue(
+            matches(
+                song("Love", "Singer", "2:53"),
+                title = "愛(Love)",
+                artist = "Singer",
+                durationSec = 174,
+            ),
+        )
+        assertTrue(
+            matches(
+                song("Love (愛)", "Singer", "2:53"),
+                title = "愛",
+                artist = "Singer",
+                durationSec = 174,
+            ),
+        )
+        // Same-script packaging must not rescue a different title.
+        assertFalse(
+            matches(
+                song("Film Name", "Some Artist", "4:07"),
+                title = "Song Name (From \"Film Name\")",
+                artist = "Singer",
+                durationSec = 247,
+            ),
+        )
+        // One word of a longer aside is not the whole title.
+        assertFalse(
+            matches(
+                song("Night", "Singer", "4:20"),
+                title = "夜に駆ける (Racing Into The Night)",
+                artist = "Singer",
+                durationSec = 260,
             ),
         )
     }

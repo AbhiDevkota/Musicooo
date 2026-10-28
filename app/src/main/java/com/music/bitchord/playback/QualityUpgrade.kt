@@ -208,7 +208,9 @@ object QualityUpgrade {
         // played. [SourceResolver.upgradeFor] applies the real quality bar.
         if (target.title.isBlank() || target.isVideo ||
             mediaId in refused ||
-            !SourceResolver.canSubstituteForYouTube()
+            !SourceResolver.canSubstituteForYouTube() ||
+            // Direct Source Stream plays one stream per track and never swaps.
+            DirectSourceGate.isActive()
         ) {
             inFlight?.cancel()
             return false
@@ -286,6 +288,9 @@ object QualityUpgrade {
         // overruled — see [askByHand].
         if (mediaId !in handAsked && uri.getQueryParameter(MARKER) != null) return false
         if (mediaId in asked || mediaId in refused || pending.containsKey(mediaId)) return false
+        // Direct Source Stream never swaps on its own. Asking by hand still
+        // works: that is the listener overruling the copy, not a background hunt.
+        if (mediaId !in handAsked && DirectSourceGate.isActive()) return false
         // Same widening as [settledForLess]: a track playing off the cache is
         // worth a second look whenever anything outranks YouTube, not only
         // when lossless was asked for.
@@ -723,6 +728,33 @@ object QualityUpgrade {
         (pending.keys + followUps.keys + forced.keys + shelved.keys + auditioning).forEach(::forget)
         asked.clear()
         refused.clear()
+    }
+
+    /**
+     * The quality ceiling just dropped — Settings, a move onto mobile data, or
+     * the watch taking the music. Everything here that was found, or is still
+     * being looked for, under the old one stops counting.
+     *
+     *  - A live lookup still running for a [pending] track was started against
+     *    sources the new ceiling may not pay for. It is cancelled, and the
+     *    track left pending, so the second look runs [SourceResolver.upgradeFor]
+     *    afresh against the sources the new ceiling allows.
+     *  - [followUps] only ever exist to chase a lossless copy, which a lowered
+     *    ceiling is by definition no longer asking for.
+     *  - A [shelved] or [forced] stream from a source the new ceiling skips is
+     *    dropped — except a forced one in [keep]: that is the copy the player
+     *    is reading right now, and every re-open of it has to reach the same
+     *    bytes. It plays out and the next track honours the new ceiling.
+     */
+    fun onCeilingLowered(keep: Set<String>, permitted: (SourceStream) -> Boolean) {
+        pending.replaceAll { _, waiting ->
+            waiting.inFlight?.cancel()
+            waiting.copy(inFlight = null)
+        }
+        followUps.values.forEach { it.inFlight?.cancel() }
+        followUps.clear()
+        shelved.entries.removeIf { !permitted(it.value) }
+        forced.entries.removeIf { (mediaId, stream) -> mediaId !in keep && !permitted(stream) }
     }
 
     // ── Handing the stream to the player ────────────────────────────────────

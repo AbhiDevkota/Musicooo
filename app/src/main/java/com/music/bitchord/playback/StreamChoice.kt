@@ -124,6 +124,18 @@ object StreamChoice {
     }
 
     /**
+     * Releases every choice [drop] says no longer stands — a lowered quality
+     * ceiling, which an addon pinned under the old one must not outlive.
+     *
+     * Only safe for tracks nothing is reading yet. A track already being read
+     * has a half-filled cache entry that only its own stream may finish, which
+     * is why the caller passes the tracks around the playhead in [keep].
+     */
+    fun forgetWhere(keep: Set<String>, drop: (SourceStream) -> Boolean) {
+        chosen.entries.removeIf { (videoId, choice) -> videoId !in keep && drop(choice.stream) }
+    }
+
+    /**
      * Tracks whose substituted stream refused to serve its bytes, and when.
      *
      * [forget] alone is not enough to recover from one. The search behind a
