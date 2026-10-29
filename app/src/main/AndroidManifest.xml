@@ -76,6 +76,15 @@
         tools:targetApi="34">
 
         <!--
+          Lets a release build be sampled with simpleperf or Perfetto from adb,
+          so jank is measured on the build users get rather than on a debug
+          build that is slow for its own reasons. No runtime cost.
+        -->
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
+
+        <!--
           One UI 7+ only routes an app's ongoing notification to Live
           Notifications / the Now Bar if the app opts in here. Ignored by every
           other OEM. Samsung additionally gates the non-media Live Notification

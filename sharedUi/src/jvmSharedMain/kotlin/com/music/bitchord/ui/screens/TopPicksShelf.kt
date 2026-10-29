@@ -45,6 +45,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.gestures.ScrollableState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.ui.AppUi
@@ -62,6 +63,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
 import com.music.bitchord.ui.components.libraryGrid
+import com.music.bitchord.ui.components.MOTION_FRAME_GAP_MS
 import com.music.bitchord.ui.components.LIBRARY_GRID_SPACING
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -638,6 +640,9 @@ private fun loopPhase(periodMs: Int): State<Float> {
                 }
                 last = now
             }
+            // A nine-second breath doesn't need every vsync, and each frame of
+            // it redraws the page under the glass — see MOTION_FRAME_GAP_MS.
+            delay(MOTION_FRAME_GAP_MS)
         }
     }
     return phase
@@ -927,8 +932,17 @@ private class Frame(val left: Float, val top: Float, val side: Float) {
  * above the caption.
  */
 @Composable
-private fun MoodArt(mood: TopPickMood, style: MoodStyle, modifier: Modifier, square: Boolean = false) {
-    val phase by loopPhase(style.periodMs)
+private fun MoodArt(
+    mood: TopPickMood,
+    style: MoodStyle,
+    modifier: Modifier,
+    square: Boolean = false,
+    /** Drawn at rest — see [stillPhase] — and never asks for a frame. */
+    still: Boolean = false,
+) {
+    // Read only in the draw below, so a frame of the loop redraws this canvas
+    // and recomposes nothing.
+    val loop = if (still) null else loopPhase(style.periodMs)
     val cache = remember(mood) { EmblemCache() }
     Canvas(modifier) {
         drawRect(style.background)
@@ -944,8 +958,21 @@ private fun MoodArt(mood: TopPickMood, style: MoodStyle, modifier: Modifier, squ
             Frame(left = (w - side) / 2f, top = h * 0.37f - side / 2f, side = side)
         }
         val stroke = cache.stroke((if (square) 2.dp else 2.5.dp).toPx())
-        drawEmblem(mood, f, phase, style.stroke, stroke, cache)
+        drawEmblem(mood, f, loop?.value ?: mood.stillPhase(), style.stroke, stroke, cache)
     }
+}
+
+/**
+ * Where in its loop a mood's emblem is drawn when it holds still: its start,
+ * where nearly every one is whole and at rest, but for the two that are only
+ * part-way drawn there.
+ */
+private fun TopPickMood.stillPhase(): Float = when (this) {
+    // The pulse partway along the trace, rather than not yet set out.
+    TopPickMood.FITNESS -> 0.55f
+    // A line half typed, with the cursor showing.
+    TopPickMood.WORK -> 0.6f
+    else -> 0f
 }
 
 private val TAU = 2f * PI.toFloat()
@@ -1479,15 +1506,13 @@ internal fun FindYourMoodShelf(onClick: (TopPickMood, String) -> Unit, onShowAll
     val rowState = rememberLazyListState()
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(stringResource(Res.string.find_your_mood), onShowAll = onShowAll)
-        PausedWhileScrolling(rowState) {
-            ShelfRow(
-                contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                state = rowState,
-            ) {
-                items(TopPickMood.entries.filter { it.isCoreMood }, key = { it.name }) { mood ->
-                    MoodTile(mood, onClick, Modifier.width(SHELF_CARD_WIDTH))
-                }
+        ShelfRow(
+            contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            state = rowState,
+        ) {
+            items(TopPickMood.entries.filter { it.isCoreMood }, key = { it.name }) { mood ->
+                MoodTile(mood, onClick, Modifier.width(SHELF_CARD_WIDTH))
             }
         }
     }
@@ -1503,22 +1528,19 @@ fun MoodGridPage(
     onClick: (TopPickMood, String) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
-    artworkMotion: Boolean = true,
-) = CompositionLocalProvider(LocalArtworkMotion provides artworkMotion) {
-    PausedWhileScrolling(gridState) {
-        BoxWithConstraints(modifier.fillMaxSize()) {
-            val grid = libraryGrid(maxWidth - PAGE_GUTTER * 2)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(grid.columns),
-                state = gridState,
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.padding(horizontal = PAGE_GUTTER),
-            ) {
-                gridItems(TopPickMood.entries, key = { it.name }) { mood ->
-                    MoodTile(mood, onClick, Modifier.fillMaxWidth())
-                }
+) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val grid = libraryGrid(maxWidth - PAGE_GUTTER * 2)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(grid.columns),
+            state = gridState,
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(horizontal = PAGE_GUTTER),
+        ) {
+            gridItems(TopPickMood.entries, key = { it.name }) { mood ->
+                MoodTile(mood, onClick, Modifier.fillMaxWidth())
             }
         }
     }
@@ -1536,7 +1558,11 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
                 .clip(RoundedCornerShape(12.dp))
                 .thumbnailBorder(RoundedCornerShape(12.dp)),
         ) {
-            MoodArt(mood, mood.style(), Modifier.fillMaxSize(), square = true)
+            // Still. A shelf of tiles each breathing on its own loop kept the
+            // page under the glass bars redrawing — and the bars' blur with
+            // it — for as long as the shelf was in view; the motion is Top
+            // Picks' own, one card at a time.
+            MoodArt(mood, mood.style(), Modifier.fillMaxSize(), square = true, still = true)
             Icon(
                 painter = painterResource(Res.drawable.ic_logo),
                 contentDescription = null,

@@ -10,6 +10,7 @@ import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -45,6 +46,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +55,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,7 +75,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.components.backdrop.backdrops.SnapshotBackdrop
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 /**
@@ -119,6 +127,9 @@ fun iosMenuColors(): IosMenuColors =
 /** The panel's silhouette: a large, continuously curved corner. */
 val IosMenuShape: Shape = RoundedCornerShape(30.dp).continuous()
 
+/** [IosMenuShape]'s plain rounded-rect twin, for a shadow drawn while it scales. */
+private val IosMenuShadowShape: Shape = RoundedCornerShape(30.dp)
+
 /** Wide enough for "Remove from listening history" on one line or two. */
 val IosMenuWidth = 256.dp
 
@@ -144,6 +155,8 @@ fun Modifier.iosMenuPanel(
     /** Paints the slab in this instead, as the held-item menu does to match its item's plate. */
     fillOverride: Color? = null,
     rimOverride: Color? = null,
+    /** False where the caller casts [iosMenuShadow] itself, apart from the panel. */
+    castsShadow: Boolean = true,
 ): Modifier {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurs = translucent && !reduceDynamicBlur
@@ -154,12 +167,7 @@ fun Modifier.iosMenuPanel(
     } else {
         colors.fill
     }
-    val shadowed = shadow(
-        elevation = 24.dp,
-        shape = IosMenuShape,
-        ambientColor = Color.Black.copy(alpha = 0.30f),
-        spotColor = Color.Black.copy(alpha = 0.30f),
-    )
+    val shadowed = if (castsShadow) iosMenuShadow() else this
     val surface = if (hazeFrost) {
         val style = remember(colors, fill) { menuFrost(colors.fill, alpha = fill.alpha) }
         shadowed.clip(IosMenuShape).optimizedHazeEffect(state = hazeState, style = style)
@@ -172,6 +180,14 @@ fun Modifier.iosMenuPanel(
         .clip(IosMenuShape)
         .border(0.5.dp, rimOverride ?: colors.rim, IosMenuShape)
 }
+
+/** The shadow the menu panel casts. */
+fun Modifier.iosMenuShadow(shape: Shape = IosMenuShape): Modifier = shadow(
+    elevation = 24.dp,
+    shape = shape,
+    ambientColor = Color.Black.copy(alpha = 0.30f),
+    spotColor = Color.Black.copy(alpha = 0.30f),
+)
 
 /**
  * The menu panel's frost drawn from a recorded [backdrop], in [shape] under
@@ -197,6 +213,9 @@ fun Modifier.menuBackdropFrost(backdrop: Backdrop, shape: Shape, fill: Color): M
 
 private val MENU_BLUR = 24.dp
 private const val MENU_BACKDROP_SCALE = 0.25f
+
+/** The longest a menu waits for its frost's still before growing without it. */
+private const val STILL_WAIT_MS = 150L
 
 /** The break between groups: a hairline inset from the panel's edges, with air either side. */
 @Composable
@@ -419,12 +438,30 @@ fun <T : Any> IosMenuPopover(
     val progress = remember { Animatable(0f) }
     LaunchedEffect(open) {
         if (open) {
+            // The opening frame is the heaviest the menu has: every row
+            // composed and measured, the player pausing its canvas, and the
+            // still the frost blurs taken and read back. Grown from that frame,
+            // the spring — which runs on the clock — jumps across it. So the
+            // panel waits, unseen, for that frame and the still to be done;
+            // not when it is coming back from part-way out. Only a still
+            // the panel will frost with is waited for: with no glass, or the
+            // blur reduced, none is taken.
+            if (progress.value == 0f) {
+                withFrameNanos { }
+                withFrameNanos { }
+                (backdrop as? SnapshotBackdrop)?.takeIf {
+                    isGlassSupported() && !AppSettings.reduceDynamicBlur.value
+                }?.let { still ->
+                    withTimeoutOrNull(STILL_WAIT_MS) { snapshotFlow { still.hasStill }.first { it } }
+                }
+            }
             progress.animateTo(
                 1f,
                 if (reduceMotion) {
                     tween(durationMillis = 120, easing = LinearEasing)
                 } else {
-                    spring(dampingRatio = 0.78f, stiffness = 520f)
+                    // Critically damped: it settles without overshooting.
+                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 600f)
                 },
             )
         } else {
@@ -463,14 +500,41 @@ fun <T : Any> IosMenuPopover(
                         onClick = onDismiss,
                     ),
             )
-            Column(
+            // The panel's shadow, cast by a plate of its own behind it: the
+            // panel is drawn into a layer of its own size (see the placement
+            // below), which would cut a shadow of its own off at its edges.
+            // Cast from a plain rounded rect: a shadow that size is a blur
+            // deep enough that the continuous corner can't be told from it,
+            // and the GPU draws a rounded rect's straight off, where a path's
+            // is a mask the size of the panel rasterized on the CPU — again
+            // at each new scale, every frame of the growth.
+            Box(Modifier.iosMenuShadow(IosMenuShadowShape))
+            Box(
                 Modifier
                     // Taps between rows land on the panel, not the scrim under it.
                     .pointerInput(Unit) {}
-                    .iosMenuPanel(translucent = true, backdrop = backdrop, hazeState = hazeState)
-                    .padding(vertical = 8.dp),
+                    .iosMenuPanel(
+                        translucent = true,
+                        backdrop = backdrop,
+                        hazeState = hazeState,
+                        castsShadow = false,
+                    ),
+                propagateMinConstraints = true,
             ) {
-                content(menuItem)
+                // The rows in a layer of their own. The frost under them is
+                // drawn again on every frame of the growth — it holds the
+                // still in place while the panel scales over it — and drawn
+                // in the same layer, every label and glyph went with it, each
+                // frame at a new scale: rasterized again and uploaded again on
+                // the render thread. Apart, they are drawn once, full size,
+                // and only scaled.
+                Column(
+                    Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .padding(vertical = 8.dp),
+                ) {
+                    content(menuItem)
+                }
             }
         },
     ) { measurables, constraints ->
@@ -482,9 +546,10 @@ fun <T : Any> IosMenuPopover(
 
         val scrimPlaceable = measurables[0].measure(Constraints.fixed(width, height))
         val panelWidth = IosMenuWidth.roundToPx().coerceAtMost(width - margin * 2)
-        val panel = measurables[1].measure(
+        val panel = measurables[2].measure(
             Constraints(minWidth = panelWidth, maxWidth = panelWidth, maxHeight = (bottom - top).coerceAtLeast(0)),
         )
+        val shadowPlate = measurables[1].measure(Constraints.fixed(panel.width, panel.height))
         val anchorBounds = menuAnchor?.translate(-overlayOffset)
         val right = anchorBounds?.right?.roundToInt() ?: (width - margin)
         val panelX = (right - panel.width)
@@ -493,17 +558,28 @@ fun <T : Any> IosMenuPopover(
         val hangsDown = anchorBounds != null && anchorBounds.center.y < height / 2f
         val panelY = if (hangsDown) anchorBounds.top.roundToInt().coerceIn(top, lowest) else lowest
 
+        val growth: GraphicsLayerScope.() -> Unit = {
+            val p = progress.value
+            alpha = (p * 2.5f).coerceIn(0f, 1f)
+            if (!reduceMotion) {
+                transformOrigin = TransformOrigin(1f, if (hangsDown) 0f else 1f)
+                val scale = lerp(0.3f, 1f, p)
+                scaleX = scale
+                scaleY = scale
+            }
+        }
         layout(width, height) {
             scrimPlaceable.place(0, 0)
+            shadowPlate.placeWithLayer(panelX, panelY, layerBlock = growth)
             panel.placeWithLayer(panelX, panelY) {
-                val p = progress.value
-                alpha = (p * 2.5f).coerceIn(0f, 1f)
-                if (!reduceMotion) {
-                    transformOrigin = TransformOrigin(1f, if (hangsDown) 0f else 1f)
-                    val scale = lerp(0.3f, 1f, p)
-                    scaleX = scale
-                    scaleY = scale
-                }
+                growth()
+                // Drawn full size into a layer of its own, and only that
+                // picture scaled. Scaled as it was drawn, the panel's
+                // continuous corners — a path, not a rounded rect — were
+                // rasterized again on the CPU for its clips and rim at every
+                // new scale, and uploaded again, frame after frame of the
+                // growth. At one size the masks are made once and kept.
+                compositingStrategy = CompositingStrategy.Offscreen
             }
         }
     }

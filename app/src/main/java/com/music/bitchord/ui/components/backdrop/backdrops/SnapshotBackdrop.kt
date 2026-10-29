@@ -61,6 +61,9 @@ class SnapshotBackdrop internal constructor() : Backdrop {
         requests++
     }
 
+    /** Whether a still is in — for a panel that would rather not open on none. */
+    val hasStill: Boolean get() = image != null
+
     /** Lets the still go; until the next [capture] this draws nothing. */
     fun release() {
         image = null

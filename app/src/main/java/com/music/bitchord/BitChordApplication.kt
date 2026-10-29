@@ -2,6 +2,8 @@ package com.music.bitchord
 
 import android.app.Application
 import androidx.annotation.OptIn
+import androidx.compose.ui.ComposeUiFlags
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.media3.common.util.UnstableApi
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -46,6 +48,7 @@ import kotlin.concurrent.thread
 class BitChordApplication : Application(), SingletonImageLoader.Factory {
 
     @OptIn(UnstableApi::class)
+    @kotlin.OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate() {
         super.onCreate()
         // The player is drawn by the shared UI module; this is what it reads
@@ -64,7 +67,23 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
                     else -> android.util.Log.e(tag, message, error)
                 }
             }
+        } else {
+            // R8 strips android.util.Log from a release build (proguard-rules.pro);
+            // this stops Media3 composing the lines it would have handed it.
+            androidx.media3.common.util.Log.setLogLevel(androidx.media3.common.util.Log.LOG_LEVEL_OFF)
+            // java.util.logging reaches logcat without android.util.Log, through
+            // the handler Android installs on its root logger — the Discord
+            // gateway's connection chatter went out that way.
+            java.util.logging.LogManager.getLogManager().reset()
+            java.util.logging.Logger.getLogger("").level = java.util.logging.Level.OFF
         }
+        // Compose re-votes the window's frame rate from dispatchDraw on every
+        // frame (API 35+), and Samsung's View logs each vote together with a
+        // stack walk of its caller: measured on an S22, 8,000 lines in two
+        // minutes, two stack traces built on the main thread per frame. The app
+        // asks for its refresh rate itself (MainActivity.applyPerformanceMode),
+        // so those votes buy nothing — and they kept resetting that request.
+        ComposeUiFlags.isAdaptiveRefreshRateEnabled = false
         // The Spotify library and import live in the shared module; the tokens are the WebView's.
         SpotifyLibrary.auth = SpotifyLibrary.Auth {
             SpotifyToken.accessToken()?.let { SpotifyLibrary.Tokens(it, SpotifyToken.clientToken()) }
