@@ -35,6 +35,7 @@ import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer
+import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -5221,7 +5222,7 @@ class PlaybackService : MediaLibraryService() {
      * [buildPlayer] builds, because nothing here is ever heard: stock
      * renderers plus the FFmpeg fallback, no spatial processor, no audio
      * session, no focus, no session. The fallback is not optional: without it
-     * a rendition no platform decoder takes (ALAC) can never leave
+     * a rendition only FFmpeg is given (ALAC) can never leave
      * `STATE_BUFFERING`, and every upgrade to one times out unproven.
      *
      * The one thing it does not share is the load control. [farBufferingLoadControl]
@@ -9497,15 +9498,25 @@ class PlaybackService : MediaLibraryService() {
 /**
  * The stock renderers, plus FFmpeg after the MediaCodec one.
  *
- * FFmpeg comes last so it only gets a track no platform decoder takes: ALAC
- * everywhere, and AC-4 and Dolby Digital (Plus, Atmos) on phones without
- * Dolby's own decoder. Atmos then plays as its 5.1 bed, folded down to stereo
- * — the object layer needs Dolby's decoder, which is the only thing that can
- * read it. Same sink as the MediaCodec renderer, so the DSP chain and the
- * precision path see no difference between the two.
+ * FFmpeg comes last so it only gets a track no platform decoder takes: AC-4
+ * and Dolby Digital (Plus, Atmos) on phones without Dolby's own decoder. Atmos
+ * then plays as its 5.1 bed, folded down to stereo — the object layer needs
+ * Dolby's decoder, which is the only thing that can read it. Same sink as the
+ * MediaCodec renderer, so the DSP chain and the precision path see no
+ * difference between the two.
+ *
+ * ALAC goes to FFmpeg on every device, because MediaCodec is never offered it
+ * ([withoutPlatformAlac]). Samsung ships no ALAC codec, which is where FFmpeg
+ * was proved; Qualcomm vendor images ship `c2.qti.alac.sw.decoder`, which
+ * released itself on its first input buffer (realme RMX3842, Android 16) and
+ * misreports position on the tracks it does play. A codec that fails mid-
+ * playback is never retried on the next renderer — the track just falls to
+ * YouTube — so the only fix is not to start there. Nothing is given up: the
+ * vendor codec is software as well, and lossless decoders agree to the bit.
  *
  * Shared by the real players and the upgrade audition, which must be able to
- * decode whatever it is auditioning or it can never prove it.
+ * decode whatever it is auditioning or it can never prove it — and with the
+ * same decoder, or the proof is of something else.
  */
 private open class FfmpegFallbackRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
     override fun buildAudioRenderers(
@@ -9521,7 +9532,7 @@ private open class FfmpegFallbackRenderersFactory(context: Context) : DefaultRen
         super.buildAudioRenderers(
             context,
             extensionRendererMode,
-            mediaCodecSelector,
+            withoutPlatformAlac(mediaCodecSelector),
             enableDecoderFallback,
             audioSink,
             eventHandler,
@@ -9531,3 +9542,26 @@ private open class FfmpegFallbackRenderersFactory(context: Context) : DefaultRen
         out.add(FfmpegAudioRenderer(eventHandler, eventListener, audioSink))
     }
 }
+
+/**
+ * [selector] with no decoders for ALAC, so `MediaCodecAudioRenderer` reports
+ * it unsupported and the track selector hands it to FFmpeg — unless this
+ * build's FFmpeg cannot decode it (an ABI it was not built for), where a
+ * vendor codec is still better than none. Wraps rather than replaces, so a
+ * subclass's own selector (the FLAC one) keeps working underneath.
+ */
+private fun withoutPlatformAlac(selector: MediaCodecSelector) =
+    MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+        if (mimeType == MimeTypes.AUDIO_ALAC && ffmpegDecodesAlac) {
+            emptyList()
+        } else {
+            selector.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+        }
+    }
+
+/**
+ * Asked once per process, and only when an ALAC track is first looked at: the
+ * native library then loads on the playback thread, as it did before, rather
+ * than on the main thread while a player is built.
+ */
+private val ffmpegDecodesAlac by lazy { FfmpegLibrary.supportsFormat(MimeTypes.AUDIO_ALAC) }
