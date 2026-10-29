@@ -494,7 +494,7 @@
     <string name="source_matching">Kaynak eşleştirme</string>
     <string name="upgrade_length_slack">Parça süresi toleransı</string>
     <string name="upgrade_length_slack_subtitle">Yedek akış için izin verilen en fazla süre farkı</string>
-    <string name="upgrade_length_slack_footer">Daha büyük tolerans daha fazla kaynak eşleşmesi kabul eder; daha küçük tolerans daha katıdır. Varsayılan 3 saniyedir.</string>
+    <string name="upgrade_length_slack_footer">Daha büyük tolerans daha fazla kaynak eşleşmesi kabul eder; daha küçük tolerans daha katıdır. Varsayılan 5 saniyedir.</string>
     <string name="seconds_short">%1$d sn</string>
     <string name="spdc_token">sp_dc belirteci</string>
     <string name="spotify_canvas_setup">Spotify\'ı ayarla</string>

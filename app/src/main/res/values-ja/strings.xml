@@ -451,7 +451,7 @@
     <string name="source_matching">ソースの照合</string>
     <string name="upgrade_length_slack">曲の長さの許容差</string>
     <string name="upgrade_length_slack_subtitle">差し替えストリームで許容する長さの最大差</string>
-    <string name="upgrade_length_slack_footer">許容差を大きくするとソースの一致が増え、小さくすると厳しくなります。既定値は3秒です。</string>
+    <string name="upgrade_length_slack_footer">許容差を大きくするとソースの一致が増え、小さくすると厳しくなります。既定値は5秒です。</string>
     <string name="seconds_short">%1$d秒</string>
     <string name="spdc_token">sp_dcトークン</string>
     <string name="spotify_canvas_setup">Spotify を設定</string>

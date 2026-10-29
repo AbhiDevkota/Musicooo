@@ -478,7 +478,7 @@
     <string name="source_matching">Coincidencia de fuentes</string>
     <string name="upgrade_length_slack">Tolerancia de duración</string>
     <string name="upgrade_length_slack_subtitle">Diferencia máxima de duración permitida para un stream de reemplazo</string>
-    <string name="upgrade_length_slack_footer">Una tolerancia mayor acepta más coincidencias de fuentes; una menor es más estricta. El valor predeterminado es 3 segundos.</string>
+    <string name="upgrade_length_slack_footer">Una tolerancia mayor acepta más coincidencias de fuentes; una menor es más estricta. El valor predeterminado es 5 segundos.</string>
     <string name="seconds_short">%1$d s</string>
     <string name="spdc_token">Token sp_dc</string>
     <string name="spotify_canvas_setup">Configurar Spotify</string>

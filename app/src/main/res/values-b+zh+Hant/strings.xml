@@ -450,7 +450,7 @@
     <string name="source_matching">來源匹配</string>
     <string name="upgrade_length_slack">曲目時長容差</string>
     <string name="upgrade_length_slack_subtitle">替換音訊流允許的最大時長差</string>
-    <string name="upgrade_length_slack_footer">容差越大，接受的來源匹配越多；容差越小則越嚴格。預設為 3 秒。</string>
+    <string name="upgrade_length_slack_footer">容差越大，接受的來源匹配越多；容差越小則越嚴格。預設為 5 秒。</string>
     <string name="seconds_short">%1$d 秒</string>
     <string name="spdc_token">sp_dc 令牌</string>
     <string name="spotify_canvas_setup">Spotify Canvas 設定</string>

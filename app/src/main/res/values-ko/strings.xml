@@ -662,7 +662,7 @@
     <string name="source_matching">소스 매칭</string>
     <string name="upgrade_length_slack">음악 길이 허용오차</string>
     <string name="upgrade_length_slack_subtitle">대체 스트림에서 허용할 최대 길이 차이</string>
-    <string name="upgrade_length_slack_footer">허용오차가 클수록 더 많은 소스를 찾습니다. 허용오차가 작을수록 더 엄격합니다. 기본값은 3초입니다.</string>
+    <string name="upgrade_length_slack_footer">허용오차가 클수록 더 많은 소스를 찾습니다. 허용오차가 작을수록 더 엄격합니다. 기본값은 5초입니다.</string>
     <string name="seconds_short">%1$d초</string>
     <string name="spdc_token">sp_dc 토큰</string>
     <string name="spotify_canvas_setup">Spotify Canvas 설정</string>

@@ -466,7 +466,7 @@
     <string name="source_matching">Correspondance des sources</string>
     <string name="upgrade_length_slack">Tolérance de durée</string>
     <string name="upgrade_length_slack_subtitle">Écart de durée maximal autorisé pour un flux de remplacement</string>
-    <string name="upgrade_length_slack_footer">Une tolérance plus large accepte plus de correspondances ; une tolérance plus faible est plus stricte. La valeur par défaut est de 3 secondes.</string>
+    <string name="upgrade_length_slack_footer">Une tolérance plus large accepte plus de correspondances ; une tolérance plus faible est plus stricte. La valeur par défaut est de 5 secondes.</string>
     <string name="seconds_short">%1$d s</string>
     <string name="spdc_token">Jeton sp_dc</string>
     <string name="spotify_canvas_setup">Configurer Spotify</string>

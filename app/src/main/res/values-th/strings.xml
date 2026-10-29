@@ -479,7 +479,7 @@
     <string name="source_matching">การจับคู่แหล่งที่มา</string>
     <string name="upgrade_length_slack">ค่าคลาดเคลื่อนของความยาวแทร็ก</string>
     <string name="upgrade_length_slack_subtitle">ความต่างของความยาวสูงสุดที่ยอมรับสำหรับสตรีมทดแทน</string>
-    <string name="upgrade_length_slack_footer">ค่าคลาดเคลื่อนที่มากขึ้นจะยอมรับการจับคู่ได้มากขึ้น ค่าที่น้อยลงจะเข้มงวดกว่า ค่าเริ่มต้นคือ 3 วินาที</string>
+    <string name="upgrade_length_slack_footer">ค่าคลาดเคลื่อนที่มากขึ้นจะยอมรับการจับคู่ได้มากขึ้น ค่าที่น้อยลงจะเข้มงวดกว่า ค่าเริ่มต้นคือ 5 วินาที</string>
     <string name="seconds_short">%1$d วิ</string>
     <string name="spdc_token">โทเคน sp_dc</string>
     <string name="spotify_canvas_setup">ตั้งค่า Spotify</string>

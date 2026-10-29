@@ -501,6 +501,7 @@ object SourceResolver {
             waitForAll = true,
             strictLength = true,
             requireSharedArtist = true,
+            driftSec = upgradeSlackSec(),
         ) { candidate, stream ->
             worthSwapping(stream.format, playing).also { worth ->
                 // Named rather than skipped silently. This is the one refusal
@@ -840,11 +841,29 @@ object SourceResolver {
      * Either side being unknown is a no. An unverifiable length is not a
      * length that agrees, and the cost of being wrong here is a listener's
      * song replaced mid-play by a different cut of it.
+     *
+     * @param slackSec the listener's own tolerance when it is a swap being
+     *   decided — see [upgradeSlackSec].
      */
-    fun sameRecordingAs(candidateSec: Int?, playingSec: Int?): Boolean {
+    fun sameRecordingAs(candidateSec: Int?, playingSec: Int?, slackSec: Int = UPGRADE_DRIFT_SEC): Boolean {
         if (candidateSec == null || playingSec == null) return false
-        return kotlin.math.abs(candidateSec - playingSec) <= UPGRADE_DRIFT_SEC
+        return kotlin.math.abs(candidateSec - playingSec) <= slackSec
     }
+
+    /**
+     * How far a replacement's runtime may sit from the playing track's for a
+     * mid-song swap: Settings' "Track length tolerance".
+     *
+     * The setting used to reach only the audition and the check after the
+     * swap, both of which run on a stream already chosen. Choosing it ran on
+     * [UPGRADE_DRIFT_SEC] alone, so every candidate between two seconds and
+     * the setting was thrown out before the setting was ever consulted — the
+     * slider could tighten the bar and never loosen it. Measured on 'Take on
+     * Me': a 24-bit/192 kHz remaster at 3:48 against YouTube's 3:45, refused
+     * three seconds out under a tolerance set to five, and the upgrade landed
+     * on the 16-bit album cut instead.
+     */
+    fun upgradeSlackSec(): Int = AppSettings.upgradeLengthSlackSeconds.value
 
     /**
      * Whether anything outranks YouTube right now — i.e. whether a YouTube
@@ -929,6 +948,7 @@ object SourceResolver {
      *   (with what its bytes turned out to be) or refuse it with null.
      * @param timeoutMs ends the race at that point with whatever has already
      *   answered, rather than losing those answers along with the slow ones.
+     * @param driftSec the [strictLength] bar — see [matchAndStream].
      * @return the winning source alongside its stream, so callers can name it in
      *   a log line without searching the list again.
      */
@@ -939,6 +959,7 @@ object SourceResolver {
         waitForAll: Boolean = false,
         strictLength: Boolean = false,
         requireSharedArtist: Boolean = false,
+        driftSec: Int = UPGRADE_DRIFT_SEC,
         refine: suspend (MusicSource, SourceStream) -> SourceStream? = { _, stream -> stream },
         timeoutMs: Long? = null,
         accept: (MusicSource, SourceStream) -> Boolean = { _, _ -> true },
@@ -955,6 +976,7 @@ object SourceResolver {
                         waitForAll,
                         strictLength,
                         requireSharedArtist,
+                        driftSec,
                     )?.let { refine(source, it) }
                 }
             }
@@ -1015,11 +1037,16 @@ object SourceResolver {
      *   instead of answering from whichever of them are quick — affordable only
      *   when nobody is waiting on the first note.
      * @param strictLength requires a candidate's runtime to agree with
-     *   [target]'s to within [UPGRADE_DRIFT_SEC]. Kept apart from [waitForAll]
+     *   [target]'s to within [driftSec]. Kept apart from [waitForAll]
      *   because it is only meaningful when the target *has* a runtime:
      *   [TrackMatcher.withinSeconds] answers false for every candidate against a
      *   null one, so asking for this against a target that never carried a
      *   duration is not a strict search but an empty one.
+     * @param driftSec [UPGRADE_DRIFT_SEC] unless the caller is deciding a
+     *   mid-song swap, which answers to the listener's tolerance instead — see
+     *   [upgradeSlackSec]. A download and the YouTube fallback keep the fixed
+     *   bar: neither cuts into audio already playing, which is what the setting
+     *   is about.
      */
     private suspend fun matchAndStream(
         source: MusicSource,
@@ -1028,6 +1055,7 @@ object SourceResolver {
         waitForAll: Boolean = false,
         strictLength: Boolean = false,
         requireSharedArtist: Boolean = false,
+        driftSec: Int = UPGRADE_DRIFT_SEC,
     ): SourceStream? {
         for (query in TrackMatcher.queries(target)) {
             val candidates = attempt(source) {
@@ -1076,10 +1104,35 @@ object SourceResolver {
             // nothing else is worth cutting a listener's audio for — or filing
             // on their device under the name of the track they asked for.
             if (strictLength) {
-                matches = matches.filter { TrackMatcher.withinSeconds(it, target, UPGRADE_DRIFT_SEC) }
+                val (sameLength, otherLength) = matches.partition {
+                    TrackMatcher.withinSeconds(it, target, driftSec)
+                }
+                // Named rather than dropped silently: a copy refused for its
+                // length reads in the log exactly like a source that never had
+                // it, and the two have opposite fixes.
+                if (otherLength.isNotEmpty()) {
+                    TrackLog.d(
+                        TAG,
+                        "${source.displayName}: ${otherLength.size} match(es) for '${target.title}' outside " +
+                            "±${driftSec}s of ${target.durationSec}s: " +
+                            otherLength.joinToString { "'${it.title}' ${it.durationText ?: "?"}" },
+                    )
+                }
+                matches = sameLength
             }
             if (matches.isEmpty()) continue
-            return streamBest(source, matches, target, request)
+            return streamBest(
+                source,
+                matches,
+                target,
+                request,
+                // The listener's tolerance already decided which runtimes are
+                // the same recording here; narrowing again to a fixed three
+                // seconds would quietly undo a setting of five.
+                sameLengthSec = if (strictLength) maxOf(SAME_RECORDING_SEC, driftSec) else SAME_RECORDING_SEC,
+                // Only the patient lookups can afford to open more than one row.
+                compareRows = waitForAll,
+            )
         }
         return null
     }
@@ -1133,8 +1186,9 @@ object SourceResolver {
         matches: List<Song>,
         target: TrackMatcher.Target,
         wantsLossless: Boolean,
+        sameLengthSec: Int = SAME_RECORDING_SEC,
     ): List<Song> {
-        val sameLength = matches.filter { TrackMatcher.withinSeconds(it, target, SAME_RECORDING_SEC) }
+        val sameLength = matches.filter { TrackMatcher.withinSeconds(it, target, sameLengthSec) }
         val eligible = sameLength.ifEmpty { matches }
         // The immersive mix goes first when the listener asked for immersive
         // audio and the device can decode it. This is not a quality rung and
@@ -1151,8 +1205,17 @@ object SourceResolver {
         }
         if (!wantsLossless) return eligible
         // Stable, so the confidence order [TrackMatcher.ranked] produced
-        // survives inside each tier.
-        return eligible.sortedByDescending { it.sourceQuality == ModuleSource.LOSSLESS }
+        // survives inside each tier. Hi-res ahead of CD quality: both are
+        // [ModuleSource.LOSSLESS], and with one tier for the two a catalogue
+        // holding a 24-bit remaster and a 16-bit album cut of the same song
+        // handed over whichever it happened to list first.
+        return eligible.sortedByDescending {
+            when {
+                it.sourceQuality != ModuleSource.LOSSLESS -> 0
+                it.sourceHiRes -> 2
+                else -> 1
+            }
+        }
     }
 
     /**
@@ -1163,16 +1226,32 @@ object SourceResolver {
      */
     private fun atmosWanted(): Boolean = DeviceCodecs.atmosWanted
 
+    /**
+     * @param compareRows keeps opening the remaining lossless rows after one
+     *   has answered, and returns the best of them by [isBetter], rather than
+     *   the first. Only for a caller that is not holding up a first note: each
+     *   row is another stream call. Row tags say lossless or not, and a hi-res
+     *   hint only where the catalogue gave one — the stream's own format is
+     *   the only place the bit depth and rate are certain.
+     */
     private suspend fun streamBest(
         source: MusicSource,
         matches: List<Song>,
         target: TrackMatcher.Target,
         request: StreamRequest,
+        sameLengthSec: Int = SAME_RECORDING_SEC,
+        compareRows: Boolean = false,
     ): SourceStream? {
         val wantsLossless = request is StreamRequest.Lossless
-        val ordered = preferred(matches, target, wantsLossless)
+        val ordered = preferred(matches, target, wantsLossless, sameLengthSec)
         var settleFor: SourceStream? = null
+        var best: SourceStream? = null
         for (match in ordered.take(STREAM_ATTEMPTS)) {
+            if (best != null) {
+                // Past the first answer, only rows that could beat it: another
+                // lossless one. An immersive answer is beaten by nothing.
+                if (best.format.isDolbyAtmos || match.sourceQuality != ModuleSource.LOSSLESS) break
+            }
             val trackId = SourceRegistry.parseTrackKey(match.videoId)?.second ?: match.videoId
             val opened = attempt(source) { source.stream(trackId, request) } ?: continue
             // The row this URL came from knows how long the recording is; the
@@ -1191,7 +1270,9 @@ object SourceResolver {
                         "duration=${match.durationText ?: "?"} explicit=${match.isExplicit ?: "?"} " +
                         "→ ${served.summary}",
                 )
-                return stream
+                if (!compareRows) return stream
+                if (best == null || isBetter(stream.format, best.format)) best = stream
+                continue
             }
             TrackLog.d(
                 TAG,
@@ -1207,7 +1288,7 @@ object SourceResolver {
             // first.
             settleFor = betterOf(settleFor, stream.copy(belowRequest = true))
         }
-        return settleFor
+        return best ?: settleFor
     }
 
     /**
@@ -1237,6 +1318,16 @@ object SourceResolver {
         // this listener both want.
         if (candidate.isDolbyAtmos != current.isDolbyAtmos) return candidate.isDolbyAtmos
         if (candidate.isLossless != current.isLossless) return candidate.isLossless == true
+        // Between two lossless copies, depth then rate. Bitrate is the wrong
+        // measure for those: a FLAC's states how compressible the recording
+        // was, and most lossless streams state none at all — so a 24/192 and a
+        // 16/44.1 used to tie, and the tie went to whoever ranked first.
+        if (candidate.isLossless == true) {
+            val depth = (candidate.bitDepth ?: 0).compareTo(current.bitDepth ?: 0)
+            if (depth != 0) return depth > 0
+            val rate = (candidate.sampleRateHz ?: 0).compareTo(current.sampleRateHz ?: 0)
+            if (rate != 0) return rate > 0
+        }
         return (candidate.kbps ?: 0) > (current.kbps ?: 0)
     }
 
@@ -1299,13 +1390,14 @@ object SourceResolver {
     private const val STREAM_ATTEMPTS = 3
 
     /**
-     * How far a replacement's runtime may sit from the playing track's before
-     * it stops being the same recording.
+     * How far a stand-in's runtime may sit from the recording asked for, for
+     * the strict matches that are not a mid-song swap — a download, the
+     * YouTube fallback for a failed source. A swap answers to the listener's
+     * own tolerance instead; see [upgradeSlackSec].
      *
-     * Far tighter than [TrackMatcher]'s own tolerance, and deliberately: that
-     * one is deciding what to play, this one is deciding whether to cut the
-     * audio a listener is in the middle of. Two seconds allows for a service
-     * rounding a runtime differently and nothing else.
+     * Far tighter than [TrackMatcher]'s own tolerance, and deliberately: two
+     * seconds allows for a service rounding a runtime differently and nothing
+     * else.
      */
     private const val UPGRADE_DRIFT_SEC = 2
 

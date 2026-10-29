@@ -1634,6 +1634,41 @@ class PlaybackService : MediaLibraryService() {
                     .setHttpRequestHeaders(headers)
                     .build()
             }
+            // The entry already holds YouTube's own bytes, from a play nothing in
+            // this process remembers — a restart, or a [StreamChoice] that has
+            // expired. This open is where those bytes run out, so it is
+            // YouTube's to finish: the race below can hand the rest of the file
+            // to a module, streamed into the middle of a WebM. See
+            // [AudioCache.heldByYouTube].
+            //
+            // The better copy still gets its hearing, the way every other
+            // YouTube start does: marked for the second look, which swaps it in
+            // under the music. Direct Source Stream has settled this before the
+            // cache was read — see [AudioCache.playbackFactory].
+            if (AudioCache.heldByYouTube(dataSpec.key ?: AudioCache.cacheKeyOf(dataSpec.uri))) {
+                val streamUrl = try {
+                    runBlocking(about) {
+                        withTimeout(RESOLVE_TIMEOUT_MS) { StreamResolver.resolve(videoId) }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    throw java.io.IOException("Stream resolution timed out for $videoId", e)
+                }
+                val headers = StreamResolver.mediaHeadersFor(streamUrl)
+                NerdStats.recordSource(videoId, "YouTube")
+                StreamChoice.remember(videoId, SourceStream(streamUrl, headers = headers), substituted = false)
+                if (QualityUpgrade.couldStillUpgrade(videoId, dataSpec.uri)) {
+                    val pending = QualityUpgrade.settledForLess(
+                        mediaId = videoId,
+                        target = SourceResolver.targetIn(dataSpec.uri),
+                        playing = NerdStats.pickedBitrateKbps(videoId)?.let { StreamFormat(kbps = it) },
+                    )
+                    if (!pending) NerdStats.onLosslessRaceEnd(videoId)
+                }
+                return@Resolver dataSpec.buildUpon()
+                    .setUri(Uri.parse(streamUrl))
+                    .setHttpRequestHeaders(headers)
+                    .build()
+            }
             val won = runBlocking(about) {
                 resolveWithModulePriority(
                     videoId = videoId,
@@ -2546,6 +2581,26 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Credits [incoming]'s configured audio format to its own current track,
+     * for a player taken over mid-play.
+     *
+     * [formatListener] reports a format once, when the renderer is configured,
+     * and the incoming player configured its renderer during the blend, while
+     * the listener was still on the outgoing one. So [audioFormatFor] went on
+     * naming the outgoing track for the whole of the incoming one, and
+     * [adoptCachedTrack] — which refuses any format not credited to the track
+     * asking — never got past it: a track crossfaded into from the disk cache
+     * never had its second look, and never showed "Upgrading quality".
+     *
+     * A renderer that has no format yet credits nothing; its callback is still
+     * to come, and now there is a listener to hear it.
+     */
+    private fun adoptFormatOf(incoming: ExoPlayer) {
+        if (incoming.audioFormat == null) return
+        audioFormatFor = incoming.currentMediaItem?.mediaId
+    }
+
     private fun adoptPlayerForVersionSwap(outgoing: ExoPlayer, incoming: ExoPlayer) {
         setSessionOwner(outgoing, owns = false)
         setSessionOwner(incoming, owns = true)
@@ -2562,6 +2617,7 @@ class PlaybackService : MediaLibraryService() {
 
         incoming.addListener(playbackListener)
         incoming.addAnalyticsListener(formatListener)
+        adoptFormatOf(incoming)
 
         mediaSession?.player = newSessionPlayer(incoming, requireNotNull(crossfade))
 
@@ -3418,6 +3474,7 @@ class PlaybackService : MediaLibraryService() {
         spareFilter = heldFilter
         incoming.addListener(playbackListener)
         incoming.addAnalyticsListener(formatListener)
+        adoptFormatOf(incoming)
 
         mediaSession?.player = newSessionPlayer(incoming, requireNotNull(crossfade))
 
@@ -4501,7 +4558,11 @@ class PlaybackService : MediaLibraryService() {
                             ?.duration
                             ?: 0L
                     }
-                    if (ms > 0) return@withTimeoutOrNull (ms / 1000).toInt()
+                    // Rounded, not truncated: catalogue runtimes are whole
+                    // seconds, and truncating a 225.9s stream to 225 spent up to
+                    // a second of the length tolerance before any candidate was
+                    // weighed.
+                    if (ms > 0) return@withTimeoutOrNull ((ms + 500) / 1000).toInt()
                     delay(UPGRADE_PROVE_STEP_MS)
                 }
                 @Suppress("UNREACHABLE_CODE") null
@@ -6194,9 +6255,10 @@ class PlaybackService : MediaLibraryService() {
     private var foreignCachePurgeJob: Job? = null
 
     /**
-     * Lets go of whatever an addon or module served, and whatever Automix
-     * downloaded only to analyse, for tracks the queue has moved past — see
-     * [AudioCache.dropForeignEntries].
+     * Lets go of what an addon or module served that cannot be kept — a partial
+     * file, an upgrade's rendition, a manifest — and whatever Automix
+     * downloaded only to analyse, for tracks the queue has moved past. A whole
+     * addon file stays; see [AudioCache.dropForeignEntries].
      *
      * Delayed so a crossfade has finished with the outgoing track, and a
      * run of skips collapses into one pass. The tracks around the playhead
@@ -6230,9 +6292,12 @@ class PlaybackService : MediaLibraryService() {
      * every resolve from here on, but a lot of playback is never resolved
      * again: read-ahead pins the next track's source ahead of time
      * ([StreamChoice]), an upgrade search started under the old ceiling can
-     * still land ([QualityUpgrade]), and an addon's bytes sit in the cache
-     * under a key the new ceiling reads too. Each of those would keep an addon
-     * playing after the listener asked for it not to, so each is let go here.
+     * still land ([QualityUpgrade]), and a partial addon file sits in the
+     * cache waiting to be finished over the connection the new ceiling is
+     * guarding. Each of those would keep an addon streaming after the listener
+     * asked for it not to, so each is let go here. A whole addon file is not:
+     * playing it off disk costs the connection nothing, which is all the
+     * ceiling is about.
      *
      * Except for what is playing. Its cache entry is half filled and only its
      * own stream may finish it, so it plays out where it is and the new

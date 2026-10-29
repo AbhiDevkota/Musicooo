@@ -363,7 +363,12 @@ object QualityUpgrade {
         // entry here at all: [pending] keeps [couldStillUpgrade] off it for
         // exactly as long as the question is genuinely open, and marking it
         // answered before it has been asked is what made a skip permanent.
-        if (NerdStats.isLosslessMime(playingMime)) {
+        // Dolby Atmos counts as done too, as it does everywhere else here — see
+        // [needsLosslessFollowUp]. A whole addon file now stays in the cache, so
+        // an Atmos mix can be replayed from disk, and [cachedFloor] describes it
+        // only by bitrate: judged as lossy, it would have a stereo FLAC cut in
+        // over the mix the listener chose.
+        if (NerdStats.isLosslessMime(playingMime) || NerdStats.isDolbyAtmosMime(playingMime)) {
             asked += mediaId
             // The codec is named because this line is a dead end — the track is
             // in [asked] by now and will never be offered an upgrade again — and
@@ -469,9 +474,23 @@ object QualityUpgrade {
             // which played for five seconds of silence and was then put back.
             waiting.inFlight?.let { lookup ->
                 val late = runCatching { lookup.await() }.getOrNull()
-                if (late != null &&
-                    SourceResolver.worthSwapping(late.format, waiting.playing) &&
-                    SourceResolver.sameRecordingAs(late.durationSec, effectiveDurationSec)
+                val slack = SourceResolver.upgradeSlackSec()
+                val sameLength = late != null &&
+                    SourceResolver.sameRecordingAs(late.durationSec, effectiveDurationSec, slack)
+                // The live lookup logs "substituted … at <format>" on finding
+                // this, so a refusal that said nothing read as a swap that had
+                // happened. Named, with both runtimes and the bar between them.
+                if (late != null && !sameLength) {
+                    TrackLog.d(
+                        TAG,
+                        "'${waiting.target.title}': the live lookup's ${late.format.summary} runs " +
+                            "${late.durationSec ?: "?"}s against ${effectiveDurationSec ?: "?"}s playing, " +
+                            "outside the ±${slack}s tolerance; searching again",
+                        about = mediaId,
+                    )
+                }
+                if (late != null && sameLength &&
+                    SourceResolver.worthSwapping(late.format, waiting.playing)
                 ) {
                     found = late
                     if (needsLosslessFollowUp(late.format)) {
@@ -605,14 +624,25 @@ object QualityUpgrade {
      *    playing its upgraded copy is exactly the one that should be offered
      *    the revert.
      *  - **A recorded choice that is not a substitute.** `null` means nothing
-     *    resolved this track in this process — it is playing off the disk cache
-     *    — and what is in that entry is genuinely unknown. Today's behaviour is
-     *    kept there deliberately: revert stays on offer as the escape hatch for
-     *    a substitution nothing announced, which is the case it was written for.
+     *    resolved this track in this process — it is playing off the disk cache.
+     *    The entry's own origin tag answers it then, see [cachedOrigin]. Only
+     *    an entry with no tag is genuinely unknown, and revert stays on offer
+     *    there as the escape hatch for a substitution nothing announced.
+     *
+     * @param cachedOrigin who filled the cache entry the item reads from — see
+     *   [AudioCache.originOf]. Without it every track replayed from the cache
+     *   after a restart read as unknown, which is every such track: the menu
+     *   offered "Revert to original" over YouTube's own Opus and hid "Upgrade
+     *   quality", the one row that could have helped.
      */
-    fun isKnownToBePlayingYouTubesOwn(mediaId: String, rendition: String?): Boolean {
+    fun isKnownToBePlayingYouTubesOwn(
+        mediaId: String,
+        rendition: String?,
+        cachedOrigin: AudioCache.Origin? = null,
+    ): Boolean {
         if (rendition != null) return false
-        return StreamChoice.of(mediaId) != null && !StreamChoice.isSubstitute(mediaId)
+        if (StreamChoice.of(mediaId) != null) return !StreamChoice.isSubstitute(mediaId)
+        return cachedOrigin == AudioCache.Origin.YOUTUBE
     }
 
     /**

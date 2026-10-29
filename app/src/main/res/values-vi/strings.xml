@@ -492,7 +492,7 @@
     <string name="source_matching">Khớp nguồn</string>
     <string name="upgrade_length_slack">Dung sai độ dài bản nhạc</string>
     <string name="upgrade_length_slack_subtitle">Chênh lệch thời lượng tối đa cho phép của luồng thay thế</string>
-    <string name="upgrade_length_slack_footer">Dung sai lớn hơn chấp nhận nhiều kết quả khớp hơn; dung sai nhỏ hơn sẽ chặt chẽ hơn. Mặc định là 3 giây.</string>
+    <string name="upgrade_length_slack_footer">Dung sai lớn hơn chấp nhận nhiều kết quả khớp hơn; dung sai nhỏ hơn sẽ chặt chẽ hơn. Mặc định là 5 giây.</string>
     <string name="seconds_short">%1$d giây</string>
     <string name="spdc_token">Token sp_dc</string>
     <string name="spotify_canvas_setup">Thiết lập Spotify</string>

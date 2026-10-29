@@ -6086,14 +6086,17 @@ private fun String?.isDeviceFolder(): Boolean =
  * original" or with "Upgrade quality".
  *
  * See [QualityUpgrade.isKnownToBePlayingYouTubesOwn] for why "known" is doing
- * real work here: an unresolved track playing off the disk cache answers false,
- * and keeps the revert on offer.
+ * real work here: an unresolved track playing off the disk cache is judged by
+ * the origin its cache entry was tagged with, and keeps the revert on offer
+ * only when the entry has none.
  */
 private fun playingYouTubesOwn(videoId: String, controller: MediaController?): Boolean {
     val item = controller?.currentMediaItem?.takeIf { it.mediaId == videoId } ?: return false
+    val uri = item.localConfiguration?.uri
     return QualityUpgrade.isKnownToBePlayingYouTubesOwn(
         videoId,
-        item.localConfiguration?.uri?.let(QualityUpgrade::cacheTag),
+        uri?.let(QualityUpgrade::cacheTag),
+        uri?.let(AudioCache::originOf),
     )
 }
 

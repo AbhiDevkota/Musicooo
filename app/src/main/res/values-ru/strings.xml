@@ -484,7 +484,7 @@
     <string name="source_matching">Сопоставление источников</string>
     <string name="upgrade_length_slack">Допуск по длительности</string>
     <string name="upgrade_length_slack_subtitle">Максимальная разница в длительности для замещающего потока</string>
-    <string name="upgrade_length_slack_footer">Больший допуск принимает больше совпадений из источников; меньший — строже. По умолчанию 3 секунды.</string>
+    <string name="upgrade_length_slack_footer">Больший допуск принимает больше совпадений из источников; меньший — строже. По умолчанию 5 секунды.</string>
     <string name="seconds_short">%1$d с</string>
     <string name="spdc_token">Токен sp_dc</string>
     <string name="spotify_canvas_setup">Настроить Spotify</string>

@@ -14,8 +14,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +31,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.ui.haptics.Haptic
+import com.music.bitchord.ui.haptics.rememberHaptics
 
 /**
  * The iOS 26 switch: a wide green capsule and a white pill of a thumb, which
@@ -48,6 +53,10 @@ import androidx.compose.ui.unit.dp
  * Interactive, it takes up M3's 48dp touch target around the drawn capsule, as
  * M3's does. The settings rows were spaced around that height — a sub-row has
  * no top padding of its own — and without it they close up on each other.
+ *
+ * It buzzes when [checked] flips rather than when it is tapped: most rows also
+ * toggle from their own `onClick`, which never passes through here, and the
+ * value changing is the one thing every path has in common.
  */
 @Composable
 fun IosSwitch(
@@ -80,6 +89,14 @@ fun IosSwitch(
         label = "iosSwitchTrack",
     )
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+
+    val haptics = rememberHaptics()
+    // Skips the first run, so a switch scrolling into view stays quiet.
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(checked) {
+        if (settled) haptics.play(if (checked) Haptic.ToggleOn else Haptic.ToggleOff)
+        settled = true
+    }
 
     Box(
         modifier = modifier
