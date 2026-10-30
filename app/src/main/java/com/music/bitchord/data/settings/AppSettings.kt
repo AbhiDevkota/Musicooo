@@ -127,6 +127,13 @@ enum class ThemeMode(val label: String) {
 }
 
 /**
+ * How the app's SF Pro Display is set. [DEFAULT] draws each weight one cut
+ * lighter and spaces it to Apple Music's own screens; [LEGACY] is the cut the
+ * app shipped with before that, every weight its own and spaced tight.
+ */
+enum class AppFont { DEFAULT, LEGACY }
+
+/**
  * Which of the equaliser's two tabs is driving the sound.
  *
  * One at a time rather than both at once: they are two ways of describing the
@@ -388,6 +395,7 @@ object AppSettings {
 
     val playbackSpeed = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
+    val appFont = MutableStateFlow(AppFont.DEFAULT)
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
@@ -935,6 +943,9 @@ object AppSettings {
         themeMode.value = runCatching {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
+        appFont.value = runCatching {
+            AppFont.valueOf(prefs.getString(KEY_APP_FONT, null) ?: AppFont.DEFAULT.name)
+        }.getOrDefault(AppFont.DEFAULT)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
@@ -1309,6 +1320,11 @@ object AppSettings {
     fun setThemeMode(value: ThemeMode) {
         themeMode.value = value
         prefs.edit().putString(KEY_THEME, value.name).apply()
+    }
+
+    fun setAppFont(value: AppFont) {
+        appFont.value = value
+        prefs.edit().putString(KEY_APP_FONT, value.name).apply()
     }
 
     fun setReduceAnimation(value: Boolean) {
@@ -2115,6 +2131,7 @@ object AppSettings {
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_APP_FONT = "app_font"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"

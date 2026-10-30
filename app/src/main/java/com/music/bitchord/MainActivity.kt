@@ -211,6 +211,7 @@ import com.music.bitchord.playback.fromAutoplay
 import com.music.bitchord.playback.hasYouTubeOriginal
 import com.music.bitchord.playback.loadAutoplayTracks
 import com.music.bitchord.playback.playSongs
+import com.music.bitchord.playback.BoundedQueuePlanner
 import com.music.bitchord.playback.playBoundedContext
 import com.music.bitchord.playback.contextEntryKey
 import com.music.bitchord.playback.toMediaItem
@@ -396,6 +397,7 @@ class MainActivity : AppCompatActivity() {
         MusicLink.consume(intent)
         setContent {
             val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+            val appFont by AppSettings.appFont.collectAsStateWithLifecycle()
             val highPerformance by AppSettings.highPerformanceMode.collectAsStateWithLifecycle()
             val liquidGlassEnabled by AppSettings.liquidGlass.collectAsStateWithLifecycle()
             val iosOverscrollFactory = rememberIosOverscrollFactory()
@@ -409,7 +411,7 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            BitChordTheme(darkTheme = darkTheme) {
+            BitChordTheme(darkTheme = darkTheme, font = appFont) {
                 // The glass surfaces sample this layer, and a layer records only
                 // what is drawn into it — which, for BitChord, is a page that
                 // paints no background of its own. Everywhere a page is not
@@ -1525,7 +1527,12 @@ private fun BitChordApp(
                 // receiver can follow its existing queue semantics. The bounded
                 // service path is local-player-only; the service repeats this
                 // guard for commands that race a newly connected receiver.
-                if (boundedContext && !CastController.state.value.casting) {
+                //
+                // Any list too long to fit the window goes this way too, whatever
+                // page it came from: a whole library in the player is a whole
+                // library re-sent to every media controller on each queue edit.
+                val bounded = boundedContext || songs.size > BoundedQueuePlanner.MAX_PHYSICAL_CONTEXT
+                if (bounded && !CastController.state.value.casting) {
                     c.playBoundedContext(songs, index, source, continuationToken)
                 } else {
                     val result = QueueCoordinator.buildContextQueue(

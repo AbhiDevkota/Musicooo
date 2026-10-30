@@ -2781,6 +2781,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // may be a "Playing from" label from before a rename.
             OfflinePlaylists.get(browseId)?.let { name = it.title }
             val local = localPageState(browseId)
+            // Reopened by id alone — the player's "Playing from" — a page off
+            // the device arrives with only its title, and offline nothing from
+            // YouTube or Apple ever lends it a cover. It takes the cover and
+            // credit its own card had instead.
+            if (local is UiState.Success) {
+                val record = Downloads.recordIdOf(browseId)?.let { Downloads.collections.value[it] }
+                val group = LocalGroups.groupOf(browseId, local.data)
+                if (thumbnailUrl == null) artwork = record?.thumbnailUrl ?: group?.thumbnailUrl
+                if (subtitle.isBlank()) credit = (record?.subtitle ?: group?.subtitle)?.ifBlank { null }
+            }
             val state = when {
                 local != null -> local
                 resolved == BrowseType.ARTIST -> {

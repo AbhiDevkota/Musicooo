@@ -726,6 +726,7 @@ class PlaybackService : MediaLibraryService() {
     private var boundedContextToken: String? = null
     private var boundedContextSource: QueueSource? = null
     private var boundedContextRequest: BoundedContextRequests.Request? = null
+    private var boundedCanonicalJob: Job? = null
     private var boundedContinuationJob: Job? = null
     private var boundedTopUpJob: Job? = null
     /** Coalesced bounded edits waiting for CrossfadeController settlement. */
@@ -2846,8 +2847,13 @@ class PlaybackService : MediaLibraryService() {
             repeatAll = repeatAll,
         )
 
-        QueueShuffle.setCanonicalContext(
-            registered.songs.mapIndexed { index, song ->
+        // Off the main thread: this is the one step here that scales with the
+        // whole list, and [toMediaItem] stats every downloaded track. Shuffle
+        // toggled before it lands reads the player's own rows, then this replaces them.
+        boundedCanonicalJob?.cancel()
+        QueueShuffle.clearCanonicalContext()
+        boundedCanonicalJob = scope.launch(Dispatchers.Default) {
+            val canonicalItems = registered.songs.mapIndexed { index, song ->
                 val canonical = song.copy(queueEntryId = "context:$contextToken:$index")
                 QueueShuffle.withQueueMetadata(
                     canonical.toMediaItem(),
@@ -2855,8 +2861,9 @@ class PlaybackService : MediaLibraryService() {
                     newCanonicalIndex = index,
                     newTier = QueueTier.CONTEXT,
                 )
-            },
-        )
+            }
+            if (isActive) QueueShuffle.setCanonicalContext(canonicalItems)
+        }
 
         val items = boundedMediaItems(plan, window)
         val start = plan.history.size
@@ -2871,6 +2878,8 @@ class PlaybackService : MediaLibraryService() {
     private fun clearBoundedContext() {
         boundedEditState = BoundedQueueEdits.invalidateContext(boundedEditState)
         boundedContextRequest?.handoffToken?.let(BoundedContextRequests::discard)
+        boundedCanonicalJob?.cancel()
+        boundedCanonicalJob = null
         boundedContinuationJob?.cancel()
         boundedContinuationJob = null
         boundedTopUpJob?.cancel()
@@ -3666,9 +3675,7 @@ class PlaybackService : MediaLibraryService() {
                 // has fallen out of the visible 25-song window to the end
                 // instead of deleting it; it becomes upcoming again in the
                 // same order and the loop can continue indefinitely.
-                repeat(expiredHistory) {
-                    exoPlayer.moveMediaItem(0, exoPlayer.mediaItemCount - 1)
-                }
+                exoPlayer.rotateExpiredHistory(expiredHistory)
             } else {
                 exoPlayer.removeMediaItems(0, expiredHistory)
             }
@@ -8767,10 +8774,12 @@ class PlaybackService : MediaLibraryService() {
                 )
             }
 
-            // 2. Fallback to local downloaded songs (offline-ready)
+            // 2. Fallback to local downloaded songs (offline-ready). Capped, as is
+            // the device library below: this answers a headset's play button
+            // with nothing queued, which has no use for the whole collection.
             val downloaded = Downloads.getDownloadedSongs(this@PlaybackService)
             if (downloaded.isNotEmpty()) {
-                val items = downloaded.map { it.toMediaItem() }
+                val items = downloaded.take(BoundedQueuePlanner.MAX_PHYSICAL_CONTEXT).map { it.toMediaItem() }
                 return@future MediaSession.MediaItemsWithStartPosition(
                     ImmutableList.copyOf(items),
                     0,
@@ -8781,7 +8790,7 @@ class PlaybackService : MediaLibraryService() {
             // 3. Fallback to device local music
             val localSongs = LocalMediaRepository.getLocalMusic(this@PlaybackService)
             if (localSongs.isNotEmpty()) {
-                val items = localSongs.map { it.toMediaItem() }
+                val items = localSongs.take(BoundedQueuePlanner.MAX_PHYSICAL_CONTEXT).map { it.toMediaItem() }
                 return@future MediaSession.MediaItemsWithStartPosition(
                     ImmutableList.copyOf(items),
                     0,

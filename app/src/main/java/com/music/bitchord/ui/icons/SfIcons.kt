@@ -64,7 +64,7 @@ import com.composables.sfsymbols.monochrome.SFMusicNote
 import com.composables.sfsymbols.monochrome.SFMusicNoteHouse
 import com.composables.sfsymbols.monochrome.SFMusicNoteList
 import com.composables.sfsymbols.monochrome.SFMusicNoteSlash
-import com.composables.sfsymbols.monochrome.SFPaintbrush
+import com.composables.sfsymbols.monochrome.SFPaintbrushPointed
 import com.composables.sfsymbols.monochrome.SFPencil
 import com.composables.sfsymbols.monochrome.SFPencilTip
 import com.composables.sfsymbols.monochrome.SFPerson
@@ -98,6 +98,7 @@ import com.composables.sfsymbols.monochrome.SFTag
 import com.composables.sfsymbols.monochrome.SFTextAlignleft
 import com.composables.sfsymbols.monochrome.SFTextBadgeMinus
 import com.composables.sfsymbols.monochrome.SFTextBadgePlus
+import com.composables.sfsymbols.monochrome.SFTextformat
 import com.composables.sfsymbols.monochrome.SFTextLineFirstAndArrowtriangleForward
 import com.composables.sfsymbols.monochrome.SFTextLineLastAndArrowtriangleForward
 import com.composables.sfsymbols.monochrome.SFTrash
@@ -130,7 +131,7 @@ object SfIcons {
     val AddAccount: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPersonCropCircleBadgePlus) }
     val Advanced: ImageVector by lazy { bold(SfSymbols.Monochrome.SFWrenchAndScrewdriver) }
     val Animation: ImageVector by lazy { bold(SfSymbols.Monochrome.SFFigureWalkMotion) }
-    val Appearance: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPaintbrush) }
+    val Appearance: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPaintbrushPointed) }
     val Apps: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSquareGrid2x2) }
     val ArrowBack: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronBackward) }
     val AutoAwesome: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSparkles) }
@@ -159,6 +160,7 @@ object SfIcons {
     val FileUpload: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowUpDocument) }
     val FilterAlt: ImageVector by lazy { bold(SfSymbols.Monochrome.SFLine3HorizontalDecreaseCircle) }
     val Folder: ImageVector by lazy { bold(SfSymbols.Monochrome.SFFolder) }
+    val Font: ImageVector by lazy { bold(SfSymbols.Monochrome.SFTextformat) }
     val FrameRate: ImageVector by lazy { bold(SfSymbols.Monochrome.SFStopwatch) }
     val Fullscreen: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowUpLeftAndArrowDownRight) }
     val Gradient: ImageVector by lazy { bold(SfSymbols.Monochrome.SFCircleLefthalfFilled) }
