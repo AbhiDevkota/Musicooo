@@ -72,6 +72,14 @@
     <string name="recent_searches">Son aramalar</string>
     <string name="clear">Temizle</string>
     <string name="search_hint">Sanatçılar, Şarkılar, Sözler ve Daha Fazlası</string>
+    <string name="recognition_title">Şarkı ara</string>
+    <string name="recognition_listening">Müzik dinleniyor…</string>
+    <string name="recognition_hint">Çal, söyle veya mırıldan</string>
+    <string name="recognition_microphone">Mikrofon</string>
+    <string name="recognition_permission_title">Müziği tanımak için mikrofonu etkinleştir</string>
+    <string name="recognition_permission_body">BitChord’un çevrende çalan müziği dinleyebilmesi için mikrofon erişimine izin ver.</string>
+    <string name="recognition_enable_microphone">Mikrofonu etkinleştir</string>
+    <string name="recognition_open_settings">Ayarları aç</string>
     <string name="recent_search_edit">“%1$s” öğesini düzenle</string>
     <string name="recent_search_remove">“%1$s” öğesini son aramalardan kaldır</string>
     <string name="storage_required_save">Şarkıları kaydetmek için depolama erişimi gerekiyor</string>

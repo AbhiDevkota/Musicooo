@@ -67,6 +67,14 @@
     <string name="recent_searches">การค้นหาล่าสุด</string>
     <string name="clear">ล้าง</string>
     <string name="search_hint">ศิลปิน เพลง เนื้อเพลง และอื่น ๆ</string>
+    <string name="recognition_title">ค้นหาเพลง</string>
+    <string name="recognition_listening">กำลังฟังเพลง…</string>
+    <string name="recognition_hint">เล่น ร้อง หรือฮัมเพลง</string>
+    <string name="recognition_microphone">ไมโครโฟน</string>
+    <string name="recognition_permission_title">เปิดใช้ไมโครโฟนเพื่อจดจำเพลง</string>
+    <string name="recognition_permission_body">อนุญาตการเข้าถึงไมโครโฟนเพื่อให้ BitChord ฟังเพลงที่เล่นอยู่รอบตัวคุณ</string>
+    <string name="recognition_enable_microphone">เปิดใช้ไมโครโฟน</string>
+    <string name="recognition_open_settings">เปิดการตั้งค่า</string>
     <string name="recent_search_edit">แก้ไข “%1$s”</string>
     <string name="recent_search_remove">นำ “%1$s” ออกจากการค้นหาล่าสุด</string>
     <string name="storage_required_save">ต้องได้รับสิทธิ์เข้าถึงพื้นที่จัดเก็บเพื่อบันทึกเพลง</string>

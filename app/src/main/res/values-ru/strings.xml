@@ -76,6 +76,14 @@
     <string name="recent_searches">Недавние запросы</string>
     <string name="clear">Очистить</string>
     <string name="search_hint">Исполнители, песни, тексты и многое другое</string>
+    <string name="recognition_title">Найти песню</string>
+    <string name="recognition_listening">Слушаем музыку…</string>
+    <string name="recognition_hint">Включите, спойте или напойте</string>
+    <string name="recognition_microphone">Микрофон</string>
+    <string name="recognition_permission_title">Включите микрофон для распознавания музыки</string>
+    <string name="recognition_permission_body">Разрешите доступ к микрофону, чтобы BitChord мог слушать музыку вокруг вас.</string>
+    <string name="recognition_enable_microphone">Включить микрофон</string>
+    <string name="recognition_open_settings">Открыть настройки</string>
     <string name="recent_search_edit">Изменить «%1$s»</string>
     <string name="recent_search_remove">Удалить «%1$s» из недавних запросов</string>
     <string name="storage_required_save">Для сохранения песен нужен доступ к хранилищу</string>

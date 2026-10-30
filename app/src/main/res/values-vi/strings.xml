@@ -70,6 +70,14 @@
     <string name="recent_searches">Tìm kiếm gần đây</string>
     <string name="clear">Xóa</string>
     <string name="search_hint">Nghệ sĩ, bài hát, lời bài hát và hơn thế nữa</string>
+    <string name="recognition_title">Tìm bài hát</string>
+    <string name="recognition_listening">Đang nghe nhạc…</string>
+    <string name="recognition_hint">Phát, hát hoặc ngân nga</string>
+    <string name="recognition_microphone">Micrô</string>
+    <string name="recognition_permission_title">Bật micrô để nhận diện nhạc</string>
+    <string name="recognition_permission_body">Cho phép truy cập micrô để BitChord nghe nhạc đang phát xung quanh bạn.</string>
+    <string name="recognition_enable_microphone">Bật micrô</string>
+    <string name="recognition_open_settings">Mở cài đặt</string>
     <string name="recent_search_edit">Chỉnh sửa “%1$s”</string>
     <string name="recent_search_remove">Xóa “%1$s” khỏi tìm kiếm gần đây</string>
     <string name="storage_required_save">Cần quyền truy cập bộ nhớ để lưu bài hát</string>

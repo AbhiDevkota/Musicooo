@@ -64,6 +64,14 @@
     <string name="recent_searches">最近搜尋</string>
     <string name="clear">清除</string>
     <string name="search_hint">藝人、歌曲、歌詞等</string>
+    <string name="recognition_title">搜尋歌曲</string>
+    <string name="recognition_listening">正在聆聽音樂…</string>
+    <string name="recognition_hint">播放、演唱或哼唱</string>
+    <string name="recognition_microphone">麥克風</string>
+    <string name="recognition_permission_title">啟用麥克風以辨識音樂</string>
+    <string name="recognition_permission_body">允許存取麥克風，讓 BitChord 聆聽周圍播放的音樂。</string>
+    <string name="recognition_enable_microphone">啟用麥克風</string>
+    <string name="recognition_open_settings">開啟設定</string>
     <string name="recent_search_edit">編輯“%1$s”</string>
     <string name="recent_search_remove">從最近搜尋中移除“%1$s”</string>
     <string name="storage_required_save">需要儲存訪問許可權才能儲存歌曲</string>

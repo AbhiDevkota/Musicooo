@@ -95,9 +95,14 @@
     <string name="recent_searches">Recent searches</string>
     <string name="clear">Clear</string>
     <string name="search_hint">Artists, Songs, Lyrics and More</string>
-    <string name="voice_search_prompt">What do you want to listen to?</string>
-    <string name="voice_search_unavailable">Voice search isn\'t available on this device</string>
-    <string name="voice_search_permission_denied">Microphone access is needed to search with your voice</string>
+    <string name="recognition_title">Search for a song</string>
+    <string name="recognition_listening">Listening for music…</string>
+    <string name="recognition_hint">Play, sing, or hum</string>
+    <string name="recognition_microphone">Microphone</string>
+    <string name="recognition_permission_title">Enable Mic to recognize music</string>
+    <string name="recognition_permission_body">Allow microphone access so BitChord can listen to what\'s playing around you.</string>
+    <string name="recognition_enable_microphone">Enable Mic</string>
+    <string name="recognition_open_settings">Open settings</string>
     <string name="settings_search_hint">Search settings</string>
     <string name="settings_search_empty">No settings match “%1$s”</string>
     <string name="recent_search_edit">Edit “%1$s”</string>

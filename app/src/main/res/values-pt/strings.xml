@@ -70,6 +70,14 @@
     <string name="recent_searches">Pesquisas recentes</string>
     <string name="clear">Limpar</string>
     <string name="search_hint">Artistas, músicas, letras e mais</string>
+    <string name="recognition_title">Procurar uma música</string>
+    <string name="recognition_listening">A ouvir música…</string>
+    <string name="recognition_hint">Reproduza, cante ou assobie</string>
+    <string name="recognition_microphone">Microfone</string>
+    <string name="recognition_permission_title">Ativa o microfone para reconhecer música</string>
+    <string name="recognition_permission_body">Permite o acesso ao microfone para o BitChord ouvir o que está a tocar à tua volta.</string>
+    <string name="recognition_enable_microphone">Ativar microfone</string>
+    <string name="recognition_open_settings">Abrir definições</string>
     <string name="recent_search_edit">Editar “%1$s”</string>
     <string name="recent_search_remove">Remover “%1$s” das pesquisas recentes</string>
     <string name="storage_required_save">É necessário acesso ao armazenamento para salvar músicas</string>

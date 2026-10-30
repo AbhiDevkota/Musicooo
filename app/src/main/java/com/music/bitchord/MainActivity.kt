@@ -260,7 +260,7 @@ import com.music.bitchord.ui.components.QueueActionNoticeHost
 import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
 import com.music.bitchord.ui.components.SearchField
-import com.music.bitchord.ui.components.rememberVoiceSearch
+import com.music.bitchord.ui.components.SongRecognitionDialog
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
 import com.music.bitchord.sharedui.resources.search_addons_hint
@@ -679,15 +679,17 @@ private fun BitChordApp(
     var searchFocusRequested by remember { mutableStateOf(false) }
     val searchFieldFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    // Voice input returns a finished query rather than a keystroke, so it
-    // takes the same path as typing one and pressing the keyboard's Search
-    // key: fill the field, run the search, and drop focus so the results are
-    // what the listening sheet returns to. Null on a device with no
-    // recognizer, which keeps the microphone out of the bar there.
-    val startVoiceSearch = rememberVoiceSearch { spoken ->
-        viewModel.onQueryChange(spoken)
-        viewModel.submitSearch()
+    val softwareKeyboard = LocalSoftwareKeyboardController.current
+    // The microphone opens the in-app recognition sheet, where the permission
+    // request and its denied state live. It no longer waits on a system speech
+    // recognizer, so the icon stays available even on de-Googled builds.
+    var showSongRecognition by remember { mutableStateOf(false) }
+    val startSongRecognition: () -> Unit = {
+        // The full-screen sheet replaces the search field, so leave it with no
+        // keyboard waiting underneath when the sheet closes.
         focusManager.clearFocus()
+        softwareKeyboard?.hide()
+        showSongRecognition = true
     }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
@@ -3489,7 +3491,7 @@ private fun BitChordApp(
                                 onQueryChange = viewModel::onQueryChange,
                                 onSubmit = viewModel::submitSearch,
                                 focusRequester = searchFieldFocus,
-                                onVoiceSearch = startVoiceSearch,
+                                onVoiceSearch = startSongRecognition,
                                 placeholder = org.jetbrains.compose.resources.stringResource(
                                     if (searchSource == SearchSource.LIBRARY) {
                                         SharedRes.string.search_library_hint
@@ -4893,6 +4895,12 @@ private fun BitChordApp(
                     },
                 )
             }
+        }
+
+        // The recognition sheet has its own window, so it sits above the tabs
+        // and the player alike and owns the back press while it is open.
+        if (showSongRecognition) {
+            SongRecognitionDialog(onDismiss = { showSongRecognition = false })
         }
 
         if (showLyricsSources) {

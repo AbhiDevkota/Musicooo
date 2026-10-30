@@ -69,6 +69,14 @@
     <string name="recent_searches">Recherches récentes</string>
     <string name="clear">Effacer</string>
     <string name="search_hint">Artistes, chansons, paroles et plus</string>
+    <string name="recognition_title">Rechercher une chanson</string>
+    <string name="recognition_listening">Écoute de la musique…</string>
+    <string name="recognition_hint">Lancez la musique, chantez ou fredonnez</string>
+    <string name="recognition_microphone">Microphone</string>
+    <string name="recognition_permission_title">Activez le micro pour reconnaître la musique</string>
+    <string name="recognition_permission_body">Autorisez l’accès au micro pour que BitChord écoute ce qui passe autour de vous.</string>
+    <string name="recognition_enable_microphone">Activer le micro</string>
+    <string name="recognition_open_settings">Ouvrir les réglages</string>
     <string name="recent_search_edit">Modifier « %1$s »</string>
     <string name="recent_search_remove">Retirer « %1$s » des recherches récentes</string>
     <string name="storage_required_save">L\'accès au stockage est nécessaire pour enregistrer les chansons</string>
