@@ -107,7 +107,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
@@ -584,9 +583,13 @@ private fun BitChordApp(
         )
     }
     playerSheetMotion.windowInfo = LocalWindowInfo.current
-    // Derived, so a reader hears when a slide starts and ends rather than on
-    // each frame of it.
-    val playerSliding by remember { derivedStateOf { playerSheetMotion.holding } }
+    // Whether a portrait player fully up has the page covered. Derived, so the
+    // page's draw below hears when that flips rather than on every frame of the
+    // sheet's travel: read straight off the fraction, each of those frames
+    // redrew the page's whole window behind the player, glass and blurs and all.
+    val coveredByPlayer by remember {
+        derivedStateOf { showNowPlaying && playerDock.attached && playerDock.openFraction() >= 1f }
+    }
     // "Reduce animation" keeps the player as it always was: M3's own slide up
     // and down, its own scrim and window animations, no pull from the mini
     // player and no artwork flying between the two. Everything below that
@@ -2762,7 +2765,6 @@ private fun BitChordApp(
             // and layout carry on, so the page is current the moment the
             // player starts to come down and this draws again.
             .drawWithContent {
-                val coveredByPlayer = showNowPlaying && playerDock.attached && playerDock.openFraction() >= 1f
                 if (!coveredByPlayer) drawContent()
             },
     ) {
@@ -2867,18 +2869,7 @@ private fun BitChordApp(
                             } else {
                                 Modifier
                             },
-                        )
-                        // The page held as one finished picture while the player
-                        // slides over it: this window redraws on every frame of
-                        // that, and the page's every draw — and every blur's
-                        // sampling of it — was paid again for a page that isn't
-                        // moving, at the player's expense, and in proportion to
-                        // what was in view. Last here so what samples the page
-                        // samples the picture.
-                        .graphicsLayer {
-                            compositingStrategy =
-                                if (playerSliding) CompositingStrategy.Offscreen else CompositingStrategy.Auto
-                        },
+                        ),
                     label = "content",
                 ) { destination ->
                     // Every branch below reads `destination` rather than the
