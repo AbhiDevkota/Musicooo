@@ -136,15 +136,13 @@ fun rememberFullArtworkBlurImage(
  * is a plain image draw: nothing here re-blurs while the player moves or a
  * clip plays over it. A new cover crossfades in over the last one.
  *
- * [dim] runs from 0, a light shade for the main player, to 1, the full scrim
- * the lyrics and queue need. Read in the draw, so it can follow a collapse
- * frame by frame without composing anything.
+ * It looks the same in all three states and reads nothing that moves, so moving
+ * between them never redraws it: only what sits on top of it changes.
  */
 @Composable
 fun FullArtworkBlurBackdrop(
     image: ImageBitmap?,
     modifier: Modifier = Modifier,
-    dim: () -> Float = { 1f },
 ) {
     Box(modifier = modifier.fillMaxSize().background(FallbackBackdrop)) {
         Crossfade(
@@ -163,20 +161,10 @@ fun FullArtworkBlurBackdrop(
             }
         }
 
-        // Lyrics and queue are dense white foregrounds. Preserve the cover's
-        // colour and layout, but keep bright sleeves from lowering contrast.
-        // The main player is a few large controls, and only needs a touch.
-        Canvas(Modifier.fillMaxSize()) {
-            val t = dim().coerceIn(0f, 1f)
-            fun shade(light: Float, full: Float) = Color.Black.copy(alpha = light + (full - light) * t)
-            drawRect(
-                brush = Brush.verticalGradient(
-                    0f to shade(MAIN_DIM_TOP, 0.34f),
-                    0.55f to shade(MAIN_DIM_MIDDLE, 0.48f),
-                    1f to shade(MAIN_DIM_BOTTOM, 0.64f),
-                ),
-            )
-        }
+        // Everything on this is white: the lyrics, the queue and the main
+        // player's controls. Preserve the cover's colour and layout, but keep
+        // bright sleeves from lowering contrast.
+        Canvas(Modifier.fillMaxSize()) { drawRect(brush = FullArtworkScrim) }
     }
 }
 
@@ -436,10 +424,12 @@ private fun DrawScope.drawMesh(mesh: ArtworkMesh, seamY: Float, alpha: Float) {
     )
 }
 
-/** The main player's shade over the blurred cover: just enough for white text. */
-private const val MAIN_DIM_TOP = 0.08f
-private const val MAIN_DIM_MIDDLE = 0.12f
-private const val MAIN_DIM_BOTTOM = 0.20f
+/** The shade over the blurred cover, deepening toward the controls at the foot. */
+private val FullArtworkScrim = Brush.verticalGradient(
+    0f to Color.Black.copy(alpha = 0.34f),
+    0.55f to Color.Black.copy(alpha = 0.48f),
+    1f to Color.Black.copy(alpha = 0.64f),
+)
 
 /** Drawn only until an artwork has been read — never a colour anyone chose. */
 private val FallbackBackdrop = Color(0xFF121212)

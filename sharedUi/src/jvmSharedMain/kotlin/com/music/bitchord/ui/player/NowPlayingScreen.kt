@@ -1693,22 +1693,10 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
-    // Barely dimmed under the main player, where the artwork above runs into it
-    // and a second dark band would show as one; the lyrics and queue get the
-    // full scrim their dense text needs, deepening with the collapse into them.
-    // Read where it is drawn, so the collapse costs no composition here.
-    val currentFullArtworkDim = rememberUpdatedState<() -> Float>(
-        if (landscape || tabletArtworkBackdrop) {
-            { 1f }
-        } else {
-            { p().coerceIn(0f, 1f) }
-        },
-    )
     val fullArtworkBlurContent = remember {
         movableContentOf<Modifier> { backdropModifier ->
             FullArtworkBlurBackdrop(
                 image = currentFullArtworkBlurImage.value,
-                dim = { currentFullArtworkDim.value() },
                 modifier = backdropModifier,
             )
         }

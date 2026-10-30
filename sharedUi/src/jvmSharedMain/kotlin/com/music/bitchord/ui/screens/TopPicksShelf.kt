@@ -35,6 +35,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -500,8 +501,8 @@ private fun TopPick.artistMotion(): CardMotionSource? {
  *
  * Held back with the pictures ([LocalArtworkImages]) so a cold start's feed
  * doesn't wait on it, paused through a scroll ([LocalArtworkScrolling]), and
- * let go of entirely ([LocalArtworkMotion]) while Home isn't being looked at.
- * Only the card holding the row's [ClipSlot] plays; the others keep their
+ * paused and then let go of ([LocalArtworkMotion]) while Home isn't being looked
+ * at. Only the card holding the row's [ClipSlot] plays; the others keep their
  * stills.
  */
 @Composable
@@ -523,23 +524,58 @@ private fun CardMotion(
         onDispose { reportFound?.invoke(false) }
     }
     val canvas = clip ?: return
-    // Leaving composition releases the clip's player and its decoder, which a
-    // pause keeps hold of — worth it while the player is up, which wants one of
-    // its own. The still under it comes back as it goes.
-    if (!LocalArtworkMotion.current || slot?.mayPlay == false) return
-    // Only paused for a scroll: one that's over in a second isn't worth
+    val motion = LocalArtworkMotion.current
+    val mayPlay = slot?.mayPlay != false
+    val scrolling = LocalArtworkScrolling.current
+    // Whether the clip's player exists at all. Building one blocks the main
+    // thread and tearing one down takes its surface with it, so neither may
+    // land on a frame anything is moving on: not mid-fling as the row scrolls
+    // back into view, not on the first frame of Now Playing rising, and not on
+    // the frame it lands back on the mini player. The still under it comes back
+    // as it goes.
+    var mounted by remember { mutableStateOf(false) }
+    LaunchedEffect(motion, mayPlay, scrolling) {
+        when {
+            // The row has handed the slot on, and it does that only at rest.
+            !mayPlay -> mounted = false
+            motion -> if (!mounted) {
+                delay(CLIP_START_DELAY_MS)
+                snapshotFlow { scrolling() }.first { !it }
+                mounted = true
+            }
+            else -> {
+                delay(CLIP_RELEASE_DELAY_MS)
+                mounted = false
+            }
+        }
+    }
+    if (!mounted) return
+    // Only paused for a scroll or for Now Playing passing over: neither is worth
     // fetching, decoding and fading the clip back in for. Read here, so it is
     // this card alone that recomposes as a scroll starts and ends.
-    val scrolling = LocalArtworkScrolling.current
     CanvasArtworkPlayer(
         canvas = canvas,
         isPlaying = true,
         modifier = modifier,
         bottomFade = bottomFade,
         onCoverChanged = onCover,
-        pausedForTransition = scrolling(),
+        pausedForTransition = !motion || scrolling(),
     )
 }
+
+/**
+ * How long a card waits, once nothing stands in its clip's way, to build its
+ * player: long enough for a player closing or a page settling to be finished.
+ */
+private const val CLIP_START_DELAY_MS = 400L
+
+/**
+ * How long a clip stays paused and mounted once the page stops being looked at
+ * before its player and decoder are let go: past the whole of Now Playing's
+ * slide, so the release lands under an opaque player, and so a quick look at
+ * the player and back keeps the clip.
+ */
+private const val CLIP_RELEASE_DELAY_MS = 1_000L
 
 /** The cover size the backdrop is cut from: it ends up 48px wide, so a small copy is plenty. */
 private const val BACKDROP_SOURCE_PX = 160
@@ -648,6 +684,18 @@ private fun loopPhase(periodMs: Int): State<Float> {
     return phase
 }
 
+/**
+ * Keeps a card's drawn artwork as a finished picture between its own frames.
+ *
+ * With its loop held still for a scroll or for Now Playing passing over, a card
+ * still has to be put back on screen on every frame of that movement, and once
+ * more for each blur sampling the page. Drawn outright, that was every one of
+ * the card's stacked gradient paths each time, for a picture that hadn't
+ * changed. As a layer it is one texture, and a frame of the loop itself redraws
+ * this canvas without re-recording the card around it.
+ */
+private val RetainedArt = Modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+
 private fun wave(phase: Float, offset: Float): Float = sin(2f * PI.toFloat() * (phase + offset))
 
 /**
@@ -702,7 +750,7 @@ private fun PersonalStationArt(modifier: Modifier) {
             )
         }
     }
-    Canvas(modifier) {
+    Canvas(modifier.then(RetainedArt)) {
         val w = size.width
         val h = size.height
         val cached = brushes.get(size)
@@ -766,7 +814,7 @@ private fun DiscoveryStationArt(modifier: Modifier) {
             )
         }
     }
-    Canvas(modifier) {
+    Canvas(modifier.then(RetainedArt)) {
         val w = size.width
         val h = size.height
         val cached = brushes.get(size)
@@ -944,7 +992,7 @@ private fun MoodArt(
     // and recomposes nothing.
     val loop = if (still) null else loopPhase(style.periodMs)
     val cache = remember(mood) { EmblemCache() }
-    Canvas(modifier) {
+    Canvas(if (still) modifier else modifier.then(RetainedArt)) {
         drawRect(style.background)
         val w = size.width
         val h = size.height
