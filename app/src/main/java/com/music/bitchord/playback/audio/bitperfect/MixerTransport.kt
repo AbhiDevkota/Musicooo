@@ -146,9 +146,9 @@ internal class MixerTransport private constructor(
             }
 
         /**
-         * The format this DAC would open at for the track: its own when offered,
-         * otherwise the best it has, by [BitPerfectPcm.rankRates] and
-         * [BitPerfectPcm.dacBits]. Null if it offers nothing bit-perfect at all.
+         * The format this DAC would open at for the track: its own when offered.
+         * Failing that, with [convert] the best it has, by [BitPerfectPcm.rankRates]
+         * and [BitPerfectPcm.dacBits]; without it, null.
          */
         fun bestFormat(
             manager: AudioManager,
@@ -156,22 +156,29 @@ internal class MixerTransport private constructor(
             rate: Int,
             channels: Int,
             sourceBits: Int,
+            convert: Boolean,
         ): AudioMixerAttributes? {
             val mask = channelMask(channels)
             val offered = runCatching { manager.getSupportedMixerAttributes(device) }.getOrDefault(emptyList()).filter {
                 it.mixerBehavior == AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT &&
                     it.format.channelMask == mask && bits(it.format.encoding) > 0
             }
-            val bestRate = BitPerfectPcm.rankRates(rate, offered.map { it.format.sampleRate }).firstOrNull() ?: return null
+            val bestRate = if (convert) {
+                BitPerfectPcm.rankRates(rate, offered.map { it.format.sampleRate }).firstOrNull() ?: return null
+            } else {
+                rate
+            }
             val atRate = offered.filter { it.format.sampleRate == bestRate }
-            val outputBits = BitPerfectPcm.dacBits(sourceBits, atRate.map { bits(it.format.encoding) }) ?: return null
+            val depths = atRate.map { bits(it.format.encoding) }
+            val outputBits = (if (convert) BitPerfectPcm.dacBits(sourceBits, depths) else BitPerfectPcm.outputBits(sourceBits, depths))
+                ?: return null
             return atRate.first { bits(it.format.encoding) == outputBits }
         }
 
         /** Opens the DAC at [bestFormat], or explains why not. */
-        fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int): MixerTransport {
+        fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int, convert: Boolean): MixerTransport {
             val usb = usbDevice(manager) ?: throw BitPerfectTransportException("no_usb")
-            val selected = bestFormat(manager, usb, rate, channels, sourceBits)
+            val selected = bestFormat(manager, usb, rate, channels, sourceBits, convert)
                 ?: throw BitPerfectTransportException("unsupported")
             val outputBits = bits(selected.format.encoding)
             val openedRate = selected.format.sampleRate

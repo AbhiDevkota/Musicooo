@@ -7080,6 +7080,13 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch {
+            AppSettings.convertForLimitedDac.drop(1).collect {
+                if (AppSettings.bitPerfectMode.value != BitPerfectMode.OFF) {
+                    requestOutputReconfiguration(rebuild = true)
+                }
+            }
+        }
+        scope.launch {
             // Not applied to a player mid-transition: [CrossfadeController]
             // stacks a beatmatch stretch on top of this setting, and writing the
             // raw value over it would drop the incoming track back to its own

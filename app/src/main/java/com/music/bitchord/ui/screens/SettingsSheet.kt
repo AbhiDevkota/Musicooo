@@ -266,6 +266,7 @@ fun SettingsScreen(
     val bitPerfectReady by BitPerfectOutput.ready.collectAsStateWithLifecycle()
     val dacVolume by BitPerfectOutput.hardwareVolume.collectAsStateWithLifecycle()
     val usbAllowFixedVolume by AppSettings.usbAllowFixedVolume.collectAsStateWithLifecycle()
+    val convertForLimitedDac by AppSettings.convertForLimitedDac.collectAsStateWithLifecycle()
     val loudnessNormalization by AppSettings.loudnessNormalization.collectAsStateWithLifecycle()
     val loudnessOffOnSpeaker by AppSettings.loudnessOffOnSpeaker.collectAsStateWithLifecycle()
     val outputStatus by AudioOutputStatus.current.collectAsStateWithLifecycle()
@@ -718,6 +719,17 @@ fun SettingsScreen(
                         onCheckedChange = { on ->
                             if (on) onConfirmFixedVolume() else AppSettings.setUsbAllowFixedVolume(false)
                         },
+                    )
+                }
+            }
+            if (bitPerfectMode != BitPerfectMode.OFF && bitPerfectMode.isSupported) {
+                val convertTitle = stringResource(R.string.convert_for_limited_dac)
+                row(convertTitle, "convert", "resample", "usb", "dac", "bitperfect", divided = false) {
+                    SettingsSubRow(
+                        title = convertTitle,
+                        subtitle = stringResource(R.string.convert_for_limited_dac_subtitle),
+                        checked = convertForLimitedDac,
+                        onCheckedChange = AppSettings::setConvertForLimitedDac,
                     )
                 }
             }

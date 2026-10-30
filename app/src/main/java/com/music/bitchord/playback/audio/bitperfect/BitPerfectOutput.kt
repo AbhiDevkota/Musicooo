@@ -51,9 +51,9 @@ internal interface BitPerfectOutputs {
  * Whichever sink opens first holds it until it releases; the other is told
  * no and stays on the ordinary path.
  *
- * A route that refused to open is remembered until the attached device or
- * the selected mode changes, so a track that keeps failing is not retried on
- * every buffer.
+ * A route that refused to open is remembered until the attached device, the
+ * selected mode or [AppSettings.convertForLimitedDac] changes, so a track that
+ * keeps failing is not retried on every buffer.
  */
 internal object BitPerfectOutput {
 
@@ -226,7 +226,7 @@ internal object BitPerfectOutput {
                 if (key(mode, device.id, sampleRate, channels, sourceBits) in currentFailures(mode, device.id)) {
                     return false
                 }
-                MixerTransport.bestFormat(manager, device, sampleRate, channels, sourceBits) != null
+                MixerTransport.bestFormat(manager, device, sampleRate, channels, sourceBits, AppSettings.convertForLimitedDac.value) != null
             }
             // Nothing short of opening a stream says whether Android will grant
             // exclusive mode, so the first track of each format finds out.
@@ -242,7 +242,7 @@ internal object BitPerfectOutput {
                     return false
                 }
                 val raw = UsbDirectDevices.rawDescriptors(usb, device) ?: return false
-                UsbDirectTransport.plans(raw, sampleRate, channels, sourceBits).isNotEmpty()
+                UsbDirectTransport.plans(raw, sampleRate, channels, sourceBits, AppSettings.convertForLimitedDac.value).isNotEmpty()
             }
         }
     }
@@ -260,15 +260,16 @@ internal object BitPerfectOutput {
         val manager = context.getSystemService(AudioManager::class.java)
             ?: throw BitPerfectTransportException("no_audio_manager")
         val mode = AppSettings.bitPerfectMode.value
+        val convert = AppSettings.convertForLimitedDac.value
         val transport = when (mode) {
             BitPerfectMode.OFF -> throw BitPerfectTransportException("off")
             BitPerfectMode.USB_ANDROID -> {
                 if (Build.VERSION.SDK_INT < 34) throw BitPerfectTransportException("android_version")
-                MixerTransport.open(manager, sampleRate, channels, sourceBits)
+                MixerTransport.open(manager, sampleRate, channels, sourceBits, convert)
             }
             BitPerfectMode.DAP_EXCLUSIVE -> {
                 if (Build.VERSION.SDK_INT < 27) throw BitPerfectTransportException("android_version")
-                ExclusiveTransport.open(manager, sampleRate, channels, sourceBits)
+                ExclusiveTransport.open(manager, sampleRate, channels, sourceBits, convert)
             }
             BitPerfectMode.USB_DIRECT -> {
                 val usb = UsbDirectDevices.manager(context) ?: throw BitPerfectTransportException("no_usb")
@@ -280,6 +281,7 @@ internal object BitPerfectOutput {
                     rate = sampleRate,
                     channels = channels,
                     sourceBits = sourceBits,
+                    convert = convert,
                     allowFixedVolume = AppSettings.usbAllowFixedVolume.value,
                     rememberedDb = UsbDirectDevices.rememberedVolume(device.deviceId),
                 )
@@ -356,7 +358,7 @@ internal object BitPerfectOutput {
     }
 
     private fun currentFailures(mode: BitPerfectMode, deviceId: Int): MutableSet<String> {
-        val scope = "$mode/$deviceId"
+        val scope = "$mode/$deviceId/${AppSettings.convertForLimitedDac.value}"
         if (failedFor != scope) {
             failed.clear()
             failedFor = scope

@@ -200,7 +200,7 @@ class DacFormatConverterTest {
             subslot = subslot, pcm = true, endpoints = listOf(endpoint),
         )
         val device = UsbDescriptors.Device(alternates = listOf(alternate(1, 16, 2), alternate(2, 24, 3)))
-        val formats = UsbDescriptors.dacFormats(device, 96_000, 2, 24)
+        val formats = UsbDescriptors.dacFormats(device, 96_000, 2, 24, convert = true)
         // Its own rate first, deepest setting first because 24 bits is what the source needs.
         assertEquals(96_000, formats[0].second.sampleRate)
         assertEquals(24, formats[0].second.bits)
@@ -216,8 +216,48 @@ class DacFormatConverterTest {
             interface_ = 1, alternate = 1, channels = 2, bits = 16, subslot = 2, pcm = true,
             rates = listOf(44_100 to 44_100, 48_000 to 48_000), endpoints = listOf(endpoint),
         )
-        val formats = UsbDescriptors.dacFormats(UsbDescriptors.Device(alternates = listOf(alternate)), 96_000, 2, 24)
+        val formats = UsbDescriptors.dacFormats(UsbDescriptors.Device(alternates = listOf(alternate)), 96_000, 2, 24, convert = true)
         assertEquals(listOf(48_000, 44_100), formats.map { it.second.sampleRate })
         assertTrue(formats.all { it.second.bits == 16 })
+    }
+
+    // ---- With conversion off, as it is by default ------------------------------------------
+
+    private val cappedUac1Dac = UsbDescriptors.Device(
+        alternates = listOf(
+            UsbDescriptors.Alternate(
+                interface_ = 1, alternate = 1, channels = 2, bits = 16, subslot = 2, pcm = true,
+                rates = listOf(44_100 to 44_100, 48_000 to 48_000),
+                endpoints = listOf(UsbDescriptors.Endpoint(address = 1, attributes = 1, maxPacket = 1024, interval = 1)),
+            ),
+        ),
+    )
+
+    @Test
+    fun withoutConversionARateTheDacLacksIsNotOffered() {
+        assertTrue(UsbDescriptors.dacFormats(cappedUac1Dac, 96_000, 2, 16, convert = false).isEmpty())
+    }
+
+    @Test
+    fun withoutConversionADepthTheDacLacksIsNotOffered() {
+        assertTrue(UsbDescriptors.dacFormats(cappedUac1Dac, 48_000, 2, 24, convert = false).isEmpty())
+    }
+
+    @Test
+    fun withoutConversionATrackTheDacCanTakeIsOfferedAtItsOwnFormatOnly() {
+        val formats = UsbDescriptors.dacFormats(cappedUac1Dac, 44_100, 2, 16, convert = false)
+        assertEquals(listOf(44_100), formats.map { it.second.sampleRate })
+        assertEquals(listOf(16), formats.map { it.second.bits })
+    }
+
+    @Test
+    fun withoutConversionAUac2DacIsOnlyAskedForTheTracksOwnRate() {
+        val endpoint = UsbDescriptors.Endpoint(address = 1, attributes = 1, maxPacket = 1024, interval = 1)
+        val alternate = UsbDescriptors.Alternate(
+            interface_ = 1, alternate = 1, uac2 = true, clock = 41, channels = 2, bits = 24,
+            subslot = 3, pcm = true, endpoints = listOf(endpoint),
+        )
+        val formats = UsbDescriptors.dacFormats(UsbDescriptors.Device(alternates = listOf(alternate)), 96_000, 2, 24, convert = false)
+        assertEquals(listOf(96_000), formats.map { it.second.sampleRate })
     }
 }

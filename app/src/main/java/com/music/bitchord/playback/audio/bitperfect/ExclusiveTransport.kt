@@ -39,7 +39,8 @@ internal object ExclusiveNative {
  * built in: a DAP's headphone output or line out. The native side opens the
  * stream at the track's own rate and channel count with conversion disabled,
  * and accepts it only if Android granted exclusive mode exactly as asked. If
- * the track's own format is refused, the next best is asked for the same way.
+ * the track's own format is refused and conversion is allowed, the next best
+ * is asked for the same way.
  *
  * The output is pinned to the wired headphone device when there is one, as
  * Mornye does, so a DAP whose default route is its speaker still plays
@@ -124,18 +125,19 @@ internal class ExclusiveTransport private constructor(
          */
         private const val MAX_RATE_ATTEMPTS = 3
 
-        fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int): ExclusiveTransport {
+        fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int, convert: Boolean): ExclusiveTransport {
             val outputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val wired = outputs.firstOrNull {
                 it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET
             }
             val offered = wired?.sampleRates?.takeIf { it.isNotEmpty() }?.toList() ?: BitPerfectPcm.STANDARD_RATES
-            val rates = BitPerfectPcm.rankRates(rate, offered + rate).take(MAX_RATE_ATTEMPTS)
+            val rates = if (convert) BitPerfectPcm.rankRates(rate, offered + rate).take(MAX_RATE_ATTEMPTS) else listOf(rate)
+            val depths = if (convert) listOf(32, 24, 16).filter { it <= sourceBits } else listOf(sourceBits)
             var openedRate = rate
             var failure: Throwable? = null
             var handle = 0L
             search@ for (candidate in rates) {
-                for (bits in listOf(32, 24, 16).filter { it <= sourceBits }) {
+                for (bits in depths) {
                     try {
                         handle = ExclusiveNative.open(candidate, channels, bits, wired?.id ?: 0)
                         openedRate = candidate

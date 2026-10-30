@@ -159,6 +159,7 @@ internal class UsbDirectTransport private constructor(
             rate: Int,
             channels: Int,
             sourceBits: Int,
+            convert: Boolean,
             allowFixedVolume: Boolean,
             rememberedDb: Double?,
         ): UsbDirectTransport {
@@ -166,7 +167,7 @@ internal class UsbDirectTransport private constructor(
             var handle = 0L
             try {
                 val raw = connection.rawDescriptors ?: throw BitPerfectTransportException("no_descriptors")
-                val plans = plans(raw, rate, channels, sourceBits)
+                val plans = plans(raw, rate, channels, sourceBits, convert)
                 if (plans.isEmpty()) throw BitPerfectTransportException("format")
                 handle = try {
                     UsbDirectNative.open(connection.fileDescriptor, UsbDirectNative.encode(plans))
@@ -201,14 +202,14 @@ internal class UsbDirectTransport private constructor(
             }
         }
 
-        /** Every way the attached DAC could carry this stream, best first: unchanged if it can. */
-        fun plans(raw: ByteArray, rate: Int, channels: Int, sourceBits: Int): List<UsbDescriptors.Plan> {
+        /** Every way the attached DAC could carry this stream, best first; only unchanged without [convert]. */
+        fun plans(raw: ByteArray, rate: Int, channels: Int, sourceBits: Int, convert: Boolean): List<UsbDescriptors.Plan> {
             val device = try {
                 UsbDescriptors.parse(raw)
             } catch (_: UsbDescriptors.MalformedDescriptorException) {
                 return emptyList()
             }
-            return UsbDescriptors.dacFormats(device, rate, channels, sourceBits)
+            return UsbDescriptors.dacFormats(device, rate, channels, sourceBits, convert)
                 .mapNotNull { (alternate, format) -> UsbDescriptors.plan(alternate, format) }
                 .take(32)
         }

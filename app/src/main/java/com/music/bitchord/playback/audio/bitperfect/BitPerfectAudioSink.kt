@@ -41,8 +41,9 @@ import kotlin.math.abs
  * ignored. Nothing upstream may scale a sample, and a speed other than 1x
  * would have to be resampled to be heard.
  *
- * The one exception is a track the DAC cannot take at all. [DacFormatConverter]
- * then fits it to what the transport opened at, and the status says so.
+ * The one exception, only with [com.music.bitchord.data.settings.AppSettings.convertForLimitedDac]
+ * on, is a track the DAC cannot take at all. [DacFormatConverter] then fits it
+ * to what the transport opened at, and the status says so.
  *
  * All calls arrive on the playback thread, as Media3 guarantees for a sink.
  */

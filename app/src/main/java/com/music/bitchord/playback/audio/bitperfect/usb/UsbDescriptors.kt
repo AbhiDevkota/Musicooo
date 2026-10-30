@@ -240,18 +240,28 @@ internal object UsbDescriptors {
     }
 
     /**
-     * Everything this DAC might carry a PCM track on, best first: its own rate
+     * Everything this DAC might carry a PCM track on, best first. Without
+     * [convert], only its own rate at depths that hold it. With it: its own rate
      * and depth when there is such a setting, then by [BitPerfectPcm.rankRates],
      * and at each rate the depths that hold the source before the deepest of
      * those that don't. UAC2 lists no rates here, so all of them are candidates
      * and the native side finds out which the DAC's clock accepts.
      */
-    fun dacFormats(device: Device, rate: Int, channels: Int, sourceBits: Int): List<Pair<Alternate, OutputFormat>> =
+    fun dacFormats(
+        device: Device,
+        rate: Int,
+        channels: Int,
+        sourceBits: Int,
+        convert: Boolean,
+    ): List<Pair<Alternate, OutputFormat>> = if (!convert) {
+        formats(device, rate, channels, sourceBits, dsd = false, dop = false)
+    } else {
         BitPerfectPcm.rankRates(rate, BitPerfectPcm.STANDARD_RATES + rate).flatMap { candidate ->
             val (lossless, narrower) = formats(device, candidate, channels, 16, dsd = false, dop = false)
                 .partition { (alternate, _) -> alternate.bits >= sourceBits }
             lossless + narrower.sortedByDescending { (alternate, _) -> alternate.bits }
         }
+    }
 
     /**
      * The endpoint checks that need no device speed: an isochronous OUT data
