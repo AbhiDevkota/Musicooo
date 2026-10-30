@@ -89,7 +89,7 @@ internal fun AudioPopupCard(
                         frost != null -> with(frost) {
                             Modifier.frostPanel(POPUP_CARD_SHAPE, MenuFrostDark.copy(alpha = MENU_FROST_ALPHA))
                         }
-                        else -> Modifier.optimizedHazeEffect(state = hazeState, style = menuFrost(MenuFrostDark))
+                        else -> Modifier.liveMenuFrost(hazeState, MenuFrostDark)
                     }
                 )
                 // Swallows the tap before it reaches the scrim behind, so

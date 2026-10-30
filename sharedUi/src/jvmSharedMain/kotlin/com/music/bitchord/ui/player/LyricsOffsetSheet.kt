@@ -56,8 +56,7 @@ import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.utils.containSheetGestures
 import com.music.bitchord.ui.components.MENU_FROST_ALPHA
 import com.music.bitchord.ui.components.MenuFrostDark
-import com.music.bitchord.ui.components.menuFrost
-import com.music.bitchord.ui.components.optimizedHazeEffect
+import com.music.bitchord.ui.components.liveMenuFrost
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import dev.chrisbanes.haze.HazeState
@@ -129,7 +128,7 @@ internal fun LyricsOffsetSheet(
                             frost != null -> with(frost) {
                                 Modifier.frostPanel(DrawerShape, MenuFrostDark.copy(alpha = MENU_FROST_ALPHA))
                             }
-                            else -> Modifier.optimizedHazeEffect(state = hazeState, style = menuFrost(MenuFrostDark))
+                            else -> Modifier.liveMenuFrost(hazeState, MenuFrostDark)
                         },
                     )
                     .clickable(

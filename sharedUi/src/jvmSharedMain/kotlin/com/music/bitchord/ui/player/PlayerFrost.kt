@@ -60,18 +60,24 @@ val LocalPlayerFrost = staticCompositionLocalOf<PlayerFrost?> { null }
  * still, and [overlays] — its drawers and popups — drawn beside it rather than
  * inside it, so the still is of the player alone. Taken when [overlayOpen]
  * turns true, and let go when it turns false.
+ *
+ * None while [live]: the player is then a full-screen Spotify Canvas that
+ * keeps playing under the panels, and a still of it would sit frozen under a
+ * panel over a moving picture. The panels blur it live instead, off the haze
+ * the clip is a source of — see [liveMenuFrost].
  */
 @Composable
 internal fun FrostedPlayerFrame(
     modifier: Modifier,
     tint: Color,
     frost: PlayerFrost?,
+    live: Boolean,
     /** Read off composition, so a panel opening recomposes nothing here. */
     overlayOpen: () -> Boolean,
     overlays: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    if (frost != null) {
+    if (frost != null && !live) {
         val open by rememberUpdatedState(overlayOpen)
         LaunchedEffect(frost) {
             snapshotFlow { open() }.collectLatest { up ->
@@ -91,7 +97,7 @@ internal fun FrostedPlayerFrame(
             Box(Modifier.fillMaxSize().then(source)) {
                 content()
             }
-            CompositionLocalProvider(LocalPlayerFrost provides frost) {
+            CompositionLocalProvider(LocalPlayerFrost provides frost?.takeIf { !live }) {
                 overlays()
             }
         }

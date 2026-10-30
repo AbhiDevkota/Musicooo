@@ -698,6 +698,13 @@ private fun BitChordApp(
      */
     val playerBackdrop = rememberSnapshotBackdrop()
     /**
+     * The player live instead, while it is a full-screen Spotify Canvas: that
+     * keeps playing under the ⋯ menu, and a still of it would freeze under the
+     * panel. Recorded only while that is the case — see the player's sheet.
+     */
+    val livePlayerBackdrop = rememberLayerBackdrop()
+    var playerLiveCanvas by remember { mutableStateOf(false) }
+    /**
      * The same for a ⋮ or ⋯ menu over a page: a still of everything under it —
      * the page, its bars, the mini player — blurred under the panel. The
      * page's live haze, under a panel growing on a spring, was re-cut and
@@ -2491,6 +2498,7 @@ private fun BitChordApp(
             // A canvas under the ⋯ menu holds still. Asked, not passed — see
             // the parameter.
             menuOpen = { songActions != null && menuFromPlayer && songMenuOrigin == null },
+            onLiveCanvasChanged = { playerLiveCanvas = it },
             isPlaying = player.isPlaying,
             isLoading = playPauseBusy,
             position = player.position,
@@ -2603,7 +2611,7 @@ private fun BitChordApp(
                 songActions = song
                 // Taken on the frame the menu opens on, which is long anyway,
                 // rather than on one of its spring's.
-                if (!AppSettings.reduceDynamicBlur.value) playerBackdrop.capture()
+                if (!AppSettings.reduceDynamicBlur.value && !playerLiveCanvas) playerBackdrop.capture()
             },
             // Pushed over whatever page is under the player, so back from it
             // returns there.
@@ -4700,7 +4708,13 @@ private fun BitChordApp(
                             playerBackdrop.release()
                         }
                     }
-                    Box(if (reduceDynamicBlur) Modifier else Modifier.snapshotBackdropSource(playerBackdrop)) {
+                    Box(
+                        when {
+                            reduceDynamicBlur -> Modifier
+                            playerLiveCanvas -> Modifier.layerBackdrop(livePlayerBackdrop)
+                            else -> Modifier.snapshotBackdropSource(playerBackdrop)
+                        },
+                    ) {
                         CompositionLocalProvider(LocalPlayerDock provides activeDock) {
                             nowPlaying(playerSong)
                         }
@@ -4709,7 +4723,7 @@ private fun BitChordApp(
                         item = songActions?.takeIf { songMenuOrigin == null && menuFromPlayer },
                         anchor = songMenuAnchor,
                         onDismiss = { songActions = null },
-                        backdrop = playerBackdrop,
+                        backdrop = if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop,
                     ) { song ->
                         songMenuBody(song)
                     }

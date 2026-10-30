@@ -308,7 +308,7 @@ private fun TopPickCard(
             }
             TopPickKind.ARTIST_AND_SIMILAR -> {
                 val palette = collagePalette(pick.artistName.orEmpty())
-                ArtistCollageArt(pick.images, palette, Modifier.fillMaxSize(), motion = pick.artistMotion())
+                ArtistCollageArt(pick.images, palette, Modifier.fillMaxSize())
                 eyebrowColor = palette.eyebrow
                 branded = true
             }
@@ -1603,15 +1603,17 @@ private fun collagePalette(name: String): CollagePalette = CollagePalettes[abs(n
 
 /**
  * The artist in a large circle, with up to two related artists in smaller
- * ones beneath it, on a colour that brightens toward the caption. The large
- * circle plays the artist's [motion] clip when Apple has one.
+ * ones beneath it, on a colour that brightens toward the caption.
+ *
+ * Still, unlike the single-artist photo card: an artist's clip is shot for a
+ * full portrait frame, and cut down to a circle among other faces it reads as
+ * a small moving tile rather than the artist.
  */
 @Composable
 private fun ArtistCollageArt(
     images: List<String>,
     palette: CollagePalette,
     modifier: Modifier,
-    motion: CardMotionSource? = null,
 ) {
     BoxWithConstraints(
         modifier.background(Brush.verticalGradient(listOf(palette.top, palette.bottom))),
@@ -1625,7 +1627,7 @@ private fun ArtistCollageArt(
             2 -> listOf(Triple(0.40f, 0.28f, 0.60f), Triple(0.72f, 0.52f, 0.36f))
             else -> listOf(Triple(0.37f, 0.257f, 0.594f), Triple(0.76f, 0.48f, 0.333f), Triple(0.457f, 0.608f, 0.29f))
         }
-        slots.zip(images).forEachIndexed { index, (slot, url) ->
+        slots.zip(images).forEach { (slot, url) ->
             val (cx, cy, d) = slot
             val diameter = w * d
             val circle = Modifier
@@ -1638,7 +1640,6 @@ private fun ArtistCollageArt(
                 contentScale = ContentScale.Crop,
                 modifier = circle.background(Color.Black.copy(alpha = 0.18f)),
             )
-            if (index == 0) CardMotion(motion, circle)
         }
     }
 }

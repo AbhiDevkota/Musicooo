@@ -51,6 +51,20 @@ fun menuFrost(fill: Color, alpha: Float = MENU_FROST_ALPHA): HazeStyle = HazeSty
     fallbackTint = HazeTint(fill),
 )
 
+/**
+ * [menuFrost] blurred live off [state] rather than off a still — for a panel
+ * over something that keeps moving under it, the player's full-screen Spotify
+ * Canvas. Sampled at a tenth: it is re-blurred on every frame of the video, and
+ * under a blur this wide and a slab this opaque, more pixels than that are not
+ * there to be seen.
+ */
+fun Modifier.liveMenuFrost(state: HazeState, fill: Color): Modifier =
+    optimizedHazeEffect(state = state, style = menuFrost(fill)) {
+        inputScale = HazeInputScale.Fixed(LIVE_FROST_INPUT_SCALE)
+    }
+
+private const val LIVE_FROST_INPUT_SCALE = 0.10f
+
 /** How much of the menu panel's slab covers its frost, dark. */
 const val MENU_FROST_ALPHA = 0.80f
 

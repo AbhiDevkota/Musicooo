@@ -439,8 +439,8 @@ internal fun LandscapeCredits(
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     onOverflowChange = { titleOverflowing = it },
-                    // After the title, in the artist line's colour.
-                    trailing = if (song.isExplicit == true) {
+                    // Before the title, in the artist line's colour.
+                    leading = if (song.isExplicit == true) {
                         { ExplicitBadge(artistColor) }
                     } else {
                         null

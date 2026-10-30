@@ -1356,8 +1356,8 @@ internal const val MARQUEE_ARTIST_STAGGER_MS = 3_000L
  *
  * A line too long for its width fades out at its end rather than stopping at
  * a hard edge, as Apple's does, and once it is crawling at its start too — see
- * [marqueeFade]. [trailing] sits after the line, outside the crawl, where
- * Apple puts the explicit badge.
+ * [marqueeFade]. [leading] and [trailing] sit either side of the line,
+ * outside the crawl — the explicit badge goes before the title.
  *
  * With [enabled] false the line holds still at its start — no copies, no
  * animation, nothing left running off screen — and only fades at its end.
@@ -1370,12 +1370,17 @@ internal fun MarqueeText(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     startDelayMillis: Long = 0L,
+    leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onOverflowChange: (Boolean) -> Unit = {},
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(6.dp))
+        }
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
             val maxWidthPx = constraints.maxWidth
             val layout = remember(text, style, maxWidthPx) {

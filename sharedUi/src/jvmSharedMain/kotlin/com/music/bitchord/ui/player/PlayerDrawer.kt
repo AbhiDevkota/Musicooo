@@ -56,8 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.ui.components.MENU_FROST_ALPHA
 import com.music.bitchord.ui.components.MenuFrostDark
-import com.music.bitchord.ui.components.menuFrost
-import com.music.bitchord.ui.components.optimizedHazeEffect
+import com.music.bitchord.ui.components.liveMenuFrost
 import com.music.bitchord.ui.utils.containSheetGestures
 import dev.chrisbanes.haze.HazeState
 import kotlin.math.roundToInt
@@ -218,7 +217,7 @@ fun PlayerDrawer(
                         frost != null -> with(frost) {
                             Modifier.frostPanel(DRAWER_SHAPE, MenuFrostDark.copy(alpha = MENU_FROST_ALPHA))
                         }
-                        else -> Modifier.optimizedHazeEffect(state = hazeState, style = menuFrost(MenuFrostDark))
+                        else -> Modifier.liveMenuFrost(hazeState, MenuFrostDark)
                     }
                 )
                 .clickable(
