@@ -115,6 +115,9 @@ private fun bitExactVerdict(
     // here, so the PCM conversion is a deviation every DSD track carries,
     // whatever the stages after it do.
     dsd -> "No — DSD converted to PCM"
+    bitPerfect.active && bitPerfect.dacLimited ->
+        "No — ${bitPerfect.sourceBits}-bit / ${rateText(bitPerfect.sourceRateHz)} converted to " +
+            "${bitPerfect.deviceName}'s max"
     // Every DSP stage is bypassed on the exclusive output, so the only
     // question left is whether the source itself was integer PCM.
     bitPerfect.active && bitPerfect.exact -> "Yes — bit-perfect to ${bitPerfect.deviceName}"
@@ -319,7 +322,11 @@ fun AudioPipelineDialog(
             // as what it is rather than as a resample, and its output
             // side is the PCM it produced, not the DSD rate.
             val inRate = dsdRateHz ?: nerdStats?.sampleRateHz
-            val outRate = if (dsdRateHz != null) DsdFormat.PCM_RATE else outputStatus.actualSampleRateHz
+            val outRate = when {
+                dsdRateHz != null -> DsdFormat.PCM_RATE
+                bitPerfect.active -> bitPerfect.sampleRateHz
+                else -> outputStatus.actualSampleRateHz
+            }
             val isPassthrough = inRate != null && outRate != null && inRate == outRate
             val ioRateText = if (inRate != null && outRate != null) {
                 "${rateText(inRate)} → ${rateText(outRate)}"
@@ -490,7 +497,7 @@ fun AudioPipelineDialog(
 
                 val mixerText = when {
                     bitPerfect.active ->
-                        "Bypassed (bit-perfect)"
+                        if (bitPerfect.dacLimited) "Bypassed (DAC max)" else "Bypassed (bit-perfect)"
                     outputStatus.directPlaybackActual ->
                         "Direct path active; endpoint format not independently verified"
                     outputStatus.systemMixerRateHz != null -> {

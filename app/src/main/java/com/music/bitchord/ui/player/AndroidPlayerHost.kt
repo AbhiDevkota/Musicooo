@@ -253,12 +253,17 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
 private fun AudioOutputStatus.Snapshot.toOutputFormat(bitPerfect: BitPerfectOutput.Status): OutputFormatUi {
     val encoding = if (bitPerfect.active) "${bitPerfect.outputBits}-bit PCM" else AudioOutputStatus.encodingLabel(this)
     val rate = (if (bitPerfect.active) bitPerfect.sampleRateHz else actualSampleRateHz)?.takeIf { it > 0 }
-    val summary = if (rate == null) {
+    val format = if (rate == null) {
         encoding
     } else {
         "$encoding · ${"%.1f".format(Locale.ROOT, rate / 1000f).removeSuffix(".0")} kHz"
     }
-    return OutputFormatUi(summary = summary, bitPerfect = bitPerfect.active && bitPerfect.exact)
+    val dacLimited = bitPerfect.active && bitPerfect.dacLimited
+    return OutputFormatUi(
+        summary = if (dacLimited) "$format · DAC max" else format,
+        bitPerfect = bitPerfect.active && bitPerfect.exact,
+        dacLimited = dacLimited,
+    )
 }
 
 private fun ListenTogether.State.toPartyUi() = PartyUi(

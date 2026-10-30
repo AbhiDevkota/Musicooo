@@ -79,6 +79,7 @@ internal class UsbDirectTransport private constructor(
 
     /** Samples are written left-aligned in the endpoint's container. */
     override val outputBits = format.subslot * 8
+    override val validBits = format.bits
     override val bufferSizeFrames: Long = UsbDirectNative.capacity(handle).toLong()
 
     @Volatile private var failure: String? = null
@@ -200,14 +201,14 @@ internal class UsbDirectTransport private constructor(
             }
         }
 
-        /** Every way the attached DAC could carry this stream unchanged, best first. */
+        /** Every way the attached DAC could carry this stream, best first: unchanged if it can. */
         fun plans(raw: ByteArray, rate: Int, channels: Int, sourceBits: Int): List<UsbDescriptors.Plan> {
             val device = try {
                 UsbDescriptors.parse(raw)
             } catch (_: UsbDescriptors.MalformedDescriptorException) {
                 return emptyList()
             }
-            return UsbDescriptors.formats(device, rate, channels, sourceBits, dsd = false, dop = false)
+            return UsbDescriptors.dacFormats(device, rate, channels, sourceBits)
                 .mapNotNull { (alternate, format) -> UsbDescriptors.plan(alternate, format) }
                 .take(32)
         }

@@ -1134,10 +1134,10 @@ internal fun OutputCaption(
     val badge = rememberPartyBadge()
     val outputName = rememberAudioOutputName(accountName)
     val outputFormat by PlayerPlatform.host.outputFormat.collectAsStateWithLifecycle()
-    // The shine means one thing: the DAC is receiving this track bit-perfect.
-    // Anything weaker — a hi-res stream on a float-capable route — still
-    // passes through Android's mixer, which may resample it, so it no longer
-    // earns the same mark.
+    // The shine means one thing: the DAC has this track to itself, bit-perfect
+    // or at the most the DAC can take. Anything weaker — a hi-res stream on a
+    // float-capable route — still passes through Android's mixer, which may
+    // resample it, so it no longer earns the same mark.
     // The host's first name, exactly as the output line already shortens the
     // account's — "Kushagra's Jam" alongside "Kushagra's Phone".
     val jamName = badge.hostFirstName
@@ -1146,7 +1146,7 @@ internal fun OutputCaption(
     val captionModifier = Modifier
         .fillMaxWidth(0.65f)
         .clickable { if (badge.inParty) onOpenMembers() else onOpenOutput() }
-    if (!badge.inParty && outputFormat.bitPerfect) {
+    if (!badge.inParty && (outputFormat.bitPerfect || outputFormat.dacLimited)) {
         ShimmerText(
             text = outputName,
             style = MaterialTheme.typography.labelSmall.copy(

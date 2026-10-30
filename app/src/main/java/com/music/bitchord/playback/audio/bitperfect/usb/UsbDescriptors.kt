@@ -9,6 +9,8 @@
  */
 package com.music.bitchord.playback.audio.bitperfect.usb
 
+import com.music.bitchord.playback.audio.bitperfect.BitPerfectPcm
+
 /**
  * USB Audio Class descriptor parsing and format selection for the direct USB
  * driver: which alternate setting, endpoint and clock carry a stream at
@@ -236,6 +238,20 @@ internal object UsbDescriptors {
         }
         return result.sortedWith(compareBy({ if (it.second.encoding.name.startsWith("DSD")) 0 else 1 }, { it.second.subslot }))
     }
+
+    /**
+     * Everything this DAC might carry a PCM track on, best first: its own rate
+     * and depth when there is such a setting, then by [BitPerfectPcm.rankRates],
+     * and at each rate the depths that hold the source before the deepest of
+     * those that don't. UAC2 lists no rates here, so all of them are candidates
+     * and the native side finds out which the DAC's clock accepts.
+     */
+    fun dacFormats(device: Device, rate: Int, channels: Int, sourceBits: Int): List<Pair<Alternate, OutputFormat>> =
+        BitPerfectPcm.rankRates(rate, BitPerfectPcm.STANDARD_RATES + rate).flatMap { candidate ->
+            val (lossless, narrower) = formats(device, candidate, channels, 16, dsd = false, dop = false)
+                .partition { (alternate, _) -> alternate.bits >= sourceBits }
+            lossless + narrower.sortedByDescending { (alternate, _) -> alternate.bits }
+        }
 
     /**
      * The endpoint checks that need no device speed: an isochronous OUT data

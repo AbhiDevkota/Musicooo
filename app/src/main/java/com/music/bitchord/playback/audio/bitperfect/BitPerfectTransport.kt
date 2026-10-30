@@ -13,8 +13,10 @@ import java.nio.ByteBuffer
 
 /**
  * One exclusive, mixer-free output opened at a track's own rate and channel
- * count. [BitPerfectAudioSink] owns exactly one at a time and drives it from
- * the playback thread; nothing here resamples, mixes or applies gain.
+ * count, or at the closest the DAC offers when it cannot take the track's own;
+ * [sampleRate] and [validBits] say which. [BitPerfectAudioSink] owns exactly
+ * one at a time and drives it from the playback thread; nothing here
+ * resamples, mixes or applies gain.
  *
  * Every call except [release] may throw [BitPerfectTransportException] once
  * the route is lost. The sink turns that into a recoverable Media3 error, so
@@ -30,6 +32,9 @@ internal interface BitPerfectTransport {
 
     /** Integer precision on the wire: 16, 24 or 32. */
     val outputBits: Int
+
+    /** How many of [outputBits] the DAC actually resolves: 24 of a 32-bit USB slot, say. */
+    val validBits: Int get() = outputBits
 
     /** How much audio the transport itself buffers, in frames. */
     val bufferSizeFrames: Long

@@ -65,11 +65,15 @@ class BitPerfectAudioSinkTest {
         var failOpen = false
         var failures = 0
 
+        /** A DAC that stops here, as one on a capped USB-C dongle does. */
+        var dacRate: Int? = null
+        var dacBits: Int? = null
+
         override fun canOpen(sampleRate: Int, channels: Int, sourceBits: Int, requester: Any) = available
 
         override fun open(sampleRate: Int, channels: Int, sourceBits: Int, requester: Any): BitPerfectTransport {
             if (failOpen) throw BitPerfectTransportException("unsupported")
-            return FakeTransport(sampleRate, channels, maxOf(sourceBits, 24)).also(opened::add)
+            return FakeTransport(dacRate ?: sampleRate, channels, dacBits ?: maxOf(sourceBits, 24)).also(opened::add)
         }
 
         override fun release(requester: Any) = Unit
@@ -234,6 +238,48 @@ class BitPerfectAudioSinkTest {
         buffer.flip()
         sink.handleBuffer(buffer, 0, 1)
         assertFalse(outputs.statuses.last().exact)
+    }
+
+    @Test
+    fun trackBeyondTheDacIsConvertedAndNotCalledBitPerfect() {
+        val outputs = FakeOutputs().apply { dacRate = 48000; dacBits = 16 }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.play()
+        sink.configure(config(format(rate = 96000, encoding = C.ENCODING_PCM_24BIT)))
+        val frames = 9600
+        val buffer = ByteBuffer.allocateDirect(frames * 6).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put(ByteArray(frames * 6))
+        buffer.flip()
+        assertTrue(sink.handleBuffer(buffer, 0, 1))
+        sink.playToEndOfStream()
+
+        val transport = outputs.opened.single()
+        assertEquals(frames / 2L, transport.written)
+        val status = outputs.statuses.last()
+        assertTrue(status.dacLimited)
+        assertFalse(status.exact)
+        assertEquals(48000, status.sampleRateHz)
+        assertEquals(16, status.outputBits)
+        assertEquals(96000, status.sourceRateHz)
+        assertEquals(24, status.sourceBits)
+
+        // The clock runs at the DAC's rate: half the output frames is 50 ms of the track.
+        transport.advance(2400)
+        assertEquals(50_000, sink.getCurrentPositionUs(false))
+        assertFalse(sink.isEnded())
+        transport.advance(2400)
+        assertTrue(sink.isEnded())
+    }
+
+    @Test
+    fun trackTheDacCanTakeIsNotConverted() {
+        val outputs = FakeOutputs().apply { dacRate = 44100; dacBits = 24 }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.play()
+        sink.configure(config(format(rate = 44100)))
+        sink.handleBuffer(pcm16(4), 0, 1)
+        assertFalse(outputs.statuses.last().dacLimited)
+        assertTrue(outputs.statuses.last().exact)
     }
 
     @Test

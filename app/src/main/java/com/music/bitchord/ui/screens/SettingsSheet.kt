@@ -2143,6 +2143,12 @@ private fun BitPerfectMode.description(): String = stringResource(
 @Composable
 private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.Status): String = when {
     mode == BitPerfectMode.OFF || !mode.isSupported -> mode.description()
+    status.active && status.dacLimited -> stringResource(
+        R.string.bit_perfect_status_dac_limited,
+        status.deviceName.orEmpty(),
+        "%.1f".format(status.sampleRateHz / 1000.0),
+        status.outputBits,
+    )
     status.active && !status.exact -> stringResource(
         R.string.bit_perfect_status_inexact,
         status.deviceName.orEmpty(),

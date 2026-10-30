@@ -68,8 +68,14 @@ internal object BitPerfectOutput {
         val sampleRateHz: Int = 0,
         val outputBits: Int = 0,
         val sourceBits: Int = 0,
+        val sourceRateHz: Int = 0,
         /** False once any sample of the current track had to be rounded. */
         val exact: Boolean = true,
+        /**
+         * The DAC can't take this track as it is, so it is being converted to
+         * the best format the DAC has. Never [exact]: check this one first.
+         */
+        val dacLimited: Boolean = false,
         /** Why the last attempt fell back to normal output, if it did. */
         val fallbackReason: String? = null,
     )
@@ -220,10 +226,7 @@ internal object BitPerfectOutput {
                 if (key(mode, device.id, sampleRate, channels, sourceBits) in currentFailures(mode, device.id)) {
                     return false
                 }
-                BitPerfectPcm.outputBits(
-                    sourceBits,
-                    MixerTransport.supportedBits(manager, device, sampleRate, channels),
-                ) != null
+                MixerTransport.bestFormat(manager, device, sampleRate, channels, sourceBits) != null
             }
             // Nothing short of opening a stream says whether Android will grant
             // exclusive mode, so the first track of each format finds out.

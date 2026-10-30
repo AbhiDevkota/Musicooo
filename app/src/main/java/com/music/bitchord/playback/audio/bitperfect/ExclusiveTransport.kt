@@ -38,7 +38,8 @@ internal object ExclusiveNative {
  * Exact-rate PCM through an AAudio exclusive stream, for a player whose DAC is
  * built in: a DAP's headphone output or line out. The native side opens the
  * stream at the track's own rate and channel count with conversion disabled,
- * and accepts it only if Android granted exclusive mode exactly as asked.
+ * and accepts it only if Android granted exclusive mode exactly as asked. If
+ * the track's own format is refused, the next best is asked for the same way.
  *
  * The output is pinned to the wired headphone device when there is one, as
  * Mornye does, so a DAP whose default route is its speaker still plays
@@ -117,18 +118,36 @@ internal class ExclusiveTransport private constructor(
         /** The native side refuses larger single writes. */
         private const val MAX_WRITE = 262_144
 
+        /**
+         * Each attempt opens a real stream on the playback thread, and a device
+         * that never grants exclusive mode refuses them all.
+         */
+        private const val MAX_RATE_ATTEMPTS = 3
+
         fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int): ExclusiveTransport {
             val outputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val wired = outputs.firstOrNull {
                 it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET
             }
-            val handle = try {
-                ExclusiveNative.open(rate, channels, sourceBits, wired?.id ?: 0)
-            } catch (error: IllegalStateException) {
-                throw BitPerfectTransportException("exclusive_unavailable", error)
-            } catch (error: UnsatisfiedLinkError) {
-                throw BitPerfectTransportException("exclusive_unavailable", error)
+            val offered = wired?.sampleRates?.takeIf { it.isNotEmpty() }?.toList() ?: BitPerfectPcm.STANDARD_RATES
+            val rates = BitPerfectPcm.rankRates(rate, offered + rate).take(MAX_RATE_ATTEMPTS)
+            var openedRate = rate
+            var failure: Throwable? = null
+            var handle = 0L
+            search@ for (candidate in rates) {
+                for (bits in listOf(32, 24, 16).filter { it <= sourceBits }) {
+                    try {
+                        handle = ExclusiveNative.open(candidate, channels, bits, wired?.id ?: 0)
+                        openedRate = candidate
+                        break@search
+                    } catch (error: IllegalStateException) {
+                        failure = error
+                    } catch (error: UnsatisfiedLinkError) {
+                        throw BitPerfectTransportException("exclusive_unavailable", error)
+                    }
+                }
             }
+            if (handle == 0L) throw BitPerfectTransportException("exclusive_unavailable", failure)
             try {
                 val device = ExclusiveNative.device(handle)
                 val name = outputs.firstOrNull { it.id == device }?.productName?.toString()
@@ -136,7 +155,7 @@ internal class ExclusiveTransport private constructor(
                 return ExclusiveTransport(
                     manager = manager,
                     handle = handle,
-                    sampleRate = rate,
+                    sampleRate = openedRate,
                     channelCount = channels,
                     outputBits = ExclusiveNative.bits(handle),
                     deviceName = name,

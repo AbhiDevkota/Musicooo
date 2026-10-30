@@ -1046,7 +1046,7 @@
 
     <string name="bit_perfect_output">Bit-perfect output</string>
     <string name="bit_perfect_bypassed_footer">Bit-perfect output is ready, so the faded settings are bypassed and Dolby Atmos versions aren\'t requested. They work again when the DAC is disconnected or the mode is off.</string>
-    <string name="bit_perfect_sheet_warning">Sends the track to the DAC unchanged. The equalizer, loudness normalization, crossfade, Automix, playback speed and BitChord\'s volume are bypassed.</string>
+    <string name="bit_perfect_sheet_warning">Sends the track to the DAC unchanged, or converted to the DAC\'s highest format if the track is beyond it. The equalizer, loudness normalization, crossfade, Automix, playback speed and BitChord\'s volume are bypassed.</string>
     <string name="bit_perfect_mode_off_subtitle">Audio goes through Android\'s mixer and BitChord\'s effects.</string>
     <string name="bit_perfect_mode_usb_android">USB DAC</string>
     <string name="bit_perfect_mode_usb_android_subtitle">Android 14 opens the DAC at each track\'s own rate and bit depth, without mixing or resampling.</string>
@@ -1065,6 +1065,7 @@
     <string name="bit_perfect_confirm_title">Turn on bit-perfect output?</string>
     <string name="bit_perfect_confirm_message">The DAC gets the music at full scale, and the phone\'s volume buttons may stop working. Turn the DAC or amplifier down before you play.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
+    <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d-bit · DAC max, converted from this track\'s format</string>
     <string name="bit_perfect_status_inexact">%1$s · not exact: this source isn\'t lossless PCM</string>
     <string name="bit_perfect_status_waiting">Waiting for a lossless track on a supported output</string>
     <string name="bit_perfect_status_unavailable">Not available for this track (%1$s)</string>

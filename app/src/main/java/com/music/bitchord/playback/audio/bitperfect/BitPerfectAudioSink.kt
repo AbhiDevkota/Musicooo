@@ -41,6 +41,9 @@ import kotlin.math.abs
  * ignored. Nothing upstream may scale a sample, and a speed other than 1x
  * would have to be resampled to be heard.
  *
+ * The one exception is a track the DAC cannot take at all. [DacFormatConverter]
+ * then fits it to what the transport opened at, and the status says so.
+ *
  * All calls arrive on the playback thread, as Media3 guarantees for a sink.
  */
 @OptIn(UnstableApi::class)
@@ -67,6 +70,9 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
     private var current: Input? = null
     private var transport: BitPerfectTransport? = null
     private var transportStarted = false
+
+    /** Set only while [transport] could not be opened at the track's own format. */
+    private var converter: DacFormatConverter? = null
 
     private var output: ByteBuffer = ByteBuffer.allocateDirect(0)
     private var outputFrameBytes = 0
@@ -152,7 +158,10 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
             while (buffer.remaining() >= input.frameBytes) {
                 output.clear()
                 val before = buffer.position()
-                if (!BitPerfectPcm.convert(buffer, input.encoding, input.channelCount, requireNotNull(transport).outputBits, output)) {
+                val converter = converter
+                if (converter != null) {
+                    converter.process(buffer, output)
+                } else if (!BitPerfectPcm.convert(buffer, input.encoding, input.channelCount, requireNotNull(transport).outputBits, output)) {
                     markInexact()
                 }
                 submittedFrames += (buffer.position() - before) / input.frameBytes
@@ -188,8 +197,7 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         endOfStream = true
         val active = transport ?: return
         try {
-            if (output.hasRemaining()) writeOutput()
-            if (output.hasRemaining()) return
+            if (!flushOutput()) return
             if (!stopped) {
                 active.stop()
                 stopped = true
@@ -208,10 +216,9 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
 
     override fun getCurrentPositionUs(sourceEnded: Boolean): Long {
         val active = transport ?: return AudioSink.CURRENT_POSITION_NOT_SET
-        val input = current ?: return AudioSink.CURRENT_POSITION_NOT_SET
-        if (startMediaTimeUs == C.TIME_UNSET) return AudioSink.CURRENT_POSITION_NOT_SET
+        if (current == null || startMediaTimeUs == C.TIME_UNSET) return AudioSink.CURRENT_POSITION_NOT_SET
         val played = minOf(active.playedFrames(), writtenFrames)
-        val playedUs = Util.sampleCountToDurationUs(played, input.sampleRate)
+        val playedUs = Util.sampleCountToDurationUs(played, active.sampleRate)
         if (!advancingReported && playing && played > 0) {
             advancingReported = true
             listener?.onPositionAdvancing(System.currentTimeMillis() - playedUs / 1000)
@@ -277,6 +284,18 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         }
         transport = opened
         current = input
+        converter = if (opened.sampleRate != input.sampleRate || opened.validBits < input.sourceBits) {
+            DacFormatConverter(
+                encoding = input.encoding,
+                channels = input.channelCount,
+                inputRate = input.sampleRate,
+                outputRate = opened.sampleRate,
+                validBits = opened.validBits,
+                containerBits = opened.outputBits,
+            )
+        } else {
+            null
+        }
         outputFrameBytes = opened.channelCount * (opened.outputBits / 8)
         val capacity = OUTPUT_CHUNK_FRAMES * outputFrameBytes
         if (output.capacity() < capacity) {
@@ -288,7 +307,8 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         Log.i(
             TAG,
             "Opened ${opened.driver.label} on ${opened.deviceName}: ${opened.sampleRate} Hz, " +
-                "${input.sourceBits}-bit source as ${opened.outputBits}-bit",
+                "${input.sourceBits}-bit source as ${opened.outputBits}-bit" +
+                if (converter != null) " (DAC limit, source ${input.sampleRate} Hz)" else "",
         )
         publishStatus()
         startIfReady()
@@ -301,6 +321,7 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         outputs.publishIdle()
         transport = null
         current = null
+        converter = null
         transportStarted = false
         output.clear().limit(0)
     }
@@ -312,8 +333,7 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
     private fun drainForReconfiguration(): Boolean {
         val active = transport ?: return true
         try {
-            if (output.hasRemaining()) writeOutput()
-            if (output.hasRemaining()) return false
+            if (!flushOutput()) return false
             if (!stopped) {
                 active.stop()
                 stopped = true
@@ -322,6 +342,19 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
             throw writeException(error)
         }
         return active.playedFrames() >= writtenFrames
+    }
+
+    /** Hands the transport everything still held on this side of it; true once that is all of it. */
+    private fun flushOutput(): Boolean {
+        while (true) {
+            if (output.hasRemaining()) writeOutput()
+            if (output.hasRemaining()) return false
+            val converter = converter ?: return true
+            output.clear()
+            val done = converter.drain(output)
+            output.flip()
+            if (done && !output.hasRemaining()) return true
+        }
     }
 
     private fun writeOutput() {
@@ -380,14 +413,17 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
                 driver = active.driver.label,
                 deviceName = active.deviceName,
                 sampleRateHz = active.sampleRate,
-                outputBits = active.outputBits,
+                outputBits = if (converter != null) active.validBits else active.outputBits,
                 sourceBits = current?.sourceBits ?: 0,
-                exact = exact,
+                sourceRateHz = current?.sampleRate ?: 0,
+                exact = exact && converter == null,
+                dacLimited = converter != null,
             ),
         )
     }
 
     private fun resetCounters() {
+        converter?.reset()
         output.clear().limit(0)
         writtenFrames = 0
         submittedFrames = 0

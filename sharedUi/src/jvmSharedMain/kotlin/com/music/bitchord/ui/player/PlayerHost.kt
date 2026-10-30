@@ -329,6 +329,11 @@ data class OutputFormatUi(
      * exclusive output, with every sample of the track carried exactly.
      */
     val bitPerfect: Boolean = false,
+    /**
+     * On the exclusive output, converted to the best format the DAC has because
+     * it can't take the track's own. As good as this DAC gets, but not bit-perfect.
+     */
+    val dacLimited: Boolean = false,
 )
 
 data class PartyUi(

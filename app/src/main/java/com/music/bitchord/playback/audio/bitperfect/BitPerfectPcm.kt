@@ -36,12 +36,43 @@ internal object BitPerfectPcm {
 
     private val INTEGER_BITS = listOf(16, 24, 32)
 
+    /** For an output that won't say what it runs at until it is asked to open. */
+    val STANDARD_RATES = listOf(44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000)
+
     /** Media3's int-to-float factor, kept to the bit so its output can be re-derived. */
     private const val MEDIA3_FLOAT_FACTOR = 1.0 / 0x7FFFFFFF
 
     /** The narrowest supported integer depth that loses nothing of [sourceBits]. */
     fun outputBits(sourceBits: Int, supported: Collection<Int>): Int? =
         supported.filter { it in INTEGER_BITS && it >= sourceBits }.minOrNull()
+
+    /** [outputBits], or failing that the deepest the DAC has, which [DacFormatConverter] then fits the track to. */
+    fun dacBits(sourceBits: Int, supported: Collection<Int>): Int? =
+        outputBits(sourceBits, supported) ?: supported.filter { it in INTEGER_BITS }.maxOrNull()
+
+    /**
+     * The rates to try for a track of [source] Hz, best first, out of those
+     * [offered]. Its own rate; then a multiple of it, which keeps everything;
+     * then the highest below it in the same family, whose ratio is the
+     * simplest to convert; then the other family, nearest above before highest
+     * below, since going up loses nothing.
+     */
+    fun rankRates(source: Int, offered: Collection<Int>): List<Int> {
+        fun family(rate: Int) = rate % 11025 == 0
+        return offered.distinct()
+            .filter { it == source || DacFormatConverter.canResample(source, it) }
+            .sortedWith(
+                compareBy<Int> {
+                    when {
+                        it == source -> 0
+                        family(it) == family(source) && it > source -> 1
+                        family(it) == family(source) -> 2
+                        it > source -> 3
+                        else -> 4
+                    }
+                }.thenBy { if (it > source) it else -it },
+            )
+    }
 
     /**
      * How many bits an output needs to carry [encoding] without loss, or null
@@ -84,7 +115,7 @@ internal object BitPerfectPcm {
             input.remaining() / (inBytes * channelCount),
             output.remaining() / (outBytes * channelCount),
         )
-        input.order(if (isBigEndian(encoding)) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
+        input.order(byteOrder(encoding))
         output.order(ByteOrder.LITTLE_ENDIAN)
         var exact = true
         repeat(frames * channelCount) {
@@ -102,18 +133,37 @@ internal object BitPerfectPcm {
                 }
                 else -> error("Unsupported PCM encoding $encoding")
             }
-            when (outputBits) {
-                16 -> output.putShort((sample shr 16).toShort())
-                24 -> {
-                    output.put((sample shr 8).toByte())
-                    output.put((sample shr 16).toByte())
-                    output.put((sample shr 24).toByte())
-                }
-                else -> output.putInt(sample)
-            }
+            putSample(output, sample, outputBits)
         }
         return exact
     }
+
+    /** Writes a sample left-aligned in 32 bits to a little-endian container of [outputBits]. */
+    internal fun putSample(output: ByteBuffer, sample: Int, outputBits: Int) {
+        when (outputBits) {
+            16 -> output.putShort((sample shr 16).toShort())
+            24 -> {
+                output.put((sample shr 8).toByte())
+                output.put((sample shr 16).toByte())
+                output.put((sample shr 24).toByte())
+            }
+            else -> output.putInt(sample)
+        }
+    }
+
+    /** The next sample of [input], which must already be in [byteOrder], at a scale of ±1. */
+    internal fun readNormalized(input: ByteBuffer, encoding: Int): Double = when (bytesPerSample(encoding)) {
+        2 -> input.short / 32_768.0
+        3 -> read24(input, isBigEndian(encoding)) / 8_388_608.0
+        else -> if (encoding == C.ENCODING_PCM_FLOAT) {
+            input.float.toDouble().takeUnless(Double::isNaN) ?: 0.0
+        } else {
+            input.int / 2_147_483_648.0
+        }
+    }
+
+    internal fun byteOrder(encoding: Int): ByteOrder =
+        if (isBigEndian(encoding)) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN
 
     /** The 24-bit integer a float sample stands for, clamped to range. */
     internal fun recover24(value: Float): Int {

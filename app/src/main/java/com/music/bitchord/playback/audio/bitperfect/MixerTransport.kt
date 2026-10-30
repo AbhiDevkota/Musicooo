@@ -145,28 +145,46 @@ internal class MixerTransport private constructor(
                 it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET
             }
 
-        /** The bit-perfect integer depths the attached DAC offers at exactly this rate and layout. */
-        fun supportedBits(manager: AudioManager, device: AudioDeviceInfo, rate: Int, channels: Int): List<Int> =
-            matching(manager, device, rate, channels).map { bits(it.format.encoding) }.filter { it > 0 }
+        /**
+         * The format this DAC would open at for the track: its own when offered,
+         * otherwise the best it has, by [BitPerfectPcm.rankRates] and
+         * [BitPerfectPcm.dacBits]. Null if it offers nothing bit-perfect at all.
+         */
+        fun bestFormat(
+            manager: AudioManager,
+            device: AudioDeviceInfo,
+            rate: Int,
+            channels: Int,
+            sourceBits: Int,
+        ): AudioMixerAttributes? {
+            val mask = channelMask(channels)
+            val offered = runCatching { manager.getSupportedMixerAttributes(device) }.getOrDefault(emptyList()).filter {
+                it.mixerBehavior == AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT &&
+                    it.format.channelMask == mask && bits(it.format.encoding) > 0
+            }
+            val bestRate = BitPerfectPcm.rankRates(rate, offered.map { it.format.sampleRate }).firstOrNull() ?: return null
+            val atRate = offered.filter { it.format.sampleRate == bestRate }
+            val outputBits = BitPerfectPcm.dacBits(sourceBits, atRate.map { bits(it.format.encoding) }) ?: return null
+            return atRate.first { bits(it.format.encoding) == outputBits }
+        }
 
-        /** Opens the DAC at [rate]/[channels] with the narrowest lossless depth, or explains why not. */
+        /** Opens the DAC at [bestFormat], or explains why not. */
         fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int): MixerTransport {
             val usb = usbDevice(manager) ?: throw BitPerfectTransportException("no_usb")
-            val matching = matching(manager, usb, rate, channels)
-            if (matching.isEmpty()) throw BitPerfectTransportException("unsupported")
-            val outputBits = BitPerfectPcm.outputBits(sourceBits, matching.map { bits(it.format.encoding) })
-                ?: throw BitPerfectTransportException("format")
-            val selected = matching.first { bits(it.format.encoding) == outputBits }
+            val selected = bestFormat(manager, usb, rate, channels, sourceBits)
+                ?: throw BitPerfectTransportException("unsupported")
+            val outputBits = bits(selected.format.encoding)
+            val openedRate = selected.format.sampleRate
             if (!manager.setPreferredMixerAttributes(ATTRIBUTES, usb, selected)) {
                 throw BitPerfectTransportException("unsupported")
             }
             var track: AudioTrack? = null
             try {
                 val mask = channelMask(channels)
-                val minimum = AudioTrack.getMinBufferSize(rate, mask, selected.format.encoding)
+                val minimum = AudioTrack.getMinBufferSize(openedRate, mask, selected.format.encoding)
                 if (minimum <= 0) throw BitPerfectTransportException("format")
                 val frameBytes = channels * (outputBits / 8)
-                val bufferBytes = maxOf(minimum * 2, rate / 5 * frameBytes)
+                val bufferBytes = maxOf(minimum * 2, openedRate / 5 * frameBytes)
                 track = AudioTrack.Builder()
                     .setAudioAttributes(ATTRIBUTES)
                     .setAudioFormat(selected.format)
@@ -174,7 +192,7 @@ internal class MixerTransport private constructor(
                     .setBufferSizeInBytes(bufferBytes)
                     .build()
                 if (track.state != AudioTrack.STATE_INITIALIZED || !track.setPreferredDevice(usb) ||
-                    track.sampleRate != rate || track.audioFormat != selected.format.encoding ||
+                    track.sampleRate != openedRate || track.audioFormat != selected.format.encoding ||
                     track.channelCount != channels
                 ) {
                     throw BitPerfectTransportException("format")
@@ -186,7 +204,7 @@ internal class MixerTransport private constructor(
                     device = usb,
                     mixer = selected,
                     track = track,
-                    sampleRate = rate,
+                    sampleRate = openedRate,
                     channelCount = channels,
                     outputBits = outputBits,
                     bufferSizeFrames = (track.bufferSizeInFrames).toLong(),
@@ -195,19 +213,6 @@ internal class MixerTransport private constructor(
                 runCatching { track?.release() }
                 runCatching { manager.clearPreferredMixerAttributes(ATTRIBUTES, usb) }
                 throw error as? BitPerfectTransportException ?: BitPerfectTransportException("format", error)
-            }
-        }
-
-        private fun matching(
-            manager: AudioManager,
-            device: AudioDeviceInfo,
-            rate: Int,
-            channels: Int,
-        ): List<AudioMixerAttributes> {
-            val mask = channelMask(channels)
-            return runCatching { manager.getSupportedMixerAttributes(device) }.getOrDefault(emptyList()).filter {
-                it.mixerBehavior == AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT &&
-                    it.format.sampleRate == rate && it.format.channelMask == mask
             }
         }
 
