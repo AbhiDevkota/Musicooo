@@ -5606,11 +5606,12 @@ class PlaybackService : MediaLibraryService() {
 
     /**
      * Direct Source Stream's resolve: the addons first and alone, YouTube only
-     * when none of them has the track — see [DirectSourceGate].
+     * when none of them answers in time — see [DirectSourceGate].
      *
-     * Nothing races and nothing is handed to [QualityUpgrade]. Whatever plays
-     * here plays to the end, which is the point: one search and one stream per
-     * track, not a YouTube start followed by a swap.
+     * Nothing races. An addon's answer plays to the end, which is the point:
+     * one search and one stream per track, not a YouTube start followed by a
+     * swap. A YouTube start is the one case handed to [QualityUpgrade], because
+     * that is the swap the addons' slowness has already made necessary.
      *
      * A manifest answer goes out as it is. It fails its first read and
      * [replayAsManifest] re-prepares it with the type declared, which is a
@@ -5621,12 +5622,27 @@ class PlaybackService : MediaLibraryService() {
             .onFailure { if (it is CancellationException) throw it }
             .getOrNull()
         if (direct != null) return Resolved.Module(direct)
+        val running = DirectSourceGate.stillLooking(videoId)
         TrackLog.d(
             "BitChord",
-            "no addon served '${target.title}' directly; playing it from YouTube",
+            if (running != null) {
+                "no addon answered for '${target.title}' within " +
+                    "${DirectSourceGate.LOOKUP_TIMEOUT_MS / 1000}s; starting it on YouTube and still looking"
+            } else {
+                "no addon served '${target.title}' directly; playing it from YouTube"
+            },
             about = videoId,
         )
-        return Resolved.YouTube(StreamResolver.resolve(videoId))
+        val url = try {
+            StreamResolver.resolve(videoId)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // YouTube cannot serve it, so a lookup still running is all that
+            // is left, and there is nothing playing for it to swap into.
+            return Resolved.Module(running?.await() ?: throw e)
+        }
+        DirectSourceGate.startedOnYouTube(videoId, target)
+        return Resolved.YouTube(url)
     }
 
     /**

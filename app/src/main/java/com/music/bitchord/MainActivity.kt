@@ -232,7 +232,7 @@ import com.music.bitchord.ui.components.BrowseActionsMenu
 import com.music.bitchord.ui.components.BrowseTarget
 import com.music.bitchord.ui.components.ConfirmationAlert
 import com.music.bitchord.ui.components.InfoAlert
-import com.music.bitchord.ui.components.DownloadManagerSheet
+import com.music.bitchord.ui.components.DownloadManagerPage
 import com.music.bitchord.ui.components.PlaylistPickerSheet
 import com.music.bitchord.ui.components.ReorderPlaylistPage
 import com.music.bitchord.ui.components.LongPressOrigin
@@ -653,14 +653,6 @@ private fun BitChordApp(
     var showLastfmLogin by remember { mutableStateOf(false) }
     var showWebDavEditor by remember { mutableStateOf(false) }
     var showSmbEditor by remember { mutableStateOf(false) }
-    /**
-     * Whether the download manager is open.
-     *
-     * Not [rememberSaveable]: the list behind it does not survive the process
-     * either (see [com.music.bitchord.download.DownloadSession]), and a sheet
-     * restored over an empty one would be a manager with nothing to manage.
-     */
-    var showDownloadManager by remember { mutableStateOf(false) }
     // Discord Rich Presence: its own page under Account & integrations (a
     // route), its own full-screen sign-in, and one slot for whichever of its
     // alerts is open. The alerts live out here rather than on the page because
@@ -3020,6 +3012,11 @@ private fun BitChordApp(
                                 onEditSmb = { showSmbEditor = true },
                                 onConfirmJioSaavn = { confirmJioSaavn = true },
                             )
+                        } else if (pageRoute == AppRoute.Downloads) {
+                            DownloadManagerPage(
+                                onCleared = { navigator.pop() },
+                                contentPadding = listPadding,
+                            )
                         } else if (pageRoute == AppRoute.WearOs) {
                             WearOsScreen(contentPadding = listPadding)
                         } else if (pageRoute == AppRoute.ListenTogether) {
@@ -3729,6 +3726,7 @@ private fun BitChordApp(
                 FrostedTopBar(
                     title = when (route) {
                         AppRoute.Spotify -> stringResource(R.string.spotify)
+                        AppRoute.Downloads -> stringResource(R.string.downloads)
                         AppRoute.Discord -> "Discord"
                         AppRoute.History -> stringResource(R.string.history)
                         is AppRoute.LibraryShowAll -> route.shelf.title
@@ -4047,8 +4045,11 @@ private fun BitChordApp(
                             // Left of the account photo, and only there while
                             // there is a batch to report on — see
                             // [TopBarDownloadButton], which decides that for
-                            // itself rather than being told.
-                            TopBarDownloadButton(onClick = { showDownloadManager = true })
+                            // itself rather than being told. Not on the page it
+                            // opens, where it would only lead back to itself.
+                            if (route != AppRoute.Downloads) {
+                                TopBarDownloadButton(onClick = { navigator.push(AppRoute.Downloads) })
+                            }
                             // Not on a release page, whose pill already carries
                             // three of its own controls — Apple Music leaves the
                             // profile off its album pages too.
@@ -4833,25 +4834,6 @@ private fun BitChordApp(
             }
         }
 
-        // ---- Download manager ----
-        // The batch view of what the top-bar indicator is counting. Dismissing
-        // it is what marks the batch seen, and marking it on the way *out*
-        // rather than on the way in is deliberate: it is the outcome the user is
-        // signing off on, and while the sheet is up there may not be one yet.
-        if (showDownloadManager) {
-            val closeDownloadManager = {
-                showDownloadManager = false
-                DownloadSession.markSeen()
-            }
-            BackHandler(onBack = closeDownloadManager)
-            ModalBottomSheet(
-                onDismissRequest = closeDownloadManager,
-                containerColor = MaterialTheme.colorScheme.background,
-            ) {
-                DownloadManagerSheet(onDismiss = closeDownloadManager)
-            }
-        }
-
         // ---- Add to playlist / new playlist ----
         // One sheet for both, because they are one decision: the list of
         // playlists with a way to make another. `creatingPlaylist` opens it
@@ -4862,43 +4844,36 @@ private fun BitChordApp(
                 playlistTarget = null
                 creatingPlaylist = false
             }
-            ModalBottomSheet(
-                onDismissRequest = dismiss,
-                containerColor = MaterialTheme.colorScheme.background,
-            ) {
-                PlaylistPickerSheet(
-                    playlists = playlists,
-                    loading = playlistsLoading,
-                    song = target,
-                    startCreating = target == null,
-                    onAdd = { picked ->
-                        target?.let { song ->
-                            viewModel.addToPlaylists(picked, song) { added, alreadyThere, failed ->
-                                // One line for the whole batch, saying the
-                                // outcome that matters most: what went in, else
-                                // that it was all there already, else that it
-                                // didn't work.
-                                showQueueNotice(
-                                    when {
-                                        added > 1 -> context.resources.getQuantityString(
-                                            R.plurals.added_to_playlists_notice, added, added,
-                                        )
-                                        added == 1 -> context.getString(R.string.song_added_to_playlist)
-                                        alreadyThere > 0 && failed == 0 ->
-                                            context.getString(R.string.song_already_in_playlist)
-                                        else -> context.getString(R.string.failed)
-                                    },
-                                )
-                            }
+            PlaylistPickerSheet(
+                playlists = playlists,
+                loading = playlistsLoading,
+                song = target,
+                startCreating = target == null,
+                onDismiss = dismiss,
+                onAdd = { picked ->
+                    target?.let { song ->
+                        viewModel.addToPlaylists(picked, song) { added, alreadyThere, failed ->
+                            // One line for the whole batch, saying the outcome
+                            // that matters most: what went in, else that it was
+                            // all there already, else that it didn't work.
+                            showQueueNotice(
+                                when {
+                                    added > 1 -> context.resources.getQuantityString(
+                                        R.plurals.added_to_playlists_notice, added, added,
+                                    )
+                                    added == 1 -> context.getString(R.string.song_added_to_playlist)
+                                    alreadyThere > 0 && failed == 0 ->
+                                        context.getString(R.string.song_already_in_playlist)
+                                    else -> context.getString(R.string.failed)
+                                },
+                            )
                         }
-                        dismiss()
-                    },
-                    onCreate = { title, privacy ->
-                        viewModel.createPlaylist(title, privacy, target)
-                        dismiss()
-                    },
-                )
-            }
+                    }
+                },
+                onCreate = { title, privacy ->
+                    viewModel.createPlaylist(title, privacy, target)
+                },
+            )
         }
 
         // ---- Add to a device playlist / new device playlist ----
@@ -4926,39 +4901,33 @@ private fun BitChordApp(
                     )
                 }
             }
-            ModalBottomSheet(
-                onDismissRequest = dismiss,
-                containerColor = MaterialTheme.colorScheme.background,
-            ) {
-                PlaylistPickerSheet(
-                    playlists = choices,
-                    loading = false,
-                    song = target,
-                    startCreating = target == null,
-                    offline = true,
-                    onAdd = { picked ->
-                        target?.let { song ->
-                            val result = OfflinePlaylists.add(picked.mapTo(HashSet()) { it.playlistId }, listOf(song))
-                            showQueueNotice(
-                                when {
-                                    result.added > 1 -> context.resources.getQuantityString(
-                                        R.plurals.added_to_playlists_notice, result.added, result.added,
-                                    )
-                                    result.added == 1 -> context.getString(R.string.song_added_to_playlist)
-                                    result.alreadyThere > 0 -> context.getString(R.string.song_already_in_playlist)
-                                    else -> context.getString(R.string.failed)
-                                },
-                            )
-                        }
-                        dismiss()
-                    },
-                    onCreate = { title, _ ->
-                        OfflinePlaylists.create(title, listOfNotNull(target))
-                        if (target != null) showQueueNotice(context.getString(R.string.song_added_to_playlist))
-                        dismiss()
-                    },
-                )
-            }
+            PlaylistPickerSheet(
+                playlists = choices,
+                loading = false,
+                song = target,
+                startCreating = target == null,
+                offline = true,
+                onDismiss = dismiss,
+                onAdd = { picked ->
+                    target?.let { song ->
+                        val result = OfflinePlaylists.add(picked.mapTo(HashSet()) { it.playlistId }, listOf(song))
+                        showQueueNotice(
+                            when {
+                                result.added > 1 -> context.resources.getQuantityString(
+                                    R.plurals.added_to_playlists_notice, result.added, result.added,
+                                )
+                                result.added == 1 -> context.getString(R.string.song_added_to_playlist)
+                                result.alreadyThere > 0 -> context.getString(R.string.song_already_in_playlist)
+                                else -> context.getString(R.string.failed)
+                            },
+                        )
+                    }
+                },
+                onCreate = { title, _ ->
+                    OfflinePlaylists.create(title, listOfNotNull(target))
+                    if (target != null) showQueueNotice(context.getString(R.string.song_added_to_playlist))
+                },
+            )
         }
 
         if (showSpotifyImportDialog) {

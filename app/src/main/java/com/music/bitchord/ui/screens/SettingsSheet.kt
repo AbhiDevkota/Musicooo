@@ -276,6 +276,7 @@ fun SettingsScreen(
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
     val exportDownloads by AppSettings.exportDownloads.collectAsStateWithLifecycle()
+    val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
     val hideStatusBarInPlayer by AppSettings.hideStatusBarInPlayer.collectAsStateWithLifecycle()
@@ -613,6 +614,15 @@ fun SettingsScreen(
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
                     subtitle = "Music/BitChord".takeIf { exportDownloads },
+                )
+            }
+            val syncPlaylistsTitle = stringResource(R.string.sync_downloaded_playlists)
+            row(syncPlaylistsTitle, "playlist", "new songs", "background", "automatic") {
+                SettingsSubRow(
+                    title = syncPlaylistsTitle,
+                    checked = syncDownloadedPlaylists,
+                    onCheckedChange = AppSettings::setSyncDownloadedPlaylists,
+                    subtitle = stringResource(R.string.sync_downloaded_playlists_subtitle),
                 )
             }
         }

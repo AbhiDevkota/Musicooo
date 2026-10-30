@@ -1224,17 +1224,17 @@ object AudioCache {
      *
      * Direct mode is decided in the resolver, and [CacheDataSource] never
      * calls the resolver for bytes it already holds. So the Opus played
-     * instead, and nothing said so: Direct Source Stream also switches the
-     * second look off (see [QualityUpgrade.couldStillUpgrade]), so there was no
-     * badge and no upgrade, and only clearing the song from the cache brought
-     * the addon's copy back.
+     * instead, and nothing said so: until something pins YouTube, Direct Source
+     * Stream also holds the second look off (see
+     * [QualityUpgrade.couldStillUpgrade]), so there was no badge and no upgrade,
+     * and only clearing the song from the cache brought the addon's copy back.
      *
      * Asked here, before the cache is read, and once per track: an addon
      * answer is pinned in [StreamChoice] and the Opus dropped, so the open that
      * follows misses and resolves to that pin. No answer pins YouTube instead
      * — what the direct resolve falls back to anyway — so the entry is
-     * finished by the stream that started it. Either pin ends this check for
-     * every later open of the track.
+     * finished by the stream that started it, and the addon's late answer swaps
+     * in under it. Either pin ends this check for every later open of the track.
      *
      * Runs on the loader thread, which the resolver blocks in exactly the same
      * way on a direct-mode miss.
@@ -1284,6 +1284,7 @@ object AudioCache {
                             SourceStream(url, headers = StreamResolver.mediaHeadersFor(url)),
                             substituted = false,
                         )
+                        DirectSourceGate.startedOnYouTube(videoId, SourceResolver.targetIn(uri))
                     }
             }
         } catch (e: InterruptedException) {
@@ -1489,7 +1490,8 @@ object AudioCache {
      * The pin is skipped when something is already pinned. The player may
      * have got there first and settled on YouTube after the addon timed out,
      * and an addon answer arriving late must not be written over that half-
-     * filled entry — see [StreamChoice].
+     * filled entry — see [StreamChoice]. It reaches the track as an upgrade
+     * instead, see [DirectSourceGate.startedOnYouTube].
      */
     fun prefetchDirect(upcoming: Upcoming) {
         directJob?.cancel()
@@ -1525,6 +1527,7 @@ object AudioCache {
                     if (addon != null && heldByYouTube(key)) dropYouTubeEntry(key, id)
                     if (addon != null && heldByYouTube(key)) return@launch
                     StreamChoice.remember(id, stream, substituted = addon != null)
+                    if (addon == null) DirectSourceGate.startedOnYouTube(id, upcoming.target)
                 }
             }
             fetch(id, 0, PRELOAD_BYTES)
