@@ -3484,7 +3484,7 @@ private fun BitChordApp(
                                             BrowseType.ALBUM -> EntityType.ALBUM
                                             BrowseType.ARTIST -> EntityType.ARTIST
                                             BrowseType.PLAYLIST -> EntityType.PLAYLIST
-                                            else -> EntityType.TRACK
+                                            BrowseType.OTHER -> EntityType.OTHER
                                         },
                                     ))
                                     viewModel.openDetail(
@@ -3535,7 +3535,7 @@ private fun BitChordApp(
                                                 QueueSource(entity.title, PlaybackSourceType.SEARCH),
                                             )
                                         }
-                                        EntityType.ALBUM, EntityType.ARTIST, EntityType.PLAYLIST -> {
+                                        EntityType.ALBUM, EntityType.ARTIST, EntityType.PLAYLIST, EntityType.OTHER -> {
                                             viewModel.openDetail(
                                                 browseId = entity.id,
                                                 title = entity.title,
