@@ -36,12 +36,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -73,11 +77,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -128,6 +134,12 @@ private const val SHEET_FALLBACK_HEIGHT_DP = 800f
 
 /** How fast a downward flick has to be, in dp per second, to close on its own. */
 private const val SHEET_FLING_DP = 720f
+
+/** The rounded top edge, matching the sheets elsewhere in the app. */
+private val RecognitionSheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
+/** Air between the status bar and the sheet, so it reads as a sheet, not a page. */
+private val SHEET_TOP_GAP = 16.dp
 
 /** The live microphone has not been tapped yet, so the permission prompt owns the screen. */
 private enum class MicrophoneAccess { Waiting, Granted, Denied }
@@ -263,9 +275,13 @@ fun SongRecognitionDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                // A sheet, not a page: the status bar and a little air stay
+                // outside it, and the dimmed app shows through the gap.
+                .padding(top = statusBarTop + SHEET_TOP_GAP)
                 .onSizeChanged { sheetHeight = it.height.toFloat() }
                 .graphicsLayer { translationY = dragOffset }
                 .draggable(
@@ -296,7 +312,8 @@ fun SongRecognitionDialog(
                         }
                     },
                 )
-                .recognitionSheetSurface(),
+                .clip(RecognitionSheetShape)
+                .recognitionSheetSurface(RecognitionSheetShape),
         ) {
             // A soft halo under the control, so the glass orb does not sit on
             // a flat black field while the rings travel out from it.
@@ -313,13 +330,33 @@ fun SongRecognitionDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                        ),
+                    )
                     .padding(horizontal = 24.dp),
             ) {
+                // The same grip the player wears, at the top edge of the sheet:
+                // it names the gesture and gives the eye one thing to grab.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 38.dp, height = 5.dp)
+                            .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Color.White.copy(alpha = 0.55f)),
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(60.dp),
+                        .height(56.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -817,7 +854,7 @@ private fun MicrophoneDeniedContent(canAskAgain: Boolean, onEnable: () -> Unit) 
  * texture rather than as another picture behind the text.
  */
 @Composable
-private fun Modifier.recognitionSheetSurface(): Modifier {
+private fun Modifier.recognitionSheetSurface(shape: Shape): Modifier {
     val glass = LocalLiquidGlassEnabled.current && isGlassSupported()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     if (!glass || reduceDynamicBlur) {
@@ -827,7 +864,7 @@ private fun Modifier.recognitionSheetSurface(): Modifier {
     val blurPx = with(density) { 18.dp.toPx() * 0.33f }
     return drawBackdrop(
         backdrop = LocalAppBackdrop.current,
-        shape = { RoundedCornerShape(0.dp) },
+        shape = { shape },
         effects = {
             colorControls(saturation = 1.12f)
             blur(blurPx)
