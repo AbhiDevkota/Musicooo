@@ -98,6 +98,9 @@
     <string name="recognition_permission_body">Consenti l’accesso al microfono così BitChord può ascoltare quello che suona intorno a te.</string>
     <string name="recognition_enable_microphone">Attiva microfono</string>
     <string name="recognition_open_settings">Apri impostazioni</string>
+    <string name="recognition_searching">Ricerca…</string>
+    <string name="recognition_no_match_hint">Avvicinati alla musica e riprova.</string>
+    <string name="recognition_failed_hint">Controlla la connessione e riprova.</string>
     <string name="recent_search_edit">Modifica “%1$s”</string>
     <string name="recent_search_remove">Rimuovi “%1$s” dalle ricerche recenti</string>
     <string name="storage_required_save">È necessario l\'accesso allo spazio di archiviazione per salvare i brani</string>

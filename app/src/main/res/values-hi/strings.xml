@@ -76,6 +76,9 @@
     <string name="recognition_permission_body">BitChord को आपके आस-पास बज रहा संगीत सुनने देने के लिए माइक्रोफ़ोन की अनुमति दें।</string>
     <string name="recognition_enable_microphone">माइक्रोफ़ोन चालू करें</string>
     <string name="recognition_open_settings">सेटिंग्स खोलें</string>
+    <string name="recognition_searching">खोजा जा रहा है…</string>
+    <string name="recognition_no_match_hint">संगीत के और करीब जाएँ और फिर से कोशिश करें।</string>
+    <string name="recognition_failed_hint">अपना कनेक्शन जाँचें और फिर से कोशिश करें।</string>
     <string name="recent_search_edit">“%1$s” संपादित करें</string>
     <string name="recent_search_remove">हाल की खोजों से “%1$s” हटाएं</string>
     <string name="storage_required_save">गाने सेव करने के लिए स्टोरेज एक्सेस ज़रूरी है</string>

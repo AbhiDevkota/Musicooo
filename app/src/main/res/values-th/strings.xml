@@ -75,6 +75,9 @@
     <string name="recognition_permission_body">อนุญาตการเข้าถึงไมโครโฟนเพื่อให้ BitChord ฟังเพลงที่เล่นอยู่รอบตัวคุณ</string>
     <string name="recognition_enable_microphone">เปิดใช้ไมโครโฟน</string>
     <string name="recognition_open_settings">เปิดการตั้งค่า</string>
+    <string name="recognition_searching">กำลังค้นหา…</string>
+    <string name="recognition_no_match_hint">ขยับเข้าใกล้เสียงเพลงแล้วลองอีกครั้ง</string>
+    <string name="recognition_failed_hint">ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง</string>
     <string name="recent_search_edit">แก้ไข “%1$s”</string>
     <string name="recent_search_remove">นำ “%1$s” ออกจากการค้นหาล่าสุด</string>
     <string name="storage_required_save">ต้องได้รับสิทธิ์เข้าถึงพื้นที่จัดเก็บเพื่อบันทึกเพลง</string>
