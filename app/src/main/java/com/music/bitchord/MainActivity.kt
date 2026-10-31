@@ -684,13 +684,6 @@ private fun BitChordApp(
     // request and its denied state live. It no longer waits on a system speech
     // recognizer, so the icon stays available even on de-Googled builds.
     var showSongRecognition by remember { mutableStateOf(false) }
-    val startSongRecognition: () -> Unit = {
-        // The full-screen sheet replaces the search field, so leave it with no
-        // keyboard waiting underneath when the sheet closes.
-        focusManager.clearFocus()
-        softwareKeyboard?.hide()
-        showSongRecognition = true
-    }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -934,6 +927,34 @@ private fun BitChordApp(
     }
     val controller = rememberMediaController()
     val player = rememberPlayerState(controller)
+    // Song recognition listens to the room, so anything this device was playing
+    // has to stop first. Only a take that actually paused playback resumes on
+    // cancel; a match leaves it paused while the Search tab opens.
+    var resumeAfterRecognition by remember { mutableStateOf(false) }
+    val startSongRecognition: () -> Unit = {
+        // The full-screen sheet replaces the search field, so leave it with no
+        // keyboard waiting underneath when the sheet closes.
+        focusManager.clearFocus()
+        softwareKeyboard?.hide()
+        resumeAfterRecognition = controller?.playWhenReady == true
+        if (resumeAfterRecognition) controller?.pause()
+        showSongRecognition = true
+    }
+    val dismissSongRecognition: () -> Unit = {
+        showSongRecognition = false
+        if (resumeAfterRecognition) controller?.play()
+        resumeAfterRecognition = false
+    }
+    val searchRecognizedSong: (String) -> Unit = { query ->
+        showSongRecognition = false
+        // A recognized song is a search, not a resume. Leaving playback paused
+        // keeps the Search tab's own play action in charge of what starts next.
+        resumeAfterRecognition = false
+        dismissPlayer()
+        navigator.clear()
+        selectedTab = TAB_SEARCH
+        viewModel.searchFor(query, SearchSource.YOUTUBE)
+    }
     // A resume in a party is performed on the instant the server schedules, not
     // when it was pressed, and nothing about the player moves in between — so
     // the transport spends that round trip drawn as though the tap never landed.
@@ -4900,7 +4921,10 @@ private fun BitChordApp(
         // The recognition sheet has its own window, so it sits above the tabs
         // and the player alike and owns the back press while it is open.
         if (showSongRecognition) {
-            SongRecognitionDialog(onDismiss = { showSongRecognition = false })
+            SongRecognitionDialog(
+                onDismiss = dismissSongRecognition,
+                onSearch = searchRecognizedSong,
+            )
         }
 
         if (showLyricsSources) {

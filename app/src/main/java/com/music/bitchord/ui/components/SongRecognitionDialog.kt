@@ -36,17 +36,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,12 +71,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -80,7 +90,10 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.data.shazam.MicrophoneLevelMonitor
+import com.music.bitchord.data.shazam.RecognitionSession
+import com.music.bitchord.data.shazam.RecognitionSessionState
+import com.music.bitchord.data.shazam.ShazamTrack
+import coil3.compose.AsyncImage
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
@@ -103,17 +116,25 @@ private enum class MicrophoneAccess { Waiting, Granted, Denied }
  * The sheet owns the microphone grant for the same reason the search field
  * does: the first tap is the moment that permission makes sense, and the
  * listening state is this app's UI rather than the system speech recognizer's.
- * While the grant is live, [MicrophoneLevelMonitor] streams the mic level into
- * the orb, so the rings and bars answer the sound in the room instead of
- * running on a fixed loop. If the grant is refused the sheet stays useful by
- * explaining what it needs and offering the way back to the system toggle
- * instead of dropping a toast and closing.
+ * While the grant is live, [RecognitionSession] streams the mic level into the
+ * orb, so the rings and bars answer the sound in the room instead of running on
+ * a fixed loop, and searches the same recording at 4, 8 and 12 seconds. If the
+ * grant is refused the sheet stays useful by explaining what it needs and
+ * offering the way back to the system toggle instead of dropping a toast and
+ * closing.
+ *
+ * A match is handed to [onSearch] with "title artist", so the existing Search
+ * tab owns the final choice rather than the recognizer guessing which upload is
+ * the right one.
  */
 @Composable
-fun SongRecognitionDialog(onDismiss: () -> Unit) {
+fun SongRecognitionDialog(
+    onDismiss: () -> Unit,
+    onSearch: (String) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val monitor = remember(scope) { MicrophoneLevelMonitor(scope) }
+    val session = remember(scope, context) { RecognitionSession(context, scope) }
     // The rationale question can only be put to an Activity; the Compose
     // context normally is one, but wrapping it keeps this safe in previews and
     // inside other context wrappers.
@@ -140,16 +161,18 @@ fun SongRecognitionDialog(onDismiss: () -> Unit) {
     // when the permission prompt pushes the activity down mid-request.
     LaunchedEffect(access) {
         if (access == MicrophoneAccess.Granted && context.hasMicrophone()) {
-            monitor.start()
+            session.start()
         } else {
-            monitor.stop()
+            session.stop()
         }
     }
-    DisposableEffect(monitor) {
-        onDispose { monitor.stop() }
+    DisposableEffect(session) {
+        onDispose { session.stop() }
     }
+    val level by session.level.collectAsStateWithLifecycle()
+    val state by session.state.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
-        monitor.stop()
+        session.stop()
     }
     // Coming back from the system prompt, or from Settings after the user
     // flipped the switch there, is the only way the grant can change without
@@ -159,13 +182,16 @@ fun SongRecognitionDialog(onDismiss: () -> Unit) {
         val granted = context.hasMicrophone()
         if (granted) {
             access = MicrophoneAccess.Granted
-            monitor.start()
+            // A result or a settled "no match" is not interrupted listening;
+            // only restart a take that the pause cut off.
+            if (state == RecognitionSessionState.Listening || state == RecognitionSessionState.Searching) {
+                session.start()
+            }
         } else if (access == MicrophoneAccess.Granted) {
             access = MicrophoneAccess.Denied
         }
         canAskAgain = activity?.canAskForMicrophone() == true
     }
-    val level by monitor.level.collectAsStateWithLifecycle()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -230,8 +256,31 @@ fun SongRecognitionDialog(onDismiss: () -> Unit) {
                     contentAlignment = Alignment.Center,
                 ) {
                     when (access) {
-                        MicrophoneAccess.Waiting, MicrophoneAccess.Granted ->
-                            ListeningContent(level = level)
+                        MicrophoneAccess.Waiting, MicrophoneAccess.Granted -> when (val current = state) {
+                            RecognitionSessionState.Listening ->
+                                ListeningContent(level = level, searching = false)
+                            RecognitionSessionState.Searching ->
+                                ListeningContent(level = 0f, searching = true)
+                            is RecognitionSessionState.Found -> FoundContent(
+                                track = current.track,
+                                onSearch = { onSearch(current.track.searchQuery) },
+                                onRetry = { session.start() },
+                            )
+                            RecognitionSessionState.NoMatch -> RecognitionMessageContent(
+                                icon = Icons.Rounded.MusicOff,
+                                title = stringResource(R.string.no_results),
+                                body = stringResource(R.string.recognition_no_match_hint),
+                                actionLabel = stringResource(R.string.try_again),
+                                onAction = { session.start() },
+                            )
+                            RecognitionSessionState.Failed -> RecognitionMessageContent(
+                                icon = Icons.Rounded.CloudOff,
+                                title = stringResource(R.string.failed),
+                                body = stringResource(R.string.recognition_failed_hint),
+                                actionLabel = stringResource(R.string.try_again),
+                                onAction = { session.start() },
+                            )
+                        }
                         MicrophoneAccess.Denied -> MicrophoneDeniedContent(
                             canAskAgain = canAskAgain,
                             onEnable = {
@@ -269,10 +318,11 @@ fun SongRecognitionDialog(onDismiss: () -> Unit) {
 /**
  * The listening orb. The pulse keeps time, but [level] decides how bright and
  * wide the rings travel, how much the orb swells, and how high the live bars
- * inside it jump.
+ * inside it jump. [searching] swaps the bars for a spinner once the microphone
+ * has been released and the last fingerprint is on its way to Shazam.
  */
 @Composable
-private fun ListeningContent(level: Float) {
+private fun ListeningContent(level: Float, searching: Boolean) {
     // The level itself is feedback, so it keeps moving even under "reduce
     // animation" — but it snaps rather than eases, and the decorative pulse,
     // breathing and idle bar wobble stop.
@@ -375,28 +425,40 @@ private fun ListeningContent(level: Float) {
                         radius = size.minDimension * 0.50f,
                     )
                 }
-                LiveWaveform(
-                    level = animatedLevel,
-                    animate = !reduceAnimation,
-                    modifier = Modifier.size(width = 64.dp, height = 44.dp),
-                )
+                if (searching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(44.dp),
+                        color = Color.White.copy(alpha = 0.82f),
+                        strokeWidth = 3.dp,
+                    )
+                } else {
+                    LiveWaveform(
+                        level = animatedLevel,
+                        animate = !reduceAnimation,
+                        modifier = Modifier.size(width = 64.dp, height = 44.dp),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(24.dp))
         Text(
-            text = stringResource(R.string.recognition_listening),
+            text = stringResource(
+                if (searching) R.string.recognition_searching else R.string.recognition_listening,
+            ),
             color = Color.White,
             fontSize = 22.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.recognition_hint),
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 15.sp,
-            textAlign = TextAlign.Center,
-        )
+        if (!searching) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.recognition_hint),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -433,6 +495,161 @@ private fun LiveWaveform(level: Float, animate: Boolean, modifier: Modifier = Mo
                 topLeft = Offset(left, (size.height - height) / 2f),
                 size = Size(barWidth, height),
                 cornerRadius = CornerRadius(barWidth / 2f),
+            )
+        }
+    }
+}
+
+/**
+ * The matched song. Recognition never auto-plays: the button hands the title
+ * and artist to the normal Search tab, where the listener picks the upload
+ * they actually want.
+ */
+@Composable
+private fun FoundContent(
+    track: ShazamTrack,
+    onSearch: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val artwork = track.artworkUrl
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(190.dp)
+                .recognitionGlass(RoundedCornerShape(28.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!artwork.isNullOrBlank()) {
+                AsyncImage(
+                    model = artwork,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(28.dp)),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.GraphicEq,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.72f),
+                    modifier = Modifier.size(56.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = track.title,
+            color = Color.White,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (track.artist.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = track.artist,
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(28.dp))
+        Button(
+            onClick = onSearch,
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color.Black,
+            ),
+            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.search),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+            )
+        }
+        TextButton(onClick = onRetry) {
+            Text(
+                text = stringResource(R.string.try_again),
+                color = Color.White.copy(alpha = 0.68f),
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+/** A settled answer or a failed request, with one clear way to start over. */
+@Composable
+private fun RecognitionMessageContent(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(horizontal = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .recognitionGlass(CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.72f),
+                modifier = Modifier.size(40.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = body,
+            color = Color.White.copy(alpha = 0.62f),
+            fontSize = 15.sp,
+            lineHeight = 21.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(28.dp))
+        Button(
+            onClick = onAction,
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color.Black,
+            ),
+            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
+        ) {
+            Text(
+                text = actionLabel,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
             )
         }
     }

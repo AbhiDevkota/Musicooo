@@ -72,6 +72,12 @@
     <string name="recognition_permission_body">允许访问麦克风，以便 BitChord 聆听周围播放的音乐。</string>
     <string name="recognition_enable_microphone">启用麦克风</string>
     <string name="recognition_open_settings">打开设置</string>
+    <string name="recognition_searching">正在搜索…</string>
+    <string name="recognition_no_match_hint">请靠近音乐后重试。</string>
+    <string name="recognition_failed_hint">请检查网络连接后重试。</string>
+    <string name="clear_recognition_cache">清除本地识曲缓存</string>
+    <string name="clear_recognition_cache_subtitle">释放识曲录音占用的空间</string>
+    <string name="recognition_cache_cleared">识曲缓存已清除</string>
     <string name="recent_search_edit">编辑“%1$s”</string>
     <string name="recent_search_remove">从最近搜索中移除“%1$s”</string>
     <string name="storage_required_save">需要存储访问权限才能保存歌曲</string>

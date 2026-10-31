@@ -72,6 +72,12 @@
     <string name="recognition_permission_body">允許存取麥克風，讓 BitChord 聆聽周圍播放的音樂。</string>
     <string name="recognition_enable_microphone">啟用麥克風</string>
     <string name="recognition_open_settings">開啟設定</string>
+    <string name="recognition_searching">正在搜尋…</string>
+    <string name="recognition_no_match_hint">請靠近音樂後再試一次。</string>
+    <string name="recognition_failed_hint">請檢查網路連線後再試一次。</string>
+    <string name="clear_recognition_cache">清除本機辨識快取</string>
+    <string name="clear_recognition_cache_subtitle">釋放辨識錄音佔用的空間</string>
+    <string name="recognition_cache_cleared">辨識快取已清除</string>
     <string name="recent_search_edit">編輯“%1$s”</string>
     <string name="recent_search_remove">從最近搜尋中移除“%1$s”</string>
     <string name="storage_required_save">需要儲存訪問許可權才能儲存歌曲</string>

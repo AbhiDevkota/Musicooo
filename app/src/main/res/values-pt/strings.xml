@@ -78,6 +78,12 @@
     <string name="recognition_permission_body">Permite o acesso ao microfone para o BitChord ouvir o que está a tocar à tua volta.</string>
     <string name="recognition_enable_microphone">Ativar microfone</string>
     <string name="recognition_open_settings">Abrir definições</string>
+    <string name="recognition_searching">A procurar…</string>
+    <string name="recognition_no_match_hint">Aproxime-se mais da música e tente novamente.</string>
+    <string name="recognition_failed_hint">Verifique a sua ligação e tente novamente.</string>
+    <string name="clear_recognition_cache">Limpar cache local de reconhecimento</string>
+    <string name="clear_recognition_cache_subtitle">Liberta espaço usado pelas gravações de reconhecimento</string>
+    <string name="recognition_cache_cleared">Cache de reconhecimento limpo</string>
     <string name="recent_search_edit">Editar “%1$s”</string>
     <string name="recent_search_remove">Remover “%1$s” das pesquisas recentes</string>
     <string name="storage_required_save">É necessário acesso ao armazenamento para salvar músicas</string>

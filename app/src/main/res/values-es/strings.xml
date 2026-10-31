@@ -77,6 +77,12 @@
     <string name="recognition_permission_body">Permite el acceso al micrófono para que BitChord escuche lo que suena a tu alrededor.</string>
     <string name="recognition_enable_microphone">Activar micrófono</string>
     <string name="recognition_open_settings">Abrir ajustes</string>
+    <string name="recognition_searching">Buscando…</string>
+    <string name="recognition_no_match_hint">Acércate más a la música e inténtalo de nuevo.</string>
+    <string name="recognition_failed_hint">Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="clear_recognition_cache">Borrar caché local de reconocimiento</string>
+    <string name="clear_recognition_cache_subtitle">Libera espacio usado por las grabaciones de reconocimiento</string>
+    <string name="recognition_cache_cleared">Caché de reconocimiento borrada</string>
     <string name="recent_search_edit">Editar “%1$s”</string>
     <string name="recent_search_remove">Quitar “%1$s” de las búsquedas recientes</string>
     <string name="storage_required_save">Se necesita acceso al almacenamiento para guardar canciones</string>

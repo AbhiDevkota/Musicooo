@@ -72,6 +72,12 @@
     <string name="recognition_permission_body">BitChord が周囲で流れている音楽を聴けるように、マイクへのアクセスを許可してください。</string>
     <string name="recognition_enable_microphone">マイクを有効にする</string>
     <string name="recognition_open_settings">設定を開く</string>
+    <string name="recognition_searching">検索中…</string>
+    <string name="recognition_no_match_hint">音楽にもっと近づいて、もう一度お試しください。</string>
+    <string name="recognition_failed_hint">接続を確認して、もう一度お試しください。</string>
+    <string name="clear_recognition_cache">ローカル認識キャッシュを消去</string>
+    <string name="clear_recognition_cache_subtitle">認識の録音が使っている容量を解放します</string>
+    <string name="recognition_cache_cleared">認識キャッシュを消去しました</string>
     <string name="recent_search_edit">「%1$s」を編集</string>
     <string name="recent_search_remove">最近の検索から「%1$s」を削除</string>
     <string name="storage_required_save">曲を保存するにはストレージへのアクセスが必要です</string>
