@@ -14,6 +14,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -25,18 +26,24 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,7 +81,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -93,7 +103,11 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.shazam.RecognitionSession
 import com.music.bitchord.data.shazam.RecognitionSessionState
 import com.music.bitchord.data.shazam.ShazamTrack
+import com.music.bitchord.ui.components.backdrop.drawBackdrop
+import com.music.bitchord.ui.components.backdrop.effects.blur
+import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
@@ -105,6 +119,15 @@ private val RecognitionBottom = Color(0xFF0A0A0B)
 private val RecognitionGlassTint = Color.White.copy(alpha = 0.10f)
 private val RecognitionGlassFallback = Color.White.copy(alpha = 0.09f)
 private val RecognitionControlFallback = Color.White.copy(alpha = 0.07f)
+
+/** Critically damped, like the player sheet: brisk out, no bounce at either end. */
+private const val SHEET_STIFFNESS = 195f
+private const val SHEET_SETTLED_PX = 0.5f
+private const val SHEET_CLOSE_FRACTION = 0.24f
+private const val SHEET_FALLBACK_HEIGHT_DP = 800f
+
+/** How fast a downward flick has to be, in dp per second, to close on its own. */
+private const val SHEET_FLING_DP = 720f
 
 /** The live microphone has not been tapped yet, so the permission prompt owns the screen. */
 private enum class MicrophoneAccess { Waiting, Granted, Denied }
@@ -135,6 +158,42 @@ fun SongRecognitionDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember(scope) { RecognitionSession(scope) }
+    val density = LocalDensity.current
+    val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    // The sheet follows the finger down, then either springs back or carries on
+    // out of the window — the same shape as the player's dismiss.
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var sheetHeight by remember { mutableFloatStateOf(0f) }
+    var dismissing by remember { mutableStateOf(false) }
+    val flingVelocity = with(density) { SHEET_FLING_DP.dp.toPx() }
+    val fallbackHeight = with(density) { SHEET_FALLBACK_HEIGHT_DP.dp.toPx() }
+
+    fun animateSheetTo(target: Float, velocity: Float, after: (() -> Unit)? = null) {
+        scope.launch {
+            animate(
+                initialValue = dragOffset,
+                targetValue = target,
+                initialVelocity = velocity,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = SHEET_STIFFNESS,
+                    visibilityThreshold = SHEET_SETTLED_PX,
+                ),
+            ) { value, _ -> dragOffset = value }
+            after?.invoke()
+        }
+    }
+
+    val dismiss: () -> Unit = {
+        if (!dismissing) {
+            dismissing = true
+            if (reduceMotion) {
+                onDismiss()
+            } else {
+                animateSheetTo(sheetHeight.takeIf { it > 0f } ?: fallbackHeight, 0f, onDismiss)
+            }
+        }
+    }
     // The rationale question can only be put to an Activity; the Compose
     // context normally is one, but wrapping it keeps this safe in previews and
     // inside other context wrappers.
@@ -194,17 +253,50 @@ fun SongRecognitionDialog(
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
             dismissOnClickOutside = false,
             usePlatformDefaultWidth = false,
+            // The sheet paints its own glass under the status bar like the
+            // player does; only the content below stays inside safe drawing.
+            decorFitsSystemWindows = false,
         ),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(RecognitionTop, RecognitionBottom))),
+                .onSizeChanged { sheetHeight = it.height.toFloat() }
+                .graphicsLayer { translationY = dragOffset }
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = rememberDraggableState { delta ->
+                        if (!dismissing) {
+                            dragOffset = (dragOffset + delta).coerceAtLeast(0f)
+                        }
+                    },
+                    onDragStopped = { velocity ->
+                        if (!dismissing) {
+                            val travel = sheetHeight.takeIf { it > 0f } ?: fallbackHeight
+                            val flick = abs(velocity) >= flingVelocity
+                            val close = if (flick) {
+                                velocity > 0f
+                            } else {
+                                dragOffset > travel * SHEET_CLOSE_FRACTION
+                            }
+                            when {
+                                close && reduceMotion -> onDismiss()
+                                close -> {
+                                    dismissing = true
+                                    animateSheetTo(travel, velocity.coerceAtLeast(0f), onDismiss)
+                                }
+                                reduceMotion -> dragOffset = 0f
+                                else -> animateSheetTo(0f, velocity)
+                            }
+                        }
+                    },
+                )
+                .recognitionSheetSurface(),
         ) {
             // A soft halo under the control, so the glass orb does not sit on
             // a flat black field while the rings travel out from it.
@@ -221,6 +313,7 @@ fun SongRecognitionDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(horizontal = 24.dp),
             ) {
                 Row(
@@ -237,7 +330,7 @@ fun SongRecognitionDialog(
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(
-                        onClick = onDismiss,
+                        onClick = dismiss,
                         modifier = Modifier
                             .size(40.dp)
                             .recognitionGlassControl(CircleShape, RecognitionControlFallback),
@@ -301,7 +394,7 @@ fun SongRecognitionDialog(
                             shape = RoundedCornerShape(percent = 50),
                             fallback = RecognitionControlFallback,
                         )
-                        .clickable(onClick = onDismiss)
+                        .clickable(onClick = dismiss)
                         .padding(horizontal = 22.dp, vertical = 10.dp),
                 ) {
                     Text(
@@ -371,7 +464,7 @@ private fun ListeningContent(level: Float, searching: Boolean) {
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier.size(300.dp),
+            modifier = Modifier.size(340.dp),
             contentAlignment = Alignment.Center,
         ) {
             Canvas(Modifier.fillMaxSize()) {
@@ -402,7 +495,7 @@ private fun ListeningContent(level: Float, searching: Boolean) {
             }
             Box(
                 modifier = Modifier
-                    .size(140.dp)
+                    .size(168.dp)
                     .graphicsLayer {
                         val scale = breathe + animatedLevel * 0.06f
                         scaleX = scale
@@ -427,7 +520,7 @@ private fun ListeningContent(level: Float, searching: Boolean) {
                 }
                 if (searching) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(52.dp),
                         color = Color.White.copy(alpha = 0.82f),
                         strokeWidth = 3.dp,
                     )
@@ -435,7 +528,7 @@ private fun ListeningContent(level: Float, searching: Boolean) {
                     LiveWaveform(
                         level = animatedLevel,
                         animate = !reduceAnimation,
-                        modifier = Modifier.size(width = 64.dp, height = 44.dp),
+                        modifier = Modifier.size(width = 84.dp, height = 58.dp),
                     )
                 }
             }
@@ -484,10 +577,10 @@ private fun LiveWaveform(level: Float, animate: Boolean, modifier: Modifier = Mo
         val gap = size.width * 0.10f
         val barWidth = (size.width - gap * (bars - 1)) / bars
         val maxHeight = size.height * 0.94f
-        val alpha = 0.55f + level * 0.45f
+        val alpha = 0.62f + level * 0.38f
         repeat(bars) { index ->
             val wave = 0.30f + 0.70f * abs(sin(phase + index * 0.85f))
-            val idleHeight = size.height * (0.10f + 0.08f * wave)
+            val idleHeight = size.height * (0.22f + 0.12f * wave)
             val height = idleHeight + (maxHeight - idleHeight) * level * wave
             val left = index * (barWidth + gap)
             drawRoundRect(
@@ -715,6 +808,44 @@ private fun MicrophoneDeniedContent(canAskAgain: Boolean, onEnable: () -> Unit) 
             )
         }
     }
+}
+
+/**
+ * A pale frosted layer across the whole sheet, not just the orb. It samples the
+ * page the dialog covers at the same low resolution the other glass surfaces
+ * use, then keeps most of the sheet's dark weight on top so the blur reads as
+ * texture rather than as another picture behind the text.
+ */
+@Composable
+private fun Modifier.recognitionSheetSurface(): Modifier {
+    val glass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    if (!glass || reduceDynamicBlur) {
+        return background(Brush.verticalGradient(listOf(RecognitionTop, RecognitionBottom)))
+    }
+    val density = LocalDensity.current
+    val blurPx = with(density) { 18.dp.toPx() * 0.33f }
+    return drawBackdrop(
+        backdrop = LocalAppBackdrop.current,
+        shape = { RoundedCornerShape(0.dp) },
+        effects = {
+            colorControls(saturation = 1.12f)
+            blur(blurPx)
+        },
+        highlight = null,
+        shadow = null,
+        onDrawSurface = {
+            drawRect(Color.Black.copy(alpha = 0.42f))
+        },
+        backdropScale = 0.33f,
+    ).background(
+        Brush.verticalGradient(
+            listOf(
+                RecognitionTop.copy(alpha = 0.70f),
+                RecognitionBottom.copy(alpha = 0.86f),
+            ),
+        ),
+    )
 }
 
 /**
