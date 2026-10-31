@@ -75,9 +75,6 @@
     <string name="recognition_searching">正在搜尋…</string>
     <string name="recognition_no_match_hint">請靠近音樂再試一次。</string>
     <string name="recognition_failed_hint">請檢查網絡連線再試一次。</string>
-    <string name="clear_recognition_cache">清除本機識別快取</string>
-    <string name="clear_recognition_cache_subtitle">釋放識別錄音佔用的空間</string>
-    <string name="recognition_cache_cleared">識別快取已清除</string>
     <string name="recent_search_edit">編輯“%1$s”</string>
     <string name="recent_search_remove">從最近搜尋中移除“%1$s”</string>
     <string name="storage_required_save">需要儲存訪問許可權才能儲存歌曲</string>

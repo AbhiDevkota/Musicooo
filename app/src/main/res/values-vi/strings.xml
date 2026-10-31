@@ -81,9 +81,6 @@
     <string name="recognition_searching">Đang tìm kiếm…</string>
     <string name="recognition_no_match_hint">Hãy đến gần nguồn nhạc hơn và thử lại.</string>
     <string name="recognition_failed_hint">Kiểm tra kết nối của bạn và thử lại.</string>
-    <string name="clear_recognition_cache">Xóa bộ nhớ đệm nhận diện cục bộ</string>
-    <string name="clear_recognition_cache_subtitle">Giải phóng dung lượng được dùng bởi bản ghi nhận diện</string>
-    <string name="recognition_cache_cleared">Đã xóa bộ nhớ đệm nhận diện</string>
     <string name="recent_search_edit">Chỉnh sửa “%1$s”</string>
     <string name="recent_search_remove">Xóa “%1$s” khỏi tìm kiếm gần đây</string>
     <string name="storage_required_save">Cần quyền truy cập bộ nhớ để lưu bài hát</string>

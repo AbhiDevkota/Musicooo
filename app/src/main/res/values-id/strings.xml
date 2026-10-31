@@ -75,9 +75,6 @@
     <string name="recognition_searching">Mencari…</string>
     <string name="recognition_no_match_hint">Dekatkan perangkat ke musik dan coba lagi.</string>
     <string name="recognition_failed_hint">Periksa koneksi Anda dan coba lagi.</string>
-    <string name="clear_recognition_cache">Hapus cache pengenalan lokal</string>
-    <string name="clear_recognition_cache_subtitle">Membebaskan ruang yang dipakai rekaman pengenalan</string>
-    <string name="recognition_cache_cleared">Cache pengenalan dihapus</string>
     <string name="recent_search_edit">Edit “%1$s”</string>
     <string name="recent_search_remove">Hapus “%1$s” dari pencarian terbaru</string>
     <string name="storage_required_save">Akses penyimpanan diperlukan untuk menyimpan lagu</string>

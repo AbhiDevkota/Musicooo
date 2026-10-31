@@ -80,9 +80,6 @@
     <string name="recognition_searching">Recherche…</string>
     <string name="recognition_no_match_hint">Rapprochez-vous de la musique et réessayez.</string>
     <string name="recognition_failed_hint">Vérifiez votre connexion et réessayez.</string>
-    <string name="clear_recognition_cache">Effacer le cache local de reconnaissance</string>
-    <string name="clear_recognition_cache_subtitle">Libère de l\'espace utilisé par les enregistrements de reconnaissance</string>
-    <string name="recognition_cache_cleared">Cache de reconnaissance effacé</string>
     <string name="recent_search_edit">Modifier « %1$s »</string>
     <string name="recent_search_remove">Retirer « %1$s » des recherches récentes</string>
     <string name="storage_required_save">L\'accès au stockage est nécessaire pour enregistrer les chansons</string>

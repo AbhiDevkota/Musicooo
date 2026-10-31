@@ -83,9 +83,6 @@
     <string name="recognition_searching">Aranıyor…</string>
     <string name="recognition_no_match_hint">Müziğe daha yaklaşın ve tekrar deneyin.</string>
     <string name="recognition_failed_hint">Bağlantınızı kontrol edin ve tekrar deneyin.</string>
-    <string name="clear_recognition_cache">Yerel tanıma önbelleğini temizle</string>
-    <string name="clear_recognition_cache_subtitle">Tanıma kayıtlarının kullandığı alanı boşaltır</string>
-    <string name="recognition_cache_cleared">Tanıma önbelleği temizlendi</string>
     <string name="recent_search_edit">“%1$s” öğesini düzenle</string>
     <string name="recent_search_remove">“%1$s” öğesini son aramalardan kaldır</string>
     <string name="storage_required_save">Şarkıları kaydetmek için depolama erişimi gerekiyor</string>

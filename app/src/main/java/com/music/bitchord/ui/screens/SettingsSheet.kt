@@ -150,7 +150,6 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.OutputPcmMode
-import com.music.bitchord.data.shazam.RecognitionCache
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.R
@@ -1204,24 +1203,6 @@ fun SettingsScreen(
                     valueRange = (AppSettings.DEFAULT_CACHE_LIMIT_BYTES / (1024 * 1024)).toFloat()..
                         CACHE_UNLIMITED_STOP_MB.toFloat(),
                     steps = 19,
-                )
-            }
-            val clearRecognitionCacheTitle = stringResource(R.string.clear_recognition_cache)
-            row(clearRecognitionCacheTitle, "recognition", "microphone", "cache", "free space") {
-                SettingsRow(
-                    icon = Icons.Rounded.DeleteSweep,
-                    title = clearRecognitionCacheTitle,
-                    subtitle = stringResource(R.string.clear_recognition_cache_subtitle),
-                    onClick = {
-                        backupScope.launch {
-                            RecognitionCache.clear(context)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.recognition_cache_cleared),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
                 )
             }
             val clearSongCacheTitle = stringResource(R.string.clear_song_cache)

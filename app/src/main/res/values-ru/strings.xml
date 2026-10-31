@@ -87,9 +87,6 @@
     <string name="recognition_searching">Поиск…</string>
     <string name="recognition_no_match_hint">Подойдите ближе к музыке и попробуйте снова.</string>
     <string name="recognition_failed_hint">Проверьте подключение и попробуйте снова.</string>
-    <string name="clear_recognition_cache">Очистить локальный кеш распознавания</string>
-    <string name="clear_recognition_cache_subtitle">Освобождает место, занятое записями распознавания</string>
-    <string name="recognition_cache_cleared">Кеш распознавания очищен</string>
     <string name="recent_search_edit">Изменить «%1$s»</string>
     <string name="recent_search_remove">Удалить «%1$s» из недавних запросов</string>
     <string name="storage_required_save">Для сохранения песен нужен доступ к хранилищу</string>
