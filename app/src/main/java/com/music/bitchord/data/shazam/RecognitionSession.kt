@@ -1,7 +1,6 @@
 package com.music.bitchord.data.shazam
 
 import android.Manifest
-import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -36,16 +35,13 @@ sealed interface RecognitionSessionState {
  * running while that lookup is in flight, which is why the next attempt can
  * simply take the longer prefix of the same audio instead of asking the user to
  * start over. A later attempt cancels the previous lookup; only the newest one
- * may change the state. The full 12-second recording, and any cancelled
- * session long enough to be useful, is copied into [RecognitionCache].
+ * may change the state. The audio stays in memory: the fingerprint is the only
+ * thing sent to the provider, and no recording is written to disk.
  */
 class RecognitionSession(
-    context: Context,
     private val scope: CoroutineScope,
     private val provider: ShazamProvider = ShazamClient,
 ) {
-
-    private val appContext = context.applicationContext
 
     private val _level = MutableStateFlow(0f)
     val level: StateFlow<Float> = _level.asStateFlow()
@@ -95,7 +91,7 @@ class RecognitionSession(
         }
     }
 
-    /** Stops the microphone and any lookup. A partial take is still cached. */
+    /** Stops the microphone and any lookup. */
     fun stop() {
         capture = null
         searchJob?.cancel()
@@ -133,7 +129,6 @@ class RecognitionSession(
             readError = true
         } finally {
             releaseRecorder(audioRecord)
-            saveRecording(take)
             _level.value = 0f
             // A recorder can be taken by a call or another app mid-listen. Only
             // report a failure while this take is still the one the UI shows.
@@ -201,12 +196,6 @@ class RecognitionSession(
         searchJob = null
         _level.value = 0f
         _state.value = state
-    }
-
-    private fun saveRecording(take: Capture) {
-        // A tap that never got a usable recording is not worth a cache entry.
-        if (take.sampleCount < ShazamSignatureGenerator.SAMPLE_RATE_HZ / 2) return
-        RecognitionCache.save(appContext, take.samples, take.sampleCount)
     }
 
     private fun updateLevel(samples: ShortArray, read: Int) {

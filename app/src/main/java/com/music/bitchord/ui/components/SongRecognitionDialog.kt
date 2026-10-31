@@ -134,7 +134,7 @@ fun SongRecognitionDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val session = remember(scope, context) { RecognitionSession(context, scope) }
+    val session = remember(scope) { RecognitionSession(scope) }
     // The rationale question can only be put to an Activity; the Compose
     // context normally is one, but wrapping it keeps this safe in previews and
     // inside other context wrappers.
