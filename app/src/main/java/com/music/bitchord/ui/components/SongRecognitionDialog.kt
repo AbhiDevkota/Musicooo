@@ -961,14 +961,19 @@ private fun FoundFlight(
     progress: Float,
 ) {
     val colors = MaterialTheme.colorScheme
+    // The cover leads, the title follows, the artist closes the sequence: a
+    // cascade reads as intentional rather than three things moving at once.
+    val pCover = progress
+    val pTitle = ((progress - 0.10f) / 0.90f).coerceIn(0f, 1f)
+    val pArtist = ((progress - 0.20f) / 0.80f).coerceIn(0f, 1f)
     val alpha = ((1f - progress) / (1f - HANDOFF_FADE_START)).coerceIn(0f, 1f)
-    FlightPiece(layout.artwork, target.artwork, progress, alpha) {
+    FlightPiece(layout.artwork, target.artwork, pCover, alpha) {
         FoundArtwork(track = track, modifier = Modifier.fillMaxSize())
     }
-    FlightPiece(layout.title, target.title, progress, alpha) {
+    FlightPiece(layout.title, target.title, pTitle, alpha) {
         Text(
             text = track.title,
-            color = lerp(Color.White, colors.onSurface, progress),
+            color = lerp(Color.White, colors.onSurface, pTitle),
             fontSize = 23.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -979,10 +984,10 @@ private fun FoundFlight(
     }
     val artistStart = layout.artist
     if (artistStart != null && track.artist.isNotBlank()) {
-        FlightPiece(artistStart, target.artist, progress, alpha) {
+        FlightPiece(artistStart, target.artist, pArtist, alpha) {
             Text(
                 text = track.artist,
-                color = lerp(Color.White.copy(alpha = 0.62f), colors.onSurfaceVariant, progress),
+                color = lerp(Color.White.copy(alpha = 0.62f), colors.onSurfaceVariant, pArtist),
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
