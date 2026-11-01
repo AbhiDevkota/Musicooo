@@ -226,7 +226,7 @@ fun SongRecognitionDialog(
     onSearch: (String) -> Unit,
     searchFieldBounds: Rect?,
     topResultBounds: TopResultBounds?,
-    onLanded: () -> Unit = {},
+    onLanded: (onCard: Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -417,7 +417,7 @@ fun SongRecognitionDialog(
                     )
                     // A soft tick marks the moment the match lands on its result.
                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    onLanded()
+                    onLanded(promoted != null)
                 }
             }
             // Let the page brighten as the sheet leaves, so dismissing the

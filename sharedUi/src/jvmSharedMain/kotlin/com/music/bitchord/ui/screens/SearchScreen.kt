@@ -193,6 +193,8 @@ fun SearchScreen(
     sourceSwitcher: (@Composable () -> Unit)? = null,
     /** Bumps to make the promoted Top result card pulse after a handoff lands. */
     topResultPulseTrigger: Int = 0,
+    /** Bumps to make the search field pulse when a handoff lands on it (fallback). */
+    searchFieldPulseTrigger: Int = 0,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -253,6 +255,7 @@ fun SearchScreen(
                         stringResource(Res.string.search_hint)
                     },
                     modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp),
+                    pulseTrigger = searchFieldPulseTrigger,
                 )
             }
             if (sourceSwitcher != null) {

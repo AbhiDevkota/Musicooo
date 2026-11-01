@@ -3,6 +3,9 @@ package com.music.bitchord.ui.components
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -25,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
@@ -65,6 +70,7 @@ fun SearchField(
      * microphone off the settings filter and the desktop's sidebar field.
      */
     onVoiceSearch: (() -> Unit)? = null,
+    pulseTrigger: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -75,9 +81,20 @@ fun SearchField(
         onSubmit()
         focusManager.clearFocus()
     }
+    val pulseScale = remember { Animatable(1f) }
+    LaunchedEffect(pulseTrigger) {
+        if (pulseTrigger == 0) return@LaunchedEffect
+        pulseScale.animateTo(1.02f, animationSpec = tween(120, easing = FastOutSlowInEasing))
+        pulseScale.animateTo(1f, animationSpec = tween(130, easing = FastOutSlowInEasing))
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pulseScale.value
+                scaleY = pulseScale.value
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
+            }
             // Fixed height prevents the row from growing when text is entered
             .height(46.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp))
