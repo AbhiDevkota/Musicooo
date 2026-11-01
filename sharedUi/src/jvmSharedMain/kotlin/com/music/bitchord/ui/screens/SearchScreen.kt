@@ -4,6 +4,9 @@ import com.music.bitchord.data.model.toSong
 import com.music.bitchord.ui.components.SwipeToQueueBox
 import com.music.bitchord.ui.components.contextClick
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -53,7 +56,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +97,20 @@ import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import java.util.Locale
 
+/**
+ * Where Search's promoted "Top result" card sits, in window coordinates. A
+ * recognized song flies its cover and title into these rectangles, so the
+ * handoff lands on the result it becomes instead of the search field.
+ */
+data class TopResultBounds(
+    val videoId: String,
+    val songTitle: String,
+    val songArtist: String,
+    val artwork: Rect,
+    val title: Rect,
+    val artist: Rect,
+)
+
 @Composable
 fun SearchScreen(
     query: String,
@@ -110,6 +131,8 @@ fun SearchScreen(
     onSongSwipe: (Song) -> Unit,
     onTopResultPlay: (Song) -> Unit,
     onTopResultPlaylist: (Song) -> Unit,
+    /** Reports the promoted card's geometry; the recognition sheet lands on it. */
+    onTopResultBounds: ((TopResultBounds) -> Unit)? = null,
     onBrowseClick: (BrowseItem) -> Unit,
     /**
      * Holding an album or playlist hit rather than tapping it — the same menu
@@ -326,6 +349,18 @@ fun SearchScreen(
                                     onPlay = { onTopResultPlay(topResult.song) },
                                     onPlaylist = { onTopResultPlaylist(topResult.song) },
                                     onLongPress = { onSongLongPress(topResult.song) },
+                                    onBounds = { artwork, title, artist ->
+                                        onTopResultBounds?.invoke(
+                                            TopResultBounds(
+                                                videoId = topResult.song.videoId,
+                                                songTitle = topResult.song.title,
+                                                songArtist = topResult.song.artist,
+                                                artwork = artwork,
+                                                title = title,
+                                                artist = artist,
+                                            ),
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -487,7 +522,26 @@ private fun TopResultCard(
     onPlaylist: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    onBounds: ((artwork: Rect, title: Rect, artist: Rect) -> Unit)? = null,
 ) {
+    var artworkBounds by remember { mutableStateOf<Rect?>(null) }
+    var titleBounds by remember { mutableStateOf<Rect?>(null) }
+    var artistBounds by remember { mutableStateOf<Rect?>(null) }
+    // Read during composition so Compose tracks these as dependencies and does
+    // not skip recomposition (and thus the SideEffect below) when they change.
+    val _ab = artworkBounds
+    val _tb = titleBounds
+    val _arb = artistBounds
+    // Reported after every composition, not just when the rectangles move:
+    // re-running a cached search can keep the same card in place while a
+    // recognition sheet waits for it, and its start-of-search report is what
+    // tells that sheet where to land.
+    SideEffect {
+        val artwork = artworkBounds ?: return@SideEffect
+        val title = titleBounds ?: return@SideEffect
+        val artist = artistBounds ?: return@SideEffect
+        onBounds?.invoke(artwork, title, artist)
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -506,7 +560,10 @@ private fun TopResultCard(
             AsyncImage(
                 model = song.thumbnailUrl?.artworkAt(ROW_ART_PX),
                 contentDescription = null,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .onGloballyPositioned { artworkBounds = it.boundsInWindow() },
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
@@ -516,6 +573,7 @@ private fun TopResultCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.onGloballyPositioned { titleBounds = it.boundsInWindow() },
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -524,6 +582,7 @@ private fun TopResultCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.onGloballyPositioned { artistBounds = it.boundsInWindow() },
                 )
             }
             RowMoreButton(

@@ -319,6 +319,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.TopResultBounds
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -690,6 +691,10 @@ private fun BitChordApp(
     // handed off into this rectangle, so it lands on the field it is searching
     // rather than at an approximation of it.
     var recognitionFieldBounds by remember { mutableStateOf<Rect?>(null) }
+    // Where Search's promoted "Top result" card sits. A match flies into this
+    // card, so the cover and title land on the result they became rather than
+    // stopping at the field that asked for it.
+    var recognitionTopBounds by remember { mutableStateOf<TopResultBounds?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -944,10 +949,12 @@ private fun BitChordApp(
         softwareKeyboard?.hide()
         resumeAfterRecognition = controller?.playWhenReady == true
         if (resumeAfterRecognition) controller?.pause()
+        recognitionTopBounds = null
         showSongRecognition = true
     }
     val dismissSongRecognition: () -> Unit = {
         showSongRecognition = false
+        recognitionTopBounds = null
         if (resumeAfterRecognition) controller?.play()
         resumeAfterRecognition = false
     }
@@ -960,6 +967,9 @@ private fun BitChordApp(
         dismissPlayer()
         navigator.clear()
         selectedTab = TAB_SEARCH
+        // The handoff lands on the promoted result, so the page has to be on
+        // All even if the last search was filtered to albums or songs.
+        viewModel.onFilterChange(SearchFilter.ALL)
         viewModel.searchFor(query, SearchSource.YOUTUBE)
     }
     // A resume in a party is performed on the instant the server schedules, not
@@ -3213,6 +3223,9 @@ private fun BitChordApp(
                                     ))
                                     playRadio(song, QueueSource(searchLabel, PlaybackSourceType.SEARCH))
                                 },
+                                onTopResultBounds = { bounds ->
+                                    if (showSongRecognition) recognitionTopBounds = bounds
+                                },
                                 onTopResultPlaylist = { song ->
                                     viewModel.recordEntity(SearchHistoryEntity(
                                         id = song.videoId,
@@ -4938,6 +4951,7 @@ private fun BitChordApp(
                 onDismiss = dismissSongRecognition,
                 onSearch = searchRecognizedSong,
                 searchFieldBounds = recognitionFieldBounds,
+                topResultBounds = recognitionTopBounds,
             )
         }
 

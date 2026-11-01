@@ -8,7 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import android.view.Window
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -65,6 +65,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,7 +75,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,7 +89,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -94,7 +99,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -104,9 +108,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
+
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -118,11 +120,16 @@ import com.music.bitchord.data.shazam.RecognitionSessionState
 import com.music.bitchord.data.shazam.ShazamTrack
 import com.music.bitchord.ui.components.backdrop.drawBackdrop
 import com.music.bitchord.ui.components.backdrop.effects.blur
+import com.music.bitchord.data.DebugLog as Log
 import com.music.bitchord.ui.components.backdrop.effects.colorControls
+import com.music.bitchord.ui.screens.TopResultBounds
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -154,12 +161,38 @@ private val SHEET_TOP_GAP = 16.dp
 /** How long a match is held on screen before it starts moving to Search. */
 private const val RESULT_DWELL_MS = 1_050L
 
+/**
+ * The beat the sheet gives Search to promote the card the query becomes. The
+ * flight lands on that card when it arrives; a slow or unpromoted search falls
+ * back to the field that started the listen.
+ */
+private const val TOP_RESULT_WAIT_MS = 3_000L
+
 /** The flight from the sheet to the search field, and how small it lands. */
 private const val RESULT_FLIGHT_MS = 620
 private const val RESULT_FLIGHT_END_SCALE = 0.16f
 
-/** The matched card in flight: where it started and what it is carrying. */
-private data class FoundHandoff(val track: ShazamTrack, val bounds: Rect)
+/** The last stretch of the flight, where it dissolves into the real result. */
+private const val HANDOFF_FADE_START = 0.82f
+
+/** The matched card's pieces as they sit on the sheet, before it lifts. */
+private data class FoundLayout(
+    val artwork: Rect,
+    val title: Rect,
+    val artist: Rect?,
+)
+
+/**
+ * The matched card in flight: what it carries, the card it detaches from, and
+ * where it lands. [layout] and [target] are only both present when Search has
+ * already promoted the matching result, which is the element-by-element path.
+ */
+private data class FoundHandoff(
+    val track: ShazamTrack,
+    val card: Rect,
+    val layout: FoundLayout?,
+    val target: TopResultBounds?,
+)
 
 /** The live microphone has not been tapped yet, so the permission prompt owns the screen. */
 private enum class MicrophoneAccess { Waiting, Granted, Denied }
@@ -178,16 +211,19 @@ private enum class MicrophoneAccess { Waiting, Granted, Denied }
  * offering the way back to the system toggle instead of dropping a toast and
  * closing.
  *
- * A match is held for a beat and then flown to [searchFieldBounds], the
- * search field it was started from, while [onSearch] loads the results behind
- * the sheet. The Search tab still owns the final choice rather than the
- * recognizer guessing which upload is the right one.
+ * A match is held for a beat and then handed to Search while [onSearch] loads
+ * the results behind the sheet. If that search promotes the matching song, the
+ * cover, title and artist fly into the promoted card's own rectangles and
+ * dissolve into it; otherwise the card falls back to [searchFieldBounds], the
+ * field it was started from. The Search tab still owns the final choice rather
+ * than the recognizer guessing which upload is the right one.
  */
 @Composable
 fun SongRecognitionDialog(
     onDismiss: () -> Unit,
     onSearch: (String) -> Unit,
     searchFieldBounds: Rect?,
+    topResultBounds: TopResultBounds?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -201,12 +237,18 @@ fun SongRecognitionDialog(
     var sheetHeight by remember { mutableFloatStateOf(0f) }
     var dismissing by remember { mutableStateOf(false) }
     // The matched card's place on screen, then the same card detached into a
-    // flight of its own once the Search tab has been asked for results.
+    // flight of its own once the Search tab has been asked for results. The
+    // three rects are measured separately so each piece can land on its own
+    // counterpart in Search's promoted result.
     var resultBounds by remember { mutableStateOf<Rect?>(null) }
+    var foundArtworkBounds by remember { mutableStateOf<Rect?>(null) }
+    var foundTitleBounds by remember { mutableStateOf<Rect?>(null) }
+    var foundArtistBounds by remember { mutableStateOf<Rect?>(null) }
     var handoff by remember { mutableStateOf<FoundHandoff?>(null) }
+    var scrimAlpha by remember { mutableFloatStateOf(0f) }
     val flight = remember { Animatable(0f) }
     var rootWidth by remember { mutableFloatStateOf(0f) }
-    var dialogWindow by remember { mutableStateOf<Window?>(null) }
+
     val flingVelocity = with(density) { SHEET_FLING_DP.dp.toPx() }
     val fallbackHeight = with(density) { SHEET_FALLBACK_HEIGHT_DP.dp.toPx() }
 
@@ -295,10 +337,15 @@ fun SongRecognitionDialog(
     }
 
     // A match does not wait for a Search tap. It is held for a beat, the
-    // results are asked for behind the sheet, and then the card flies to the
-    // field that started the listen while the sheet leaves underneath it. By
-    // the time it lands, Search is already the page behind.
+    // results are asked for behind the sheet, and then the card flies into the
+    // promoted result — or, when Search has nothing to promote, to the field
+    // that started the listen — while the sheet leaves underneath it. By the
+    // time it lands, Search is already the page behind.
     val foundTrack = (state as? RecognitionSessionState.Found)?.track
+    // The effect below starts before Search has reported anything, so it has to
+    // read the newest bounds through a state holder rather than the value this
+    // composition launched with.
+    val latestTopResultBounds by rememberUpdatedState(topResultBounds)
     LaunchedEffect(foundTrack?.searchQuery) {
         val track = foundTrack ?: return@LaunchedEffect
         delay(RESULT_DWELL_MS)
@@ -309,14 +356,32 @@ fun SongRecognitionDialog(
             onDismiss()
             return@LaunchedEffect
         }
-        val bounds = resultBounds
+        // Search loads behind the sheet. Wait for its promoted card so the
+        // pieces have somewhere exact to land; without it (slow network, no
+        // top hit) the card still leaves for the field that was tapped.
+        val promoted = withTimeoutOrNull(TOP_RESULT_WAIT_MS) {
+            snapshotFlow { latestTopResultBounds }.first { bounds ->
+                bounds != null && bounds.matches(track)
+            }
+        }
+        try {
+        } catch (_: Exception) { }
+        if (dismissing) return@LaunchedEffect
+        val card = resultBounds
+        val artwork = foundArtworkBounds
+        val title = foundTitleBounds
+        val layout = if (artwork != null && title != null) {
+            FoundLayout(artwork = artwork, title = title, artist = foundArtistBounds)
+        } else {
+            null
+        }
         val travel = sheetHeight.takeIf { it > 0f } ?: fallbackHeight
         dismissing = true
-        if (bounds != null) {
-            handoff = FoundHandoff(track, bounds)
+        if (card != null) {
+            handoff = FoundHandoff(track, card, layout, promoted)
             flight.snapTo(0f)
         }
-        val startDim = dialogWindow?.attributes?.dimAmount ?: 0f
+        val startDim = scrimAlpha
         coroutineScope {
             launch {
                 animate(
@@ -330,7 +395,7 @@ fun SongRecognitionDialog(
                     ),
                 ) { value, _ -> dragOffset = value }
             }
-            if (bounds != null) {
+            if (card != null) {
                 launch {
                     flight.animateTo(
                         targetValue = 1f,
@@ -340,14 +405,14 @@ fun SongRecognitionDialog(
             }
             // Let the page brighten as the sheet leaves, so dismissing the
             // window at the end does not snap the scrim off in one frame.
-            if (dialogWindow != null && startDim > 0f) {
+            if (startDim > 0f) {
                 launch {
                     animate(
                         initialValue = startDim,
                         targetValue = 0f,
                         animationSpec = tween(RESULT_FLIGHT_MS),
                     ) { value, _ ->
-                        dialogWindow?.setDimAmount(value)
+                        scrimAlpha = value
                     }
                 }
             }
@@ -355,22 +420,23 @@ fun SongRecognitionDialog(
         onDismiss()
     }
 
-    Dialog(
-        onDismissRequest = dismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false,
-            // The sheet paints its own glass under the status bar like the
-            // player does; only the content below stays inside safe drawing.
-            decorFitsSystemWindows = false,
-        ),
+    // Rendered in-composition (not as a separate window) so the Search page
+    // behind it keeps receiving layout passes and can report its Top result
+    // rectangles for the handoff.
+    BackHandler(enabled = true) { dismiss() }
+    LaunchedEffect(Unit) {
+        animate(0f, 0.5f) { v, _ -> scrimAlpha = v }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { rootWidth = it.width.toFloat() },
     ) {
-        val view = LocalView.current
-        DisposableEffect(view) {
-            dialogWindow = (view.parent as? DialogWindowProvider)?.window
-            onDispose { dialogWindow = null }
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = scrimAlpha)),
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -502,7 +568,12 @@ fun SongRecognitionDialog(
                                             resultBounds = it.boundsInWindow()
                                         },
                                     ) {
-                                        FoundContent(track = current.track)
+                                        FoundContent(
+                                            track = current.track,
+                                            onArtworkBounds = { foundArtworkBounds = it },
+                                            onTitleBounds = { foundTitleBounds = it },
+                                            onArtistBounds = { foundArtistBounds = it },
+                                        )
                                     }
                                 }
                                 RecognitionSessionState.NoMatch -> RecognitionMessageContent(
@@ -552,36 +623,50 @@ fun SongRecognitionDialog(
                 }
             }
             // The resting card is hidden the moment it lifts; this is that
-            // same card in the root, outside the sheet's clip, on its way to
-            // the search field. The sheet slides away underneath it.
+            // same card in the root, outside the sheet's clip. When Search has
+            // promoted the matching song the pieces land on its own result;
+            // otherwise the whole card still leaves for the field that asked
+            // for it. The sheet slides away underneath either way.
             val flying = handoff
             if (flying != null) {
                 val progress = flight.value
-                val target = searchFieldBounds?.center ?: Offset(
-                    x = rootWidth / 2f,
-                    y = with(density) { (statusBarTop + 41.dp).toPx() },
-                )
-                val scale = 1f + (RESULT_FLIGHT_END_SCALE - 1f) * progress
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = flying.bounds.left.roundToInt(),
-                                y = flying.bounds.top.roundToInt(),
-                            )
-                        }
-                        .width(with(density) { flying.bounds.width.toDp() })
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = (target.x - flying.bounds.center.x) * progress
-                            translationY = (target.y - flying.bounds.center.y) * progress
-                            // Held readable for most of the flight, then
-                            // dissolved into the field it lands on.
-                            alpha = ((1f - progress) / 0.2f).coerceIn(0f, 1f)
-                        },
-                ) {
-                    FoundContent(track = flying.track)
+                val layout = flying.layout
+                val promoted = flying.target
+                if (layout != null && promoted != null) {
+                    FoundFlight(
+                        track = flying.track,
+                        layout = layout,
+                        target = promoted,
+                        progress = progress,
+                    )
+                } else {
+                    val target = searchFieldBounds?.center ?: Offset(
+                        x = rootWidth / 2f,
+                        y = with(density) { (statusBarTop + 41.dp).toPx() },
+                    )
+                    val scale = 1f + (RESULT_FLIGHT_END_SCALE - 1f) * progress
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    x = flying.card.left.roundToInt(),
+                                    y = flying.card.top.roundToInt(),
+                                )
+                            }
+                            .width(with(density) { flying.card.width.toDp() })
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = (target.x - flying.card.center.x) * progress
+                                translationY = (target.y - flying.card.center.y) * progress
+                                // Held readable for most of the flight, then
+                                // dissolved into the field it lands on.
+                                alpha = ((1f - progress) / (1f - HANDOFF_FADE_START))
+                                    .coerceIn(0f, 1f)
+                            },
+                    ) {
+                        FoundContent(track = flying.track)
+                    }
                 }
             }
         }
@@ -781,36 +866,22 @@ private fun LiveWaveform(level: Float, animate: Boolean, modifier: Modifier = Mo
  * search field — which is why it carries no buttons or state of its own.
  */
 @Composable
-private fun FoundContent(track: ShazamTrack) {
-    val artwork = track.artworkUrl
+private fun FoundContent(
+    track: ShazamTrack,
+    onArtworkBounds: (Rect) -> Unit = {},
+    onTitleBounds: (Rect) -> Unit = {},
+    onArtistBounds: (Rect) -> Unit = {},
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = 8.dp),
     ) {
-        Box(
+        FoundArtwork(
+            track = track,
             modifier = Modifier
                 .size(190.dp)
-                .recognitionGlass(RoundedCornerShape(28.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (!artwork.isNullOrBlank()) {
-                AsyncImage(
-                    model = artwork,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(28.dp)),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Rounded.GraphicEq,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.72f),
-                    modifier = Modifier.size(56.dp),
-                )
-            }
-        }
+                .onGloballyPositioned { onArtworkBounds(it.boundsInWindow()) },
+        )
         Spacer(Modifier.height(24.dp))
         Text(
             text = track.title,
@@ -820,6 +891,7 @@ private fun FoundContent(track: ShazamTrack) {
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.onGloballyPositioned { onTitleBounds(it.boundsInWindow()) },
         )
         if (track.artist.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
@@ -830,10 +902,142 @@ private fun FoundContent(track: ShazamTrack) {
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.onGloballyPositioned { onArtistBounds(it.boundsInWindow()) },
             )
         }
     }
 }
+
+/** The cover square, shared by the resting card and the flight overlay. */
+@Composable
+private fun FoundArtwork(track: ShazamTrack, modifier: Modifier = Modifier) {
+    val artwork = track.artworkUrl
+    Box(
+        modifier = modifier.recognitionGlass(RoundedCornerShape(28.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!artwork.isNullOrBlank()) {
+            AsyncImage(
+                model = artwork,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(28.dp)),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.GraphicEq,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.72f),
+                modifier = Modifier.size(56.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The match on its way into Search's promoted result. Each piece keeps its own
+ * measured rectangle and is carried to the corresponding rectangle in that
+ * card, so the cover lands on the cover and the title lands on the title rather
+ * than the whole card shrinking into a single point. The real result is already
+ * underneath; the last stretch fades the fliers into it.
+ */
+@Composable
+private fun FoundFlight(
+    track: ShazamTrack,
+    layout: FoundLayout,
+    target: TopResultBounds,
+    progress: Float,
+) {
+    val colors = MaterialTheme.colorScheme
+    val alpha = ((1f - progress) / (1f - HANDOFF_FADE_START)).coerceIn(0f, 1f)
+    FlightPiece(layout.artwork, target.artwork, progress, alpha) {
+        FoundArtwork(track = track, modifier = Modifier.fillMaxSize())
+    }
+    FlightPiece(layout.title, target.title, progress, alpha) {
+        Text(
+            text = track.title,
+            color = lerp(Color.White, colors.onSurface, progress),
+            fontSize = 23.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+    val artistStart = layout.artist
+    if (artistStart != null && track.artist.isNotBlank()) {
+        FlightPiece(artistStart, target.artist, progress, alpha) {
+            Text(
+                text = track.artist,
+                color = lerp(Color.White.copy(alpha = 0.62f), colors.onSurfaceVariant, progress),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/**
+ * One piece of [FoundFlight]. It is laid out at [start], then translated and
+ * scaled from its top-left corner until its bounds equal [target] at
+ * `progress == 1f`.
+ */
+@Composable
+private fun FlightPiece(
+    start: Rect,
+    target: Rect,
+    progress: Float,
+    alpha: Float,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val targetScaleX = if (start.width > 0f) target.width / start.width else 1f
+    val targetScaleY = if (start.height > 0f) target.height / start.height else 1f
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(start.left.roundToInt(), start.top.roundToInt()) }
+            .size(
+                width = with(density) { start.width.toDp() },
+                height = with(density) { start.height.toDp() },
+            )
+            .graphicsLayer {
+                transformOrigin = TransformOrigin(0f, 0f)
+                translationX = (target.left - start.left) * progress
+                translationY = (target.top - start.top) * progress
+                scaleX = 1f + (targetScaleX - 1f) * progress
+                scaleY = 1f + (targetScaleY - 1f) * progress
+                this.alpha = alpha
+            },
+    ) {
+        content()
+    }
+}
+
+/**
+ * Whether the promoted card is the song the recognizer heard. Only the title is
+ * compared: the search query carries the artist already, and the promoted cards
+ * read YouTube's title rather than Shazam's, so an exact artist match would
+ * cost the handoff more often than it would protect it.
+ */
+private fun TopResultBounds.matches(track: ShazamTrack): Boolean {
+    val heard = track.title.matchKey()
+    val promoted = songTitle.matchKey()
+    if (heard.isEmpty() || promoted.isEmpty()) return false
+    return heard == promoted || promoted.contains(heard) || heard.contains(promoted)
+}
+
+/** Folds a title to lowercase words so a parenthetical still matches its song. */
+private fun String.matchKey(): String = lowercase(Locale.ROOT)
+    .replace(Regex("\\([^)]*\\)"), " ")
+    .replace(Regex("\\[[^\\]]*]"), " ")
+    .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+    .trim()
 
 /** A settled answer or a failed request, with one clear way to start over. */
 @Composable
