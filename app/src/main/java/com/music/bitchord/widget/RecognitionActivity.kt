@@ -10,7 +10,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.music.bitchord.MainActivity
@@ -77,8 +80,20 @@ class RecognitionActivity : Activity() {
      */
     private var frameBitmap: Bitmap? = null
 
+    /** The main looper's handler, for sleeps that must land after in-flight frames. */
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The window is hand-made pass-through. It paints nothing and lives
+        // over the launcher for the whole take — if it swallowed touches it
+        // would sit on top of the very widget the user is trying to tap
+        // again, and "tap to stop" would never reach the widget at all. Let
+        // every touch fall through to the launcher so the second tap lands
+        // on the pill itself, and the system's own dialogs (the permission
+        // ask among them) sit in windows above this one, untouched by the
+        // flag.
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -105,14 +120,18 @@ class RecognitionActivity : Activity() {
         }
     }
 
-    // A second tap while a take is live is the stop button: the pill goes back
-    // to sleep and the microphone lets go. With nothing running — the window
-    // is already settling its ending — the tap changes nothing on purpose.
+    // A second tap while a take is live is the stop button: the pill goes
+    // back to sleep and the microphone lets go. A tap into a live window
+    // whose take is already over — abandoned from the background, or already
+    // settling its ending — restarts the listen, exactly what a first tap
+    // would have done on a clean launcher.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (listening) {
             abandon()
             finish()
+        } else {
+            startListening()
         }
     }
 
@@ -194,19 +213,27 @@ class RecognitionActivity : Activity() {
     }
 
     /**
-     * Leaves the take without an ending: the pill goes back to sleep before
-     * anything else, the microphone stops, and the watch above is cancelled
-     * whole. Idempotent by way of the flag, so the settled paths — which
-     * unset [listening] first and close the window after — falling through
-     * [onStop] on the way out touch none of this.
+     * Leaves the take without an ending: the microphone stops, the watch is
+     * cancelled whole, and the pill goes back to sleep. Idempotent by way of
+     * the flag, so the settled paths — which unset [listening] first and
+     * close the window after — falling through [onStop] on the way out touch
+     * none of this.
+     *
+     * The sleep is re-posted a main-loop turn past the cancellation: the
+     * frame loop may have one frame already inside the binder on its way to
+     * the launcher, and a frame that lands *after* this method's sleep would
+     * leave the widget awake at a frozen picture — the very picture of a
+     * stop that didn't take.
      */
     private fun abandon() {
         listening = false
-        RecognitionWidgetProvider.showSleep(this)
         session?.stop()
         scope?.cancel()
         session = null
         scope = null
+        mainHandler.post {
+            RecognitionWidgetProvider.showSleep(this)
+        }
     }
 
     /**
