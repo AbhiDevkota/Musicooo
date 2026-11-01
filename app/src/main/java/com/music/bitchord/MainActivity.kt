@@ -697,6 +697,9 @@ private fun BitChordApp(
     var recognitionTopBounds by remember { mutableStateOf<TopResultBounds?>(null) }
     var recognitionLandedTrigger by remember { mutableIntStateOf(0) }
     var recognitionFieldLandedTrigger by remember { mutableIntStateOf(0) }
+    // The query a recognition run produced; keeps its promoted Top result card
+    // on screen after the sheet closes, until the user searches something else.
+    var recognitionQuery by remember { mutableStateOf<String?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -971,6 +974,7 @@ private fun BitChordApp(
         selectedTab = TAB_SEARCH
         // The handoff lands on the promoted result, so the page has to be on
         // All even if the last search was filtered to albums or songs.
+        recognitionQuery = query
         viewModel.onFilterChange(SearchFilter.ALL)
         viewModel.searchFor(query, SearchSource.YOUTUBE)
     }
@@ -3230,7 +3234,7 @@ private fun BitChordApp(
                                 },
                                 topResultPulseTrigger = recognitionLandedTrigger,
                                 searchFieldPulseTrigger = recognitionFieldLandedTrigger,
-                                forceTopResult = showSongRecognition,
+                                forceTopResult = (recognitionQuery != null && query == recognitionQuery),
                                 onTopResultPlaylist = { song ->
                                     viewModel.recordEntity(SearchHistoryEntity(
                                         id = song.videoId,
