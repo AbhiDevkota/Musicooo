@@ -8,8 +8,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.view.Window
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -41,6 +43,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -57,14 +60,12 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.MusicOff
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -87,19 +89,24 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -113,9 +120,12 @@ import com.music.bitchord.ui.components.backdrop.drawBackdrop
 import com.music.bitchord.ui.components.backdrop.effects.blur
 import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private val RecognitionTop = Color(0xFF1D1D20)
@@ -141,6 +151,16 @@ private val RecognitionSheetShape = RoundedCornerShape(topStart = 28.dp, topEnd 
 /** Air between the status bar and the sheet, so it reads as a sheet, not a page. */
 private val SHEET_TOP_GAP = 16.dp
 
+/** How long a match is held on screen before it starts moving to Search. */
+private const val RESULT_DWELL_MS = 1_050L
+
+/** The flight from the sheet to the search field, and how small it lands. */
+private const val RESULT_FLIGHT_MS = 620
+private const val RESULT_FLIGHT_END_SCALE = 0.16f
+
+/** The matched card in flight: where it started and what it is carrying. */
+private data class FoundHandoff(val track: ShazamTrack, val bounds: Rect)
+
 /** The live microphone has not been tapped yet, so the permission prompt owns the screen. */
 private enum class MicrophoneAccess { Waiting, Granted, Denied }
 
@@ -158,25 +178,35 @@ private enum class MicrophoneAccess { Waiting, Granted, Denied }
  * offering the way back to the system toggle instead of dropping a toast and
  * closing.
  *
- * A match is handed to [onSearch] with "title artist", so the existing Search
- * tab owns the final choice rather than the recognizer guessing which upload is
- * the right one.
+ * A match is held for a beat and then flown to [searchFieldBounds], the
+ * search field it was started from, while [onSearch] loads the results behind
+ * the sheet. The Search tab still owns the final choice rather than the
+ * recognizer guessing which upload is the right one.
  */
 @Composable
 fun SongRecognitionDialog(
     onDismiss: () -> Unit,
     onSearch: (String) -> Unit,
+    searchFieldBounds: Rect?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember(scope) { RecognitionSession(scope) }
     val density = LocalDensity.current
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     // The sheet follows the finger down, then either springs back or carries on
     // out of the window — the same shape as the player's dismiss.
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var sheetHeight by remember { mutableFloatStateOf(0f) }
     var dismissing by remember { mutableStateOf(false) }
+    // The matched card's place on screen, then the same card detached into a
+    // flight of its own once the Search tab has been asked for results.
+    var resultBounds by remember { mutableStateOf<Rect?>(null) }
+    var handoff by remember { mutableStateOf<FoundHandoff?>(null) }
+    val flight = remember { Animatable(0f) }
+    var rootWidth by remember { mutableFloatStateOf(0f) }
+    var dialogWindow by remember { mutableStateOf<Window?>(null) }
     val flingVelocity = with(density) { SHEET_FLING_DP.dp.toPx() }
     val fallbackHeight = with(density) { SHEET_FALLBACK_HEIGHT_DP.dp.toPx() }
 
@@ -264,6 +294,67 @@ fun SongRecognitionDialog(
         canAskAgain = activity?.canAskForMicrophone() == true
     }
 
+    // A match does not wait for a Search tap. It is held for a beat, the
+    // results are asked for behind the sheet, and then the card flies to the
+    // field that started the listen while the sheet leaves underneath it. By
+    // the time it lands, Search is already the page behind.
+    val foundTrack = (state as? RecognitionSessionState.Found)?.track
+    LaunchedEffect(foundTrack?.searchQuery) {
+        val track = foundTrack ?: return@LaunchedEffect
+        delay(RESULT_DWELL_MS)
+        // A back press or a swipe during the beat already owns the exit.
+        if (dismissing) return@LaunchedEffect
+        onSearch(track.searchQuery)
+        if (reduceMotion) {
+            onDismiss()
+            return@LaunchedEffect
+        }
+        val bounds = resultBounds
+        val travel = sheetHeight.takeIf { it > 0f } ?: fallbackHeight
+        dismissing = true
+        if (bounds != null) {
+            handoff = FoundHandoff(track, bounds)
+            flight.snapTo(0f)
+        }
+        val startDim = dialogWindow?.attributes?.dimAmount ?: 0f
+        coroutineScope {
+            launch {
+                animate(
+                    initialValue = dragOffset,
+                    targetValue = travel,
+                    initialVelocity = 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = SHEET_STIFFNESS,
+                        visibilityThreshold = SHEET_SETTLED_PX,
+                    ),
+                ) { value, _ -> dragOffset = value }
+            }
+            if (bounds != null) {
+                launch {
+                    flight.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(RESULT_FLIGHT_MS, easing = FastOutSlowInEasing),
+                    )
+                }
+            }
+            // Let the page brighten as the sheet leaves, so dismissing the
+            // window at the end does not snap the scrim off in one frame.
+            if (dialogWindow != null && startDim > 0f) {
+                launch {
+                    animate(
+                        initialValue = startDim,
+                        targetValue = 0f,
+                        animationSpec = tween(RESULT_FLIGHT_MS),
+                    ) { value, _ ->
+                        dialogWindow?.setDimAmount(value)
+                    }
+                }
+            }
+        }
+        onDismiss()
+    }
+
     Dialog(
         onDismissRequest = dismiss,
         properties = DialogProperties(
@@ -275,170 +366,222 @@ fun SongRecognitionDialog(
             decorFitsSystemWindows = false,
         ),
     ) {
-        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val view = LocalView.current
+        DisposableEffect(view) {
+            dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            onDispose { dialogWindow = null }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // A sheet, not a page: the status bar and a little air stay
-                // outside it, and the dimmed app shows through the gap.
-                .padding(top = statusBarTop + SHEET_TOP_GAP)
-                .onSizeChanged { sheetHeight = it.height.toFloat() }
-                .graphicsLayer { translationY = dragOffset }
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta ->
-                        if (!dismissing) {
-                            dragOffset = (dragOffset + delta).coerceAtLeast(0f)
-                        }
-                    },
-                    onDragStopped = { velocity ->
-                        if (!dismissing) {
-                            val travel = sheetHeight.takeIf { it > 0f } ?: fallbackHeight
-                            val flick = abs(velocity) >= flingVelocity
-                            val close = if (flick) {
-                                velocity > 0f
-                            } else {
-                                dragOffset > travel * SHEET_CLOSE_FRACTION
-                            }
-                            when {
-                                close && reduceMotion -> onDismiss()
-                                close -> {
-                                    dismissing = true
-                                    animateSheetTo(travel, velocity.coerceAtLeast(0f), onDismiss)
-                                }
-                                reduceMotion -> dragOffset = 0f
-                                else -> animateSheetTo(0f, velocity)
-                            }
-                        }
-                    },
-                )
-                .clip(RecognitionSheetShape)
-                .recognitionSheetSurface(RecognitionSheetShape),
+                .onSizeChanged { rootWidth = it.width.toFloat() },
         ) {
-            // A soft halo under the control, so the glass orb does not sit on
-            // a flat black field while the rings travel out from it.
             Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(360.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.07f), Color.Transparent),
-                        ),
-                    ),
-            )
-            Column(
-                modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
-                        ),
+                    // A sheet, not a page: the status bar and a little air stay
+                    // outside it, and the dimmed app shows through the gap.
+                    .padding(top = statusBarTop + SHEET_TOP_GAP)
+                    .onSizeChanged { sheetHeight = it.height.toFloat() }
+                    .graphicsLayer { translationY = dragOffset }
+                    .draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { delta ->
+                            if (!dismissing) {
+                                dragOffset = (dragOffset + delta).coerceAtLeast(0f)
+                            }
+                        },
+                        onDragStopped = { velocity ->
+                            if (!dismissing) {
+                                val travel = sheetHeight.takeIf { it > 0f } ?: fallbackHeight
+                                val flick = abs(velocity) >= flingVelocity
+                                val close = if (flick) {
+                                    velocity > 0f
+                                } else {
+                                    dragOffset > travel * SHEET_CLOSE_FRACTION
+                                }
+                                when {
+                                    close && reduceMotion -> onDismiss()
+                                    close -> {
+                                        dismissing = true
+                                        animateSheetTo(travel, velocity.coerceAtLeast(0f), onDismiss)
+                                    }
+                                    reduceMotion -> dragOffset = 0f
+                                    else -> animateSheetTo(0f, velocity)
+                                }
+                            }
+                        },
                     )
-                    .padding(horizontal = 24.dp),
+                    .clip(RecognitionSheetShape)
+                    .recognitionSheetSurface(RecognitionSheetShape),
             ) {
-                // The same grip the player wears, at the top edge of the sheet:
-                // it names the gesture and gives the eye one thing to grab.
+                // A soft halo under the control, so the glass orb does not sit on
+                // a flat black field while the rings travel out from it.
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier
-                            .size(width = 38.dp, height = 5.dp)
-                            .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.White.copy(alpha = 0.55f)),
-                    )
-                }
-                Row(
+                        .align(Alignment.Center)
+                        .size(360.dp)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.07f), Color.Transparent),
+                            ),
+                        ),
+                )
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                            ),
+                        )
+                        .padding(horizontal = 24.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.recognition_title),
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(
-                        onClick = dismiss,
+                    // The same grip the player wears, at the top edge of the sheet:
+                    // it names the gesture and gives the eye one thing to grab.
+                    Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .recognitionGlassControl(CircleShape, RecognitionControlFallback),
+                            .fillMaxWidth()
+                            .height(24.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.close),
-                            tint = Color.White.copy(alpha = 0.78f),
+                        Box(
+                            Modifier
+                                .size(width = 38.dp, height = 5.dp)
+                                .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.White.copy(alpha = 0.55f)),
                         )
                     }
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    when (access) {
-                        MicrophoneAccess.Waiting, MicrophoneAccess.Granted -> when (val current = state) {
-                            RecognitionSessionState.Listening ->
-                                ListeningContent(level = level, searching = false)
-                            RecognitionSessionState.Searching ->
-                                ListeningContent(level = 0f, searching = true)
-                            is RecognitionSessionState.Found -> FoundContent(
-                                track = current.track,
-                                onSearch = { onSearch(current.track.searchQuery) },
-                                onRetry = { session.start() },
-                            )
-                            RecognitionSessionState.NoMatch -> RecognitionMessageContent(
-                                icon = Icons.Rounded.MusicOff,
-                                title = stringResource(R.string.no_results),
-                                body = stringResource(R.string.recognition_no_match_hint),
-                                actionLabel = stringResource(R.string.try_again),
-                                onAction = { session.start() },
-                            )
-                            RecognitionSessionState.Failed -> RecognitionMessageContent(
-                                icon = Icons.Rounded.CloudOff,
-                                title = stringResource(R.string.failed),
-                                body = stringResource(R.string.recognition_failed_hint),
-                                actionLabel = stringResource(R.string.try_again),
-                                onAction = { session.start() },
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.recognition_title),
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = dismiss,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .recognitionGlassControl(CircleShape, RecognitionControlFallback),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.close),
+                                tint = Color.White.copy(alpha = 0.78f),
                             )
                         }
-                        MicrophoneAccess.Denied -> MicrophoneDeniedContent(
-                            canAskAgain = canAskAgain,
-                            onEnable = {
-                                if (canAskAgain) {
-                                    requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
-                                } else {
-                                    context.openAppSettings()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when (access) {
+                            MicrophoneAccess.Waiting, MicrophoneAccess.Granted -> when (val current = state) {
+                                RecognitionSessionState.Listening ->
+                                    ListeningContent(level = level, searching = false)
+                                RecognitionSessionState.Searching ->
+                                    ListeningContent(level = 0f, searching = true)
+                                is RecognitionSessionState.Found -> if (handoff == null) {
+                                    // Measured once and handed to the flight
+                                    // overlay when the dwell ends. While the
+                                    // card is in the air this branch is empty,
+                                    // so there is never a second copy of it on
+                                    // the sheet.
+                                    Box(
+                                        Modifier.onGloballyPositioned {
+                                            resultBounds = it.boundsInWindow()
+                                        },
+                                    ) {
+                                        FoundContent(track = current.track)
+                                    }
                                 }
-                            },
+                                RecognitionSessionState.NoMatch -> RecognitionMessageContent(
+                                    icon = Icons.Rounded.MusicOff,
+                                    title = stringResource(R.string.no_results),
+                                    body = stringResource(R.string.recognition_no_match_hint),
+                                    actionLabel = stringResource(R.string.try_again),
+                                    onAction = { session.start() },
+                                )
+                                RecognitionSessionState.Failed -> RecognitionMessageContent(
+                                    icon = Icons.Rounded.CloudOff,
+                                    title = stringResource(R.string.failed),
+                                    body = stringResource(R.string.recognition_failed_hint),
+                                    actionLabel = stringResource(R.string.try_again),
+                                    onAction = { session.start() },
+                                )
+                            }
+                            MicrophoneAccess.Denied -> MicrophoneDeniedContent(
+                                canAskAgain = canAskAgain,
+                                onEnable = {
+                                    if (canAskAgain) {
+                                        requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+                                    } else {
+                                        context.openAppSettings()
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(bottom = 12.dp)
+                            .recognitionGlassControl(
+                                shape = RoundedCornerShape(percent = 50),
+                                fallback = RecognitionControlFallback,
+                            )
+                            .clickable(onClick = dismiss)
+                            .padding(horizontal = 22.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            color = Color.White.copy(alpha = 0.76f),
+                            fontSize = 15.sp,
                         )
                     }
                 }
+            }
+            // The resting card is hidden the moment it lifts; this is that
+            // same card in the root, outside the sheet's clip, on its way to
+            // the search field. The sheet slides away underneath it.
+            val flying = handoff
+            if (flying != null) {
+                val progress = flight.value
+                val target = searchFieldBounds?.center ?: Offset(
+                    x = rootWidth / 2f,
+                    y = with(density) { (statusBarTop + 41.dp).toPx() },
+                )
+                val scale = 1f + (RESULT_FLIGHT_END_SCALE - 1f) * progress
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(bottom = 12.dp)
-                        .recognitionGlassControl(
-                            shape = RoundedCornerShape(percent = 50),
-                            fallback = RecognitionControlFallback,
-                        )
-                        .clickable(onClick = dismiss)
-                        .padding(horizontal = 22.dp, vertical = 10.dp),
+                        .offset {
+                            IntOffset(
+                                x = flying.bounds.left.roundToInt(),
+                                y = flying.bounds.top.roundToInt(),
+                            )
+                        }
+                        .width(with(density) { flying.bounds.width.toDp() })
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = (target.x - flying.bounds.center.x) * progress
+                            translationY = (target.y - flying.bounds.center.y) * progress
+                            // Held readable for most of the flight, then
+                            // dissolved into the field it lands on.
+                            alpha = ((1f - progress) / 0.2f).coerceIn(0f, 1f)
+                        },
                 ) {
-                    Text(
-                        text = stringResource(R.string.cancel),
-                        color = Color.White.copy(alpha = 0.76f),
-                        fontSize = 15.sp,
-                    )
+                    FoundContent(track = flying.track)
                 }
             }
         }
@@ -631,16 +774,14 @@ private fun LiveWaveform(level: Float, animate: Boolean, modifier: Modifier = Mo
 }
 
 /**
- * The matched song. Recognition never auto-plays: the button hands the title
- * and artist to the normal Search tab, where the listener picks the upload
- * they actually want.
+ * The matched song. Recognition never auto-plays and no longer waits for a
+ * Search tap: after a beat the sheet hands the card to Search by itself, where
+ * the listener still picks the upload they actually want. The same composable
+ * draws the card at rest on the sheet and, once detached, while it flies to the
+ * search field — which is why it carries no buttons or state of its own.
  */
 @Composable
-private fun FoundContent(
-    track: ShazamTrack,
-    onSearch: () -> Unit,
-    onRetry: () -> Unit,
-) {
+private fun FoundContent(track: ShazamTrack) {
     val artwork = track.artworkUrl
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -689,35 +830,6 @@ private fun FoundContent(
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.height(28.dp))
-        Button(
-            onClick = onSearch,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black,
-            ),
-            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = stringResource(R.string.search),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-            )
-        }
-        TextButton(onClick = onRetry) {
-            Text(
-                text = stringResource(R.string.try_again),
-                color = Color.White.copy(alpha = 0.68f),
-                fontSize = 14.sp,
             )
         }
     }

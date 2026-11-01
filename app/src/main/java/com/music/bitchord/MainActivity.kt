@@ -297,6 +297,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.offset
 import com.music.bitchord.ui.components.MiniPlayerPull
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
 import com.music.bitchord.ui.player.PlayerDock
@@ -684,6 +686,10 @@ private fun BitChordApp(
     // request and its denied state live. It no longer waits on a system speech
     // recognizer, so the icon stays available even on de-Googled builds.
     var showSongRecognition by remember { mutableStateOf(false) }
+    // Where the search field sits while recognition is up. The matched card is
+    // handed off into this rectangle, so it lands on the field it is searching
+    // rather than at an approximation of it.
+    var recognitionFieldBounds by remember { mutableStateOf<Rect?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -946,9 +952,10 @@ private fun BitChordApp(
         resumeAfterRecognition = false
     }
     val searchRecognizedSong: (String) -> Unit = { query ->
-        showSongRecognition = false
-        // A recognized song is a search, not a resume. Leaving playback paused
-        // keeps the Search tab's own play action in charge of what starts next.
+        // The sheet is still on screen and runs its own hand-off out after
+        // this: the results are already arriving behind it by the time the
+        // matched card lands on the search field. Closing here would pull that
+        // animation off in the first frame.
         resumeAfterRecognition = false
         dismissPlayer()
         navigator.clear()
@@ -3507,22 +3514,28 @@ private fun BitChordApp(
                                     searchFocusRequested = false
                                 }
                             }
-                            SearchField(
-                                query = query,
-                                onQueryChange = viewModel::onQueryChange,
-                                onSubmit = viewModel::submitSearch,
-                                focusRequester = searchFieldFocus,
-                                onVoiceSearch = startSongRecognition,
-                                placeholder = org.jetbrains.compose.resources.stringResource(
-                                    if (searchSource == SearchSource.LIBRARY) {
-                                        SharedRes.string.search_library_hint
-                                    } else if (searchSource == SearchSource.ADDONS) {
-                                        SharedRes.string.search_addons_hint
-                                    } else {
-                                        SharedRes.string.search_hint
-                                    },
-                                ),
-                            )
+                            Box(
+                                Modifier.onGloballyPositioned {
+                                    recognitionFieldBounds = it.boundsInWindow()
+                                },
+                            ) {
+                                SearchField(
+                                    query = query,
+                                    onQueryChange = viewModel::onQueryChange,
+                                    onSubmit = viewModel::submitSearch,
+                                    focusRequester = searchFieldFocus,
+                                    onVoiceSearch = startSongRecognition,
+                                    placeholder = org.jetbrains.compose.resources.stringResource(
+                                        if (searchSource == SearchSource.LIBRARY) {
+                                            SharedRes.string.search_library_hint
+                                        } else if (searchSource == SearchSource.ADDONS) {
+                                            SharedRes.string.search_addons_hint
+                                        } else {
+                                            SharedRes.string.search_hint
+                                        },
+                                    ),
+                                )
+                            }
                         }
                     } else null,
                     actions = {
@@ -4924,6 +4937,7 @@ private fun BitChordApp(
             SongRecognitionDialog(
                 onDismiss = dismissSongRecognition,
                 onSearch = searchRecognizedSong,
+                searchFieldBounds = recognitionFieldBounds,
             )
         }
 

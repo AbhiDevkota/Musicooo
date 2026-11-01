@@ -32,9 +32,20 @@ data class ShazamTrack(
     val artworkUrl: String?,
     val shareUrl: String?,
 ) {
-    /** The term the Search tab should run; the user still picks the right row. */
+    /**
+     * The term the Search tab should run; the user still picks the right row.
+     *
+     * Written with a separator rather than a space: "title - artist" reads as
+     * one search phrase to YouTube Music, so a common word in the title cannot
+     * outrank the artist being looked for, and the field shows where the two
+     * halves came from.
+     */
     val searchQuery: String
-        get() = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
+        get() = when {
+            title.isBlank() -> artist
+            artist.isBlank() -> title
+            else -> "$title - $artist"
+        }
 }
 
 /**
