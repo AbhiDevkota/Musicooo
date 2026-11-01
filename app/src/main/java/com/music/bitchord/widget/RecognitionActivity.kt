@@ -2,8 +2,11 @@ package com.music.bitchord.widget
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -15,16 +18,23 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import com.music.bitchord.MainActivity
 import com.music.bitchord.R
 import com.music.bitchord.data.shazam.RecognitionSession
 import com.music.bitchord.data.shazam.RecognitionSessionState
+import com.music.bitchord.playback.PlaybackService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -83,6 +93,17 @@ class RecognitionActivity : Activity() {
      * updates just removed.
      */
     private var frameBitmap: Bitmap? = null
+
+    /**
+     * The app's own playback, borrowed for the take: bound only when a song
+     * is audible, paused so the microphone hears the room and never the echo
+     * of itself, resumed when the take ends without a match — by the stop
+     * hand, by backgrounding, by a no-match — and left paused when a fresh
+     * song arrives to take the room instead.
+     */
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var playbackController: MediaController? = null
+    private var pausedForListen = false
 
     /**
      * The glass itself is the stop button: while a take is live, any touch
@@ -164,6 +185,10 @@ class RecognitionActivity : Activity() {
         listening = true
         val density = applicationContext.resources.displayMetrics.density
         scope.launch {
+            // The room may already be carrying this app's own song, and the
+            // microphone would hear its echo before anything else: pause
+            // playback for the take so the recognition hears the world first.
+            pauseOursIfPlaying()
             session.start()
             var phase = 0f
             var lastFrame = SystemClock.elapsedRealtime()
@@ -205,6 +230,10 @@ class RecognitionActivity : Activity() {
                 }
 
                 else -> {
+                    // No song came out of the take: the room's playback goes
+                    // back to where the tap left it, and only then the
+                    // window's goodbye.
+                    resumePlayback()
                     Toast.makeText(applicationContext, R.string.widget_recognition_no_match, Toast.LENGTH_SHORT)
                         .show()
                     RecognitionWidgetProvider.showSleep(applicationContext)
@@ -222,6 +251,9 @@ class RecognitionActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         if (listening) abandon()
+        // A match path may have left its borrowed controller behind: the
+        // player card's own connection takes it from here, ours lets go.
+        releaseControllerQuietly()
     }
 
     /**
@@ -242,8 +274,66 @@ class RecognitionActivity : Activity() {
         scope?.cancel()
         RecognitionWidgetProvider.showSleep(this)
         session?.stop()
+        // The stop hand is an ending without a song: whatever the take
+        // paused for the mic gets rewound to playing.
+        resumePlayback()
         session = null
         scope = null
+    }
+
+    /**
+     * Pauses the app's own playback for the take, if a song of ours is
+     * audible. The check runs over the audio state, not over a connection,
+     * so a silent room means no session is ever bound and a cold tap from
+     * the launcher costs nothing. The controller is kept only while it
+     * holds a paused song for [resumePlayback]; another player's song on
+     * the phone — or ours already resting — is left exactly as found.
+     */
+    private suspend fun pauseOursIfPlaying() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        if (!audioManager.isMusicActive) return
+        val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
+        val future = MediaController.Builder(this, token).buildAsync()
+        controllerFuture = future
+        val controller = try {
+            withTimeoutOrNull(PAUSE_CONNECT_MS) { future.await() }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            null
+        }
+        if (controller != null && controller.isConnected && controller.isPlaying) {
+            playbackController = controller
+            controller.pause()
+            pausedForListen = true
+        } else {
+            releaseControllerQuietly()
+        }
+    }
+
+    /**
+     * Hands the room's song back on the endings that aren't a fresh match:
+     * the stop hand, backgrounding, a no-match, a failure. Guarded by the
+     * paused flag, so every path can call it blind; play goes out before
+     * the release, because a released controller answers nothing.
+     */
+    private fun resumePlayback() {
+        if (!pausedForListen) return
+        pausedForListen = false
+        runCatching { playbackController?.play() }
+        releaseControllerQuietly()
+    }
+
+    /**
+     * Lets go of the borrowed controller. Never while it owes a resume —
+     * [resumePlayback] plays first — and perfectly safe to call twice: both
+     * bonds are null by the end of the first call.
+     */
+    private fun releaseControllerQuietly() {
+        controllerFuture?.cancel(true)
+        controllerFuture = null
+        runCatching { playbackController?.release() }
+        playbackController = null
     }
 
     /**
@@ -299,6 +389,14 @@ class RecognitionActivity : Activity() {
 
         /** The waveform itself: the sheet runs its phase over 1.4 seconds. */
         const val PHASE_PER_MS = ((2 * PI).toFloat()) / 1400f
+
+        /**
+         * How long playback's session is given to connect for the pause.
+         * Past it the take starts without the pause and the recognition
+         * does its best over whatever is playing; the room's song keeps
+         * going either way.
+         */
+        const val PAUSE_CONNECT_MS = 350L
 
         /** The ImageView the frames land in, from widget_recognition_wide.xml. */
         const val WAVE_WIDTH_DP = 88f

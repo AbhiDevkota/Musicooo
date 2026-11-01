@@ -4987,6 +4987,14 @@ private fun BitChordApp(
                         widgetRecognitionMode = false
                         playRadio(song, QueueSource("Recognition", PlaybackSourceType.SEARCH))
                         showNowPlaying = true
+                    } else {
+                        // Nothing playable came out of the identify, so the
+                        // fresh queue never starts — but the widget left the
+                        // room's own song paused for its take. Hand it back
+                        // rather than end the ride on silence; play() is a
+                        // well-mannered no-op if nothing had been paused.
+                        widgetRecognitionMode = false
+                        controller?.play()
                     }
                 }
                 else -> {}
