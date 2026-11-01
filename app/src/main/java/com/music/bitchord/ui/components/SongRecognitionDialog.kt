@@ -348,14 +348,17 @@ fun SongRecognitionDialog(
     val latestTopResultBounds by rememberUpdatedState(topResultBounds)
     LaunchedEffect(foundTrack?.searchQuery) {
         val track = foundTrack ?: return@LaunchedEffect
-        delay(RESULT_DWELL_MS)
-        // A back press or a swipe during the beat already owns the exit.
-        if (dismissing) return@LaunchedEffect
+        // Kick the search off immediately, in parallel with the dwell, so the
+        // promoted card is usually already on screen when the beat ends. The
+        // dwell becomes a moment to admire the match rather than dead time.
         onSearch(track.searchQuery)
         if (reduceMotion) {
             onDismiss()
             return@LaunchedEffect
         }
+        delay(RESULT_DWELL_MS)
+        // A back press or a swipe during the beat already owns the exit.
+        if (dismissing) return@LaunchedEffect
         // Search loads behind the sheet. Wait for its promoted card so the
         // pieces have somewhere exact to land; without it (slow network, no
         // top hit) the card still leaves for the field that was tapped.
@@ -364,8 +367,6 @@ fun SongRecognitionDialog(
                 bounds != null && bounds.matches(track)
             }
         }
-        try {
-        } catch (_: Exception) { }
         if (dismissing) return@LaunchedEffect
         val card = resultBounds
         val artwork = foundArtworkBounds
