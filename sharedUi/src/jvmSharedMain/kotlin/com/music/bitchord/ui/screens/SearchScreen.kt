@@ -14,6 +14,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,6 +73,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.BrowseItem
@@ -186,6 +191,8 @@ fun SearchScreen(
      * about the results, and the switcher would just push them down.
      */
     sourceSwitcher: (@Composable () -> Unit)? = null,
+    /** Bumps to make the promoted Top result card pulse after a handoff lands. */
+    topResultPulseTrigger: Int = 0,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -349,7 +356,8 @@ fun SearchScreen(
                                     onPlay = { onTopResultPlay(topResult.song) },
                                     onPlaylist = { onTopResultPlaylist(topResult.song) },
                                     onLongPress = { onSongLongPress(topResult.song) },
-                                    onBounds = { artwork, title, artist ->
+                                    pulseTrigger = topResultPulseTrigger,
+    onBounds = { artwork, title, artist ->
                                         onTopResultBounds?.invoke(
                                             TopResultBounds(
                                                 videoId = topResult.song.videoId,
@@ -522,11 +530,18 @@ private fun TopResultCard(
     onPlaylist: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    pulseTrigger: Int = 0,
     onBounds: ((artwork: Rect, title: Rect, artist: Rect) -> Unit)? = null,
 ) {
     var artworkBounds by remember { mutableStateOf<Rect?>(null) }
     var titleBounds by remember { mutableStateOf<Rect?>(null) }
     var artistBounds by remember { mutableStateOf<Rect?>(null) }
+    val pulseScale = remember { Animatable(1f) }
+    LaunchedEffect(pulseTrigger) {
+        if (pulseTrigger == 0) return@LaunchedEffect
+        pulseScale.animateTo(1.03f, animationSpec = tween(120, easing = FastOutSlowInEasing))
+        pulseScale.animateTo(1f, animationSpec = tween(130, easing = FastOutSlowInEasing))
+    }
     // Read during composition so Compose tracks these as dependencies and does
     // not skip recomposition (and thus the SideEffect below) when they change.
     val _ab = artworkBounds
@@ -545,6 +560,11 @@ private fun TopResultCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pulseScale.value
+                scaleY = pulseScale.value
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
+            }
             .background(MaterialTheme.colorScheme.background)
             .padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 18.dp, bottom = 8.dp)
             .longPressMenuClickable(onClick = onPlay, onLongClick = onLongPress)

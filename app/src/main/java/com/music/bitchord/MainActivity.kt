@@ -695,6 +695,7 @@ private fun BitChordApp(
     // card, so the cover and title land on the result they became rather than
     // stopping at the field that asked for it.
     var recognitionTopBounds by remember { mutableStateOf<TopResultBounds?>(null) }
+    var recognitionLandedTrigger by remember { mutableIntStateOf(0) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -3226,6 +3227,7 @@ private fun BitChordApp(
                                 onTopResultBounds = { bounds ->
                                     if (showSongRecognition) recognitionTopBounds = bounds
                                 },
+                                topResultPulseTrigger = recognitionLandedTrigger,
                                 onTopResultPlaylist = { song ->
                                     viewModel.recordEntity(SearchHistoryEntity(
                                         id = song.videoId,
@@ -4952,6 +4954,7 @@ private fun BitChordApp(
                 onSearch = searchRecognizedSong,
                 searchFieldBounds = recognitionFieldBounds,
                 topResultBounds = recognitionTopBounds,
+                 onLanded = { recognitionLandedTrigger++ },
             )
         }
 
