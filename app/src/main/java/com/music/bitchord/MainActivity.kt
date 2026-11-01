@@ -4967,14 +4967,29 @@ private fun BitChordApp(
             // player that opens over them.
             searchRecognizedSong(query)
         }
-        LaunchedEffect(widgetRecognitionMode, results) {
+        // Widget recognition auto-plays the matched song and opens the player.
+        LaunchedEffect(widgetRecognitionMode, results, controller) {
             if (!widgetRecognitionMode) return@LaunchedEffect
-            val data = (results as? UiState.Success<List<SearchResult>>)?.data
-            val song = data?.filterIsInstance<SearchResult.TopTrack>()?.firstOrNull()?.song ?: data?.filterIsInstance<SearchResult.Track>()?.firstOrNull()?.song
-            if (song != null) {
-                widgetRecognitionMode = false
-                playRadio(song, QueueSource("Recognition", PlaybackSourceType.SEARCH))
-                showNowPlaying = true
+            when (val state = results) {
+                is UiState.Error -> widgetRecognitionMode = false
+                is UiState.Success -> {
+                    val data = state.data
+                    val song = data?.filterIsInstance<SearchResult.TopTrack>()?.firstOrNull()?.song
+                        ?: data?.filterIsInstance<SearchResult.Track>()?.firstOrNull()?.song
+                    if (song != null) {
+                        // A cold launch from the widget gets here before the
+                        // player session has connected, and playRadio would
+                        // step out silently — the card would open on a player
+                        // that never started. Controller is a key above, so
+                        // staying put here re-runs the whole effect the moment
+                        // the connection is live.
+                        val c = controller ?: return@LaunchedEffect
+                        widgetRecognitionMode = false
+                        playRadio(song, QueueSource("Recognition", PlaybackSourceType.SEARCH))
+                        showNowPlaying = true
+                    }
+                }
+                else -> {}
             }
         }
         // The recognition sheet has its own window, so it sits above the tabs
