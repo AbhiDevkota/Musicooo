@@ -16,13 +16,13 @@ import com.music.bitchord.R
  * manifest entry so the picker lists this under its own, recognizable name —
  * and all of them look the same, so one [RemoteViews] build covers each face:
  *
- * - sleeping: the sheet's white pill carrying its five-bar waveform at rest,
- *   the state between takes and the face the picker previews;
- * - listening: the pill's bars breathe and rise with the room, frame bitmaps
- *   rendered by [RecognitionActivity] and handed here through [showWave] at
- *   the same cadence the in-app waveform runs at. RemoteViews has no frame of
- *   its own to animate in — the animation is a stream of measured pictures,
- *   which is what makes it react to the sound instead of merely pulsing.
+ * - sleeping: the sheet's five-bar waveform, white on the black capsule, at
+ *   rest — the state between takes and the face the picker previews;
+ * - listening: the bars breathe and rise with the room, frame bitmaps
+ *   rendered by [RecognitionActivity] and handed here through [showWave].
+ *   RemoteViews has no frame of its own to animate in — the animation is a
+ *   stream of measured pictures, which is what makes the widget react to the
+ *   sound instead of merely pulsing.
  */
 open class RecognitionWidgetProvider : AppWidgetProvider() {
 
@@ -38,43 +38,45 @@ open class RecognitionWidgetProvider : AppWidgetProvider() {
         /**
          * Puts every recognition pill back to sleep. The take's ending calls
          * this last — including the endings where the activity is about to
-         * finish — so a widget never stands at a frozen frame.
+         * finish — so a widget never stands at a frozen frame. A full apply,
+         * because it also restores the tap's PendingIntent and description
+         * whatever the frames last replaced.
          */
         fun showSleep(context: Context) {
-            updateAll(context) {
-                buildViews(it).apply {
-                    setContentDescription(
-                        R.id.widget_wave,
-                        it.getString(R.string.widget_recognition_label),
-                    )
-                }
+            val appContext = context.applicationContext
+            val views = buildViews(appContext)
+            runCatching {
+                AppWidgetManager.getInstance(appContext).updateAppWidget(
+                    ComponentName(appContext, RecognitionWidgetWide::class.java),
+                    views,
+                )
             }
         }
 
         /**
-         * One listening frame, shared by every pill on the screen. [bitmap]
-         * is a picture of the pill's own bars; the RemoteViews around it are
-         * the standard build.
+         * One listening frame, shared by every pill on the screen. The frames
+         * go out as *partial* updates — only the ImageView of each pill is
+         * replaced, leaving the RemoteViews tree the sleep face installed
+         * standing — because a full re-apply at the taking cadence is what
+         * made the pill stutter: the launcher re-rendered the whole widget
+         * eleven times a second instead of re-drawing one bar picture.
          */
         fun showWave(context: Context, bitmap: Bitmap) {
-            updateAll(context) {
-                buildViews(it).apply {
+            val appContext = context.applicationContext
+            runCatching {
+                val manager = AppWidgetManager.getInstance(appContext)
+                val ids = manager.getAppWidgetIds(
+                    ComponentName(appContext, RecognitionWidgetWide::class.java),
+                )
+                if (ids.isEmpty()) return
+                val views = RemoteViews(appContext.packageName, R.layout.widget_recognition_wide).apply {
                     setImageViewBitmap(R.id.widget_wave, bitmap)
                     setContentDescription(
                         R.id.widget_wave,
-                        it.getString(R.string.widget_recognition_listening),
+                        appContext.getString(R.string.widget_recognition_listening),
                     )
                 }
-            }
-        }
-
-        private fun updateAll(context: Context, viewsOf: (Context) -> RemoteViews) {
-            val appContext = context.applicationContext
-            runCatching {
-                AppWidgetManager.getInstance(appContext).updateAppWidget(
-                    ComponentName(appContext, RecognitionWidgetWide::class.java),
-                    viewsOf(appContext),
-                )
+                manager.partiallyUpdateAppWidget(ids, views)
             }
         }
 

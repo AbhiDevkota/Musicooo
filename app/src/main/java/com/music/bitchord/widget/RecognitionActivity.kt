@@ -6,9 +6,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.music.bitchord.MainActivity
@@ -44,7 +46,7 @@ import kotlin.math.sin
  *    sharing the one accumulating clip. Its [RecognitionSession.level] is
  *    what the pill's bars are drawn from: the same five-bar waveform the
  *    sheet draws, phase-breathing on idle and rising with the room, shipped
- *    to the launcher as frame bitmaps at [FRAME_MS] cadence — [showWave].
+ *    to the launcher as frame bitmaps — [showWave].
  * 3. A find hands `"Title - Artist"` to [RecognitionDeepLink] and then opens
  *    [MainActivity]: the app comes up on Search, matches the song to a track
  *    and starts playing it with the player card over everything.
@@ -66,6 +68,14 @@ class RecognitionActivity : Activity() {
      */
     private var scope: CoroutineScope? = null
     private var listening = false
+
+    /**
+     * The one bitmap every listening frame is drawn into. Reused across the
+     * take so the render loop never allocates — a fresh bitmap per frame at
+     * the taking cadence GC-pauses itself into the stutter the partial
+     * updates just removed.
+     */
+    private var frameBitmap: Bitmap? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,11 +118,12 @@ class RecognitionActivity : Activity() {
 
     /**
      * Runs the one take: the session drives itself through every progressive
-     * search and its own recorder cleanup, and this coroutine drives the pill
-     * while the session lives. The loop steps the sheet's waveform at the
-     * sheet's own cadence — the only states that keep the session alive are
-     * Listening and Searching — so falling out of the loop is the same
-     * moment the session reaches a terminal state.
+     * search and its own recorder cleanup, and this coroutine drives the
+     * widget while the session lives. The loop steps the sheet's waveform on
+     * real time — 2π over 1.4 seconds, the sheet's own period — and the
+     * frames convene with the music: tight while a beat is in the room, easy
+     * in the silences between. Falling out of the loop is the same moment
+     * the session reaches a terminal state.
      */
     private fun startListening() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -124,15 +135,18 @@ class RecognitionActivity : Activity() {
         scope.launch {
             session.start()
             var phase = 0f
+            var lastFrame = SystemClock.elapsedRealtime()
             var state = session.state.value
             while (
                 state == RecognitionSessionState.Listening ||
                 state == RecognitionSessionState.Searching
             ) {
-                val level = if (state == RecognitionSessionState.Listening) session.level.value else 0f
-                RecognitionWidgetProvider.showWave(applicationContext, renderWave(density, phase, level))
-                delay(FRAME_MS)
-                phase = (phase + FRAME_MS * PHASE_PER_MS) % (2 * PI).toFloat()
+                val level = session.level.value
+                delay(if (level >= BEAT_LEVEL) BEAT_FRAME_MS else IDLE_FRAME_MS)
+                val now = SystemClock.elapsedRealtime()
+                phase = (phase + (now - lastFrame) * PHASE_PER_MS) % (2 * PI).toFloat()
+                lastFrame = now
+                RecognitionWidgetProvider.showWave(applicationContext, nextFrame(density, phase, level))
                 state = session.state.value
             }
             listening = false
@@ -147,6 +161,14 @@ class RecognitionActivity : Activity() {
                     startActivity(
                         Intent(applicationContext, MainActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    )
+                    // The app arrives on a fade rather than the launcher's
+                    // window-slam: the pill just finished breathing on the
+                    // home screen, so the transition into playing the song
+                    // is the two joining, not one replacing the other.
+                    overridePendingTransition(
+                        android.R.anim.fade_in,
+                        android.R.anim.fade_out,
                     )
                     finish()
                 }
@@ -188,33 +210,39 @@ class RecognitionActivity : Activity() {
     }
 
     /**
-     * One frame of the sheet's [LiveWaveform], drawn black on white so the
-     * widget carries the sheet's own white-pill vocabulary. The arithmetic is
-     * the composable's, bar for bar: an idle height that breathes on a
-     * per-bar phase, scaled up by the current level. The sleeping face is
-     * this drawing at phase zero frozen into [ic_widget_wave_sleep], so the
-     * very first frame the pill shows is a continuation of its own sleep.
+     * One frame of the sheet's [LiveWaveform], drawn white on the black
+     * capsule exactly as the sheet wears its own bars. The arithmetic is the
+     * composable's, bar for bar: an idle height that breathes on a per-bar
+     * phase, scaled up by the current level. The sleeping face is this
+     * drawing at phase zero frozen into [ic_widget_wave_sleep], so the very
+     * first frame the widget shows is a continuation of its own sleep.
+     *
+     * The frame is reused across the whole take — only the beat in it
+     * changes from one to the next — because allocating a fresh bitmap per
+     * frame at this cadence is a GC pause away from the stutter the partial
+     * updates just removed.
      */
-    private fun renderWave(density: Float, phase: Float, level: Float): Bitmap {
+    private fun nextFrame(density: Float, phase: Float, level: Float): Bitmap {
         val width = (WAVE_WIDTH_DP * density).roundToInt()
         val height = (WAVE_HEIGHT_DP * density).roundToInt()
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = frameBitmap
+            ?.takeIf { it.width == width && it.height == height && it.isMutable }
+            ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                .also { frameBitmap = it }
+        bitmap.eraseColor(Color.TRANSPARENT)
         val canvas = Canvas(bitmap)
         val gap = width * 0.10f
         val barWidth = (width - gap * 4f) / 5f
         val maxHeight = height * 0.94f
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = BAR_COLOR
-        }
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BAR_COLOR }
         val bar = RectF()
-        val alphaScale = 0.62f + level * 0.38f
         repeat(5) { index ->
             val wave = 0.30f + 0.70f * abs(sin(phase + index * 0.85f))
             val idleHeight = height * (0.22f + 0.12f * wave)
             val barHeight = idleHeight + (maxHeight - idleHeight) * level * wave
             val left = index * (barWidth + gap)
             bar.set(left, (height - barHeight) / 2f, left + barWidth, (height + barHeight) / 2f)
-            paint.alpha = (alphaScale * 0xFF).roundToInt()
+            paint.alpha = ((0.62f + level * 0.38f) * 0xFF + 0.5f).toInt()
             canvas.drawRoundRect(bar, barWidth / 2f, barWidth / 2f, paint)
         }
         return bitmap
@@ -223,8 +251,16 @@ class RecognitionActivity : Activity() {
     private companion object {
         const val REQUEST_MICROPHONE = 41
 
-        /** The waveform's cadence: the sheet runs its phase over 1.4 seconds. */
-        const val FRAME_MS = 90L
+        /**
+         * The frames' cadence in a room with music against a room resting.
+         * Faster than the sheet's own cycle when the beat is coming through,
+         * easy on the long silences a recognition listen is full of.
+         */
+        const val BEAT_FRAME_MS = 55L
+        const val IDLE_FRAME_MS = 110L
+        const val BEAT_LEVEL = 0.22f
+
+        /** The waveform itself: the sheet runs its phase over 1.4 seconds. */
         const val PHASE_PER_MS = ((2 * PI).toFloat()) / 1400f
 
         /** The ImageView the frames land in, from widget_recognition_wide.xml. */
