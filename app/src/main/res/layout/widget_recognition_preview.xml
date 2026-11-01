@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the picker shows for the recognition widget on API 31+: the real
+  widget_recognition_wide as it performs — the reactive face at full voice,
+  the state the tap promises. No ids and no press states, exactly like the
+  home widget, so the picker's picture and the placed pill agree in every
+  measurement: the black capsule full-bleed, the 88x54 waveform centered.
+
+  See that file for the layout the runtime then lands on.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_recognition_background">
+
+    <ImageView
+        android:layout_width="88dp"
+        android:layout_height="54dp"
+        android:layout_gravity="center"
+        android:contentDescription="@string/widget_recognition_label"
+        android:src="@drawable/ic_widget_wave_reactive"
+        android:scaleType="fitCenter" />
+</FrameLayout>

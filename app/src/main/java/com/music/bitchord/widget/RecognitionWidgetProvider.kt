@@ -91,7 +91,15 @@ open class RecognitionWidgetProvider : AppWidgetProvider() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
 
-        /** The pill at rest: the sleeping face and the tap's PendingIntent. */
+        /**
+         * The pill at rest: the sleeping face and the tap's PendingIntent.
+         * The ImageView reset is recorded as its own action on purpose: when
+         * the launcher re-applies this view set over a host whose ImageView
+         * still carries a listening frame's bitmap (the same-layout update
+         * path doesn't re-inflate the layout, it only re-applies recorded
+         * actions), without the reset the stale frame would keep standing on
+         * the bars — a stop that never looked like one.
+         */
         private fun buildViews(context: Context): RemoteViews {
             val pending = PendingIntent.getActivity(
                 context,
@@ -101,6 +109,7 @@ open class RecognitionWidgetProvider : AppWidgetProvider() {
             )
             return RemoteViews(context.packageName, R.layout.widget_recognition_wide).apply {
                 setOnClickPendingIntent(R.id.widget_root, pending)
+                setImageViewResource(R.id.widget_wave, R.drawable.ic_widget_wave_sleep)
             }
         }
     }
