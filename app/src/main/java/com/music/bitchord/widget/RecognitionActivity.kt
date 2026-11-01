@@ -85,10 +85,15 @@ class RecognitionActivity : Activity() {
         }
     }
 
-    // A second tap while a take is live reuses this window and changes
-    // nothing: one microphone, one ask, one ending per tap.
+    // A second tap while a take is live is the stop button: the pill goes back
+    // to sleep and the microphone lets go. With nothing running — the window
+    // is already settling its ending — the tap changes nothing on purpose.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (listening) {
+            abandon()
+            finish()
+        }
     }
 
     /**
