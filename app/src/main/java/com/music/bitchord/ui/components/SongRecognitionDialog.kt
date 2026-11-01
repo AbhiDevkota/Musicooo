@@ -406,7 +406,11 @@ fun SongRecognitionDialog(
                 launch {
                     flight.animateTo(
                         targetValue = 1f,
-                        animationSpec = tween(RESULT_FLIGHT_MS, easing = FastOutSlowInEasing),
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 400f,
+                            visibilityThreshold = 0.001f,
+                        ),
                     )
                     // A soft tick marks the moment the match lands on its result.
                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
