@@ -34,7 +34,7 @@ class ShazamClientTest {
         assertEquals("The Weeknd", track.artist)
         assertEquals("https://example.com/large.jpg", track.artworkUrl)
         assertEquals("https://www.shazam.com/track/1", track.shareUrl)
-        assertEquals("Blinding Lights The Weeknd", track.searchQuery)
+        assertEquals("Blinding Lights - The Weeknd", track.searchQuery)
     }
 
     @Test

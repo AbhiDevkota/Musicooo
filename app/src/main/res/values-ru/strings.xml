@@ -162,6 +162,10 @@
     <string name="widget_pill_label">Сейчас играет 4×1</string>
     <string name="widget_pill_description">Трек с лайком, перемешиванием и управлением воспроизведением в одну строку.</string>
     <string name="widget_preview_pill">Название песни - Исполнитель</string>
+    <string name="widget_recognition_description">Нажмите, чтобы распознать песню, которая играет рядом.</string>
+    <string name="widget_recognition_label">Распознать</string>
+    <string name="widget_recognition_listening">Слушаем…</string>
+    <string name="widget_recognition_no_match">Ничего не распознано. Попробуйте снова, пока играет музыка.</string>
     <string name="download_quality">Качество загрузки</string>
     <string name="download_wifi_only">Загружать только по Wi-Fi</string>
     <string name="spatial_audio">Пространственный звук</string>

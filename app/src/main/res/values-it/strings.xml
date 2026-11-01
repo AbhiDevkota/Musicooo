@@ -179,6 +179,10 @@
     <string name="widget_pill_label">In riproduzione 4×1</string>
     <string name="widget_pill_description">Il brano con Mi piace, Casuale e controlli di riproduzione, su una sola riga.</string>
     <string name="widget_preview_pill">Titolo brano - Artista</string>
+    <string name="widget_recognition_description">Tocca per riconoscere la canzone che sta suonando attorno a te.</string>
+    <string name="widget_recognition_label">Riconosci</string>
+    <string name="widget_recognition_listening">In ascolto…</string>
+    <string name="widget_recognition_no_match">Niente riconosciuto. Riprova mentre la musica suona.</string>
     <string name="download_quality">Qualità download</string>
     <string name="download_wifi_only">Scarica solo via Wi-Fi</string>
     <string name="convert_to_audio">Converti in audio</string>

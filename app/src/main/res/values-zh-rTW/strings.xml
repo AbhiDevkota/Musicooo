@@ -147,6 +147,10 @@
     <string name="widget_pill_label">正在播放 4×1</string>
     <string name="widget_pill_description">單行顯示曲目，以及喜歡、隨機播放和播放控制元件。</string>
     <string name="widget_preview_pill">歌曲標題 - 藝人</string>
+    <string name="widget_recognition_description">點按即可識別周圍正在播放的歌曲。</string>
+    <string name="widget_recognition_label">識別</string>
+    <string name="widget_recognition_listening">識別中…</string>
+    <string name="widget_recognition_no_match">未識別出任何歌曲。請在音樂播放時重試。</string>
     <string name="download_quality">下載質量</string>
     <string name="download_wifi_only">僅透過 Wi-Fi 下載</string>
     <string name="spatial_audio">空間音訊</string>

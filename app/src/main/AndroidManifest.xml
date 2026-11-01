@@ -245,6 +245,32 @@
         </activity>
 
         <!--
+          The recognition widget's microphone. The launch intent the widget
+          carries is all it is reachable by, and it never draws a screen: a
+          see-through window that outlives the launcher only while the
+          listen runs. That is why its settings differ so much from
+          MainActivity's —
+          - its own empty task (empty affinity, new-task launch): when the
+            listen ends MainActivity's task comes forward as it was, unchanged
+            by an invisible stopover;
+          - excluded from recents and from any display of documents: there is
+            nothing to go back to in it, and the widget is its whole entry;
+          - not resizable and configured away for rotation: a window with no
+            content in it is the same window in any shape, and a full Activity
+            restart mid-listen would restart the microphone over the same few
+            seconds for nothing.
+        -->
+        <activity
+            android:name=".widget.RecognitionActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/widget_recognition_label"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.BitChord.Recognition" />
+
+        <!--
           The launcher entries live on aliases, not on MainActivity, so the user can
           swap the home-screen icon by enabling one alias and disabling the others
           (see AppIcon). Exactly one is enabled at a time; Default is the shipped one.
@@ -529,6 +555,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_media_pill" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.RecognitionWidgetWide"
+            android:exported="false"
+            android:label="Recognize song">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_recognition_wide" />
         </receiver>
 
         <!-- The transport buttons. Reached only by this app's own PendingIntents. -->

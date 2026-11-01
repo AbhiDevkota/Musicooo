@@ -154,6 +154,10 @@
     <string name="widget_pill_label">מתנגן כעת 4×1</string>
     <string name="widget_pill_description">הרצועה עם לייק, ערבוב ופקדי הפעלה, בשורה אחת.</string>
     <string name="widget_preview_pill">שם השיר - אמן</string>
+    <string name="widget_recognition_description">הקישו כדי לזהות את השיר שמתנגן סביבכם.</string>
+    <string name="widget_recognition_label">זהה</string>
+    <string name="widget_recognition_listening">מקשיבים…</string>
+    <string name="widget_recognition_no_match">לא זוהה שיר. נסו שוב בזמן שהמוזיקה מתנגנת.</string>
     <string name="download_quality">איכות הורדה</string>
     <string name="download_wifi_only">הורדה ב-Wi-Fi בלבד</string>
     <string name="spatial_audio">אודיו מרחבי</string>

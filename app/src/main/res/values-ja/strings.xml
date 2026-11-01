@@ -147,6 +147,10 @@
     <string name="widget_pill_label">再生中 4×1</string>
     <string name="widget_pill_description">曲名といいね、シャッフル、再生コントロールを1行に。</string>
     <string name="widget_preview_pill">曲名 - アーティスト</string>
+    <string name="widget_recognition_description">タップして、周りで流れている曲を認識します。</string>
+    <string name="widget_recognition_label">認識</string>
+    <string name="widget_recognition_listening">認識中…</string>
+    <string name="widget_recognition_no_match">曲を認識できませんでした。音楽が流れている間にもう一度お試しください。</string>
     <string name="download_quality">ダウンロード品質</string>
     <string name="download_wifi_only">Wi-Fi接続時のみダウンロード</string>
     <string name="spatial_audio">空間オーディオ</string>
