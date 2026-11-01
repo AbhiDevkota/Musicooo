@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.components
 
 import android.Manifest
+import android.view.HapticFeedbackConstants
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -99,6 +100,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -342,12 +344,15 @@ fun SongRecognitionDialog(
     // that started the listen — while the sheet leaves underneath it. By the
     // time it lands, Search is already the page behind.
     val foundTrack = (state as? RecognitionSessionState.Found)?.track
+    val view = LocalView.current
     // The effect below starts before Search has reported anything, so it has to
     // read the newest bounds through a state holder rather than the value this
     // composition launched with.
     val latestTopResultBounds by rememberUpdatedState(topResultBounds)
     LaunchedEffect(foundTrack?.searchQuery) {
         val track = foundTrack ?: return@LaunchedEffect
+        // A soft tick says "I heard you" the instant a match resolves.
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         // Kick the search off immediately, in parallel with the dwell, so the
         // promoted card is usually already on screen when the beat ends. The
         // dwell becomes a moment to admire the match rather than dead time.
@@ -402,6 +407,8 @@ fun SongRecognitionDialog(
                         targetValue = 1f,
                         animationSpec = tween(RESULT_FLIGHT_MS, easing = FastOutSlowInEasing),
                     )
+                    // A soft tick marks the moment the match lands on its result.
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 }
             }
             // Let the page brighten as the sheet leaves, so dismissing the
