@@ -29,7 +29,7 @@ sealed interface RecognitionSessionState {
 
 /**
  * One microphone session: record 16 kHz mono PCM, animate from its level, and
- * search progressively at 4, 8 and 12 seconds.
+ * search progressively at 2, 4, 8 and 12 seconds.
  *
  * The short clip goes first so a clear match returns quickly. The recorder keeps
  * running while that lookup is in flight, which is why the next attempt can
@@ -146,7 +146,8 @@ class RecognitionSession(
             take.stage += 1
             take.nextSearchSample = when (take.stage) {
                 1 -> SECOND_SEARCH_SAMPLES
-                2 -> FINAL_SEARCH_SAMPLES
+                2 -> THIRD_SEARCH_SAMPLES
+                3 -> FINAL_SEARCH_SAMPLES
                 else -> Int.MAX_VALUE
             }
             if (finalAttempt) {
@@ -255,10 +256,11 @@ class RecognitionSession(
         const val ATTACK = 0.6f
         const val RELEASE = 0.12f
 
-        const val FIRST_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 4
-        const val SECOND_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 8
+        const val FIRST_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 2
+        const val SECOND_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 4
+        const val THIRD_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 8
         const val FINAL_SEARCH_SAMPLES = ShazamSignatureGenerator.SAMPLE_RATE_HZ * 12
         const val MAX_SAMPLES = FINAL_SEARCH_SAMPLES
-        const val LAST_STAGE = 2
+        const val LAST_STAGE = 3
     }
 }
