@@ -404,6 +404,9 @@ fun SongRecognitionDialog(
             }
             if (card != null) {
                 launch {
+                    // Let the sheet begin to recede first, so the card lifts
+                    // out of a surface that is already making room for it.
+                    delay(80)
                     flight.animateTo(
                         targetValue = 1f,
                         animationSpec = spring(
