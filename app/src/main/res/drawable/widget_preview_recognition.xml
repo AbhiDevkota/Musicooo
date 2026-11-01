@@ -16,20 +16,20 @@
         android:fillColor="#FF141619"
         android:pathData="M55,0 L65,0 A55,55 0,0,1 120,55 A55,55 0,0,1 65,110 L55,110 A55,55 0,0,1 0,55 A55,55 0,0,1 55,0 Z" />
 
-    <!-- The five bars at rest, each a stadium 8.6 wide, h tall. -->
-    <group android:translateX="24" android:translateY="49.35">
-        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,7 A4.3,4.3 0,0,1 0,7 L0,4.3 Z" />
+    <!-- The five bars at rest, each a stadium 10.6 wide, h tall. -->
+    <group android:translateX="16" android:translateY="48.1">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,5.3 A5.3,5.3 0,0,1 10.6,5.3 L10.6,8.5 A5.3,5.3 0,0,1 0,8.5 L0,5.3 Z" />
     </group>
-    <group android:translateX="39.8" android:translateY="48">
-        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,9.7 A4.3,4.3 0,0,1 0,9.7 L0,4.3 Z" />
+    <group android:translateX="35.4" android:translateY="46.4">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,5.3 A5.3,5.3 0,0,1 10.6,5.3 L10.6,11.9 A5.3,5.3 0,0,1 0,11.9 L0,5.3 Z" />
     </group>
-    <group android:translateX="55.7" android:translateY="47.55">
-        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,10.6 A4.3,4.3 0,0,1 0,10.6 L0,4.3 Z" />
+    <group android:translateX="54.7" android:translateY="45.85">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,5.3 A5.3,5.3 0,0,1 10.6,5.3 L10.6,13 A5.3,5.3 0,0,1 0,13 L0,5.3 Z" />
     </group>
-    <group android:translateX="71.5" android:translateY="48.35">
-        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,9 A4.3,4.3 0,0,1 0,9 L0,4.3 Z" />
+    <group android:translateX="74.1" android:translateY="46.8">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,5.3 A5.3,5.3 0,0,1 10.6,5.3 L10.6,11.1 A5.3,5.3 0,0,1 0,11.1 L0,5.3 Z" />
     </group>
-    <group android:translateX="87.4" android:translateY="48.9">
-        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,7.9 A4.3,4.3 0,0,1 0,7.9 L0,4.3 Z" />
+    <group android:translateX="93.4" android:translateY="47.5">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,5.3 A5.3,5.3 0,0,1 10.6,5.3 L10.6,9.7 A5.3,5.3 0,0,1 0,9.7 L0,5.3 Z" />
     </group>
 </vector>

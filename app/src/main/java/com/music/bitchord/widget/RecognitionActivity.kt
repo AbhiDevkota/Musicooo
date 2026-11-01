@@ -10,8 +10,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
@@ -27,7 +25,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -72,9 +69,9 @@ class RecognitionActivity : Activity() {
     private var session: RecognitionSession? = null
 
     /**
-     * The scope that runs both the session and the watch on it, kept so
-     * [abandon] can cancel the whole thing at once. Alone it is a leak —
-     * cancelling it is the only way a leaving take stops.
+     * The scope that runs the frame watch, kept so [abandon] can cancel the
+     * whole thing at once. Alone it is a leak — cancelling it is the only way
+     * a leaving take stops.
      */
     private var scope: CoroutineScope? = null
     private var listening = false
@@ -86,9 +83,6 @@ class RecognitionActivity : Activity() {
      * updates just removed.
      */
     private var frameBitmap: Bitmap? = null
-
-    /** The main looper's handler, for sleeps that must land after in-flight frames. */
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
      * The glass itself is the stop button: while a take is live, any touch
@@ -154,15 +148,16 @@ class RecognitionActivity : Activity() {
 
     /**
      * Runs the one take: the session drives itself through every progressive
-     * search and its own recorder cleanup, and this coroutine drives the
-     * widget while the session lives. The loop steps the sheet's waveform on
-     * real time — 2π over 1.4 seconds, the sheet's own period — and the
-     * frames convene with the music: tight while a beat is in the room, easy
-     * in the silences between. Falling out of the loop is the same moment
-     * the session reaches a terminal state.
+     * search and its own recorder cleanup — recording on IO, fingerprinting
+     * and lookups on workers, none of it here — while the frame watch that
+     * drives the widget rides this same thread. The loop steps the sheet's
+     * waveform on real time — 2π over 1.4 seconds, the sheet's own period —
+     * and the frames convene with the music: tight while a beat is in the
+     * room, easy in the silences between. Falling out of the loop is the
+     * same moment the session reaches a terminal state.
      */
     private fun startListening() {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         this.scope = scope
         val session = RecognitionSession(scope)
         this.session = session
@@ -187,7 +182,7 @@ class RecognitionActivity : Activity() {
             }
             listening = false
             when (val settled = state) {
-                is RecognitionSessionState.Found -> withContext(Dispatchers.Main) {
+                is RecognitionSessionState.Found -> {
                     // The match is posted before the launch, not during it:
                     // the composition reads the flow the moment it builds,
                     // and the stream is what carries the query whether
@@ -209,7 +204,7 @@ class RecognitionActivity : Activity() {
                     finish()
                 }
 
-                else -> withContext(Dispatchers.Main) {
+                else -> {
                     Toast.makeText(applicationContext, R.string.widget_recognition_no_match, Toast.LENGTH_SHORT)
                         .show()
                     RecognitionWidgetProvider.showSleep(applicationContext)
@@ -230,27 +225,25 @@ class RecognitionActivity : Activity() {
     }
 
     /**
-     * Leaves the take without an ending: the microphone stops, the watch is
-     * cancelled whole, and the pill goes back to sleep. Idempotent by way of
-     * the flag, so the settled paths — which unset [listening] first and
-     * close the window after — falling through [onStop] on the way out touch
-     * none of this.
+     * Leaves the take without an ending: the watch is cancelled, the pill
+     * goes back to sleep — right now, in this same turn of the looper — and
+     * the microphone lets go. Idempotent by way of the flag, so the settled
+     * paths — which unset [listening] first and close the window after —
+     * falling through [onStop] on the way out touch none of this.
      *
-     * The sleep is re-posted a main-loop turn past the cancellation: the
-     * frame loop may have one frame already inside the binder on its way to
-     * the launcher, and a frame that lands *after* this method's sleep would
-     * leave the widget awake at a frozen picture — the very picture of a
-     * stop that didn't take.
+     * The sleep can't be raced here, and that is the point of frames riding
+     * the main thread: a cancelled watch's next frame is never given a turn,
+     * and no frame of the last one exists anymore by the time this runs. The
+     * sleep face is therefore the last picture the widget is handed — a stop
+     * always reads as sleep, the state the second tap promised.
      */
     private fun abandon() {
         listening = false
-        session?.stop()
         scope?.cancel()
+        RecognitionWidgetProvider.showSleep(this)
+        session?.stop()
         session = null
         scope = null
-        mainHandler.post {
-            RecognitionWidgetProvider.showSleep(this)
-        }
     }
 
     /**
@@ -308,8 +301,8 @@ class RecognitionActivity : Activity() {
         const val PHASE_PER_MS = ((2 * PI).toFloat()) / 1400f
 
         /** The ImageView the frames land in, from widget_recognition_wide.xml. */
-        const val WAVE_WIDTH_DP = 72f
-        const val WAVE_HEIGHT_DP = 44f
+        const val WAVE_WIDTH_DP = 88f
+        const val WAVE_HEIGHT_DP = 54f
 
         /** The bars, white on the black capsule exactly as the sheet wears them. */
         const val BAR_COLOR = 0xFFFFFFFF.toInt()
