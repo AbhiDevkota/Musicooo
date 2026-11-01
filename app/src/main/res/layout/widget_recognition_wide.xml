@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The recognition pill: the mic and one word, inside the same pill shape the
+  media widgets use. Its label is a resource, not a literal, because
+  RecognitionWidgetProvider repaints it while the microphone is up — the
+  listening face is the same pill with [widget_recognition_listening] in
+  place of this text.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -13,7 +20,7 @@
         android:id="@+id/widget_mic"
         android:layout_width="32dp"
         android:layout_height="32dp"
-        android:contentDescription="Recognize song"
+        android:contentDescription="@string/widget_recognition_label"
         android:src="@drawable/ic_widget_mic"
         android:scaleType="centerInside" />
 
@@ -22,7 +29,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
-        android:text="Recognize"
+        android:text="@string/widget_recognition_label"
         android:textColor="#FFFFFFFF"
         android:textSize="14sp"
         android:textStyle="bold" />
