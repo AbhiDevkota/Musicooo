@@ -465,6 +465,7 @@ class MainActivity : AppCompatActivity() {
         PlayerDeepLink.consume(intent)
         JamInviteLink.consume(intent)
         MusicLink.consume(intent)
+        com.music.bitchord.widget.RecognitionDeepLink.consume(intent)
     }
 }
 
@@ -556,6 +557,7 @@ private fun BitChordApp(
             PlayerDeepLink.handled()
         }
     }
+
     /**
      * What the in-app browser is open for, or null while it is closed —
      * signing in, or picking a channel in YouTube Music's own Accounts list.
@@ -4953,6 +4955,26 @@ private fun BitChordApp(
             }
         }
 
+        var widgetRecognitionMode by remember { mutableStateOf(false) }
+        val recognitionRequested by com.music.bitchord.widget.RecognitionDeepLink.pending.collectAsStateWithLifecycle()
+        LaunchedEffect(recognitionRequested) {
+            if (recognitionRequested) {
+                com.music.bitchord.widget.RecognitionDeepLink.handled()
+                widgetRecognitionMode = true
+                selectedTab = TAB_SEARCH
+                startSongRecognition()
+            }
+        }
+        LaunchedEffect(widgetRecognitionMode, results) {
+            if (!widgetRecognitionMode) return@LaunchedEffect
+            val data = (results as? UiState.Success<List<SearchResult>>)?.data
+            val song = data?.filterIsInstance<SearchResult.TopTrack>()?.firstOrNull()?.song ?: data?.filterIsInstance<SearchResult.Track>()?.firstOrNull()?.song
+            if (song != null) {
+                widgetRecognitionMode = false
+                playRadio(song, QueueSource("Recognition", PlaybackSourceType.SEARCH))
+                showNowPlaying = true
+            }
+        }
         // The recognition sheet has its own window, so it sits above the tabs
         // and the player alike and owns the back press while it is open.
         if (showSongRecognition) {
