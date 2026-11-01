@@ -147,6 +147,9 @@ private val RecognitionControlFallback = Color.White.copy(alpha = 0.07f)
 
 /** Critically damped, like the player sheet: brisk out, no bounce at either end. */
 private const val SHEET_STIFFNESS = 195f
+
+/** The slide-away alone runs ~2x stiffer — the same spring, one notch earlier home. */
+private const val SHEET_DISMISS_STIFFNESS = 380f
 private const val SHEET_SETTLED_PX = 0.5f
 private const val SHEET_CLOSE_FRACTION = 0.24f
 private const val SHEET_FALLBACK_HEIGHT_DP = 800f
@@ -255,7 +258,7 @@ fun SongRecognitionDialog(
     val flingVelocity = with(density) { SHEET_FLING_DP.dp.toPx() }
     val fallbackHeight = with(density) { SHEET_FALLBACK_HEIGHT_DP.dp.toPx() }
 
-    fun animateSheetTo(target: Float, velocity: Float, after: (() -> Unit)? = null) {
+    fun animateSheetTo(target: Float, velocity: Float, after: (() -> Unit)? = null, stiffness: Float = SHEET_STIFFNESS) {
         scope.launch {
             animate(
                 initialValue = dragOffset,
@@ -263,7 +266,7 @@ fun SongRecognitionDialog(
                 initialVelocity = velocity,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = SHEET_STIFFNESS,
+                    stiffness = stiffness,
                     visibilityThreshold = SHEET_SETTLED_PX,
                 ),
             ) { value, _ -> dragOffset = value }
@@ -277,7 +280,7 @@ fun SongRecognitionDialog(
             if (reduceMotion) {
                 onDismiss()
             } else {
-                animateSheetTo(sheetHeight.takeIf { it > 0f } ?: fallbackHeight, 0f, onDismiss)
+                animateSheetTo(sheetHeight.takeIf { it > 0f } ?: fallbackHeight, 0f, onDismiss, SHEET_DISMISS_STIFFNESS)
             }
         }
     }
