@@ -37,9 +37,7 @@ open class RecognitionWidgetProvider : AppWidgetProvider() {
     }
 
     private fun layoutFor(manager: AppWidgetManager, id: Int): Int {
-        val opts = runCatching { manager.getAppWidgetOptions(id) }.getOrNull()
-        val w = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 0
-        return if (w >= 100) R.layout.widget_recognition_wide else R.layout.widget_recognition_square
+        return R.layout.widget_recognition_wide
     }
 
 
