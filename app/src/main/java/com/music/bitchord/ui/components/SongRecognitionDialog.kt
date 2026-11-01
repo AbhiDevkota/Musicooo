@@ -168,7 +168,7 @@ private const val RESULT_DWELL_MS = 1_050L
  * flight lands on that card when it arrives; a slow or unpromoted search falls
  * back to the field that started the listen.
  */
-private const val TOP_RESULT_WAIT_MS = 3_000L
+private const val TOP_RESULT_WAIT_MS = 5_000L
 
 /** The flight from the sheet to the search field, and how small it lands. */
 private const val RESULT_FLIGHT_MS = 620
@@ -1051,7 +1051,13 @@ private fun TopResultBounds.matches(track: ShazamTrack): Boolean {
     val heard = track.title.matchKey()
     val promoted = songTitle.matchKey()
     if (heard.isEmpty() || promoted.isEmpty()) return false
-    return heard == promoted || promoted.contains(heard) || heard.contains(promoted)
+    if (heard == promoted || promoted.contains(heard) || heard.contains(promoted)) return true
+    // Fall back to the first significant word: YouTube and Shazam often disagree
+    // on subtitles ("(Official Video)", "feat. ..."), so the shared lead word
+    // is the most stable signal that this is the same song.
+    val heardFirst = heard.split(' ').firstOrNull { it.length >= 4 }
+    val promotedFirst = promoted.split(' ').firstOrNull { it.length >= 4 }
+    return heardFirst != null && heardFirst == promotedFirst
 }
 
 /** Folds a title to lowercase words so a parenthetical still matches its song. */
