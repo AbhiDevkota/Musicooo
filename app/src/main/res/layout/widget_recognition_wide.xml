@@ -1,36 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The recognition pill: the mic and one word, inside the same pill shape the
-  media widgets use. Its label is a resource, not a literal, because
-  RecognitionWidgetProvider repaints it while the microphone is up — the
-  listening face is the same pill with [widget_recognition_listening] in
-  place of this text.
+  The recognition pill: a solid black capsule with the sheet's white action
+  button on it — the pill carries the sheet's five-bar waveform in black:
+
+  - sleeping: [ic_widget_wave_sleep], wired at add time and after every take
+    ends; the widget reads as an object at rest;
+  - listening: RecognitionActivity renders the same arithmetic the sheet's
+    LiveWaveform draws — phase-breathing idle heights, level-driven rises —
+    and hands the frames over through [RecognitionWidgetProvider.showWave].
+
+  There is no text and no separate mic anywhere: the pill in the sheet is the
+  whole vocabulary, black background included.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_pill_background"
-    android:gravity="center"
-    android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingEnd="16dp">
+    android:background="@drawable/widget_recognition_background">
 
-    <ImageView
-        android:id="@+id/widget_mic"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:contentDescription="@string/widget_recognition_label"
-        android:src="@drawable/ic_widget_mic"
-        android:scaleType="centerInside" />
+    <FrameLayout
+        android:id="@+id/widget_pill"
+        android:layout_width="84dp"
+        android:layout_height="50dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_recognition_pill">
 
-    <TextView
-        android:id="@+id/widget_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:text="@string/widget_recognition_label"
-        android:textColor="#FFFFFFFF"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-</LinearLayout>
+        <ImageView
+            android:id="@+id/widget_wave"
+            android:layout_width="56dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/widget_recognition_label"
+            android:src="@drawable/ic_widget_wave_sleep"
+            android:scaleType="fitCenter" />
+    </FrameLayout>
+</FrameLayout>
