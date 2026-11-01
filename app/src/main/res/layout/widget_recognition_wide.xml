@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The recognition pill: a solid black capsule with the sheet's white action
-  button on it — the pill carries the sheet's five-bar waveform in black:
+  The recognition pill: a solid black capsule with the sheet's waveform on
+  it — white bars in the round shapes the sheet draws them in, with nothing
+  behind them to frame them.
 
   - sleeping: [ic_widget_wave_sleep], wired at add time and after every take
     ends; the widget reads as an object at rest;
   - listening: RecognitionActivity renders the same arithmetic the sheet's
     LiveWaveform draws — phase-breathing idle heights, level-driven rises —
-    and hands the frames over through [RecognitionWidgetProvider.showWave].
+    and pushes the frames here through [RecognitionWidgetProvider.showWave].
 
-  There is no text and no separate mic anywhere: the pill in the sheet is the
-  whole vocabulary, black background included.
+  There is no text and no separate mic anywhere: the waveform on black is
+  the whole vocabulary.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -18,20 +19,12 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_recognition_background">
 
-    <FrameLayout
-        android:id="@+id/widget_pill"
-        android:layout_width="84dp"
-        android:layout_height="50dp"
+    <ImageView
+        android:id="@+id/widget_wave"
+        android:layout_width="72dp"
+        android:layout_height="44dp"
         android:layout_gravity="center"
-        android:background="@drawable/widget_recognition_pill">
-
-        <ImageView
-            android:id="@+id/widget_wave"
-            android:layout_width="56dp"
-            android:layout_height="34dp"
-            android:layout_gravity="center"
-            android:contentDescription="@string/widget_recognition_label"
-            android:src="@drawable/ic_widget_wave_sleep"
-            android:scaleType="fitCenter" />
-    </FrameLayout>
+        android:contentDescription="@string/widget_recognition_label"
+        android:src="@drawable/ic_widget_wave_sleep"
+        android:scaleType="fitCenter" />
 </FrameLayout>

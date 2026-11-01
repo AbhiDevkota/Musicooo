@@ -228,10 +228,10 @@ class RecognitionActivity : Activity() {
         const val PHASE_PER_MS = ((2 * PI).toFloat()) / 1400f
 
         /** The ImageView the frames land in, from widget_recognition_wide.xml. */
-        const val WAVE_WIDTH_DP = 56f
-        const val WAVE_HEIGHT_DP = 34f
+        const val WAVE_WIDTH_DP = 72f
+        const val WAVE_HEIGHT_DP = 44f
 
-        /** The pill's bars, the white button's content turned all the way dark. */
-        const val BAR_COLOR = 0xFF0E1013.toInt()
+        /** The bars, white on the black capsule exactly as the sheet wears them. */
+        const val BAR_COLOR = 0xFFFFFFFF.toInt()
     }
 }
