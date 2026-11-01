@@ -3230,6 +3230,7 @@ private fun BitChordApp(
                                 },
                                 topResultPulseTrigger = recognitionLandedTrigger,
                                 searchFieldPulseTrigger = recognitionFieldLandedTrigger,
+                                forceTopResult = showSongRecognition,
                                 onTopResultPlaylist = { song ->
                                     viewModel.recordEntity(SearchHistoryEntity(
                                         id = song.videoId,

@@ -195,6 +195,8 @@ fun SearchScreen(
     topResultPulseTrigger: Int = 0,
     /** Bumps to make the search field pulse when a handoff lands on it (fallback). */
     searchFieldPulseTrigger: Int = 0,
+    /** When true, the first song result is promoted as the Top result card. */
+    forceTopResult: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -348,6 +350,7 @@ fun SearchScreen(
                         } }
                     val isCurrentRow = playingRowMatcher(tracks, currentSong)
                     val topResult = results.data.filterIsInstance<SearchResult.TopTrack>().firstOrNull()
+                        ?: if (forceTopResult) results.data.filterIsInstance<SearchResult.Track>().firstOrNull()?.let { SearchResult.TopTrack(it.song) } else null
                     if (filter == SearchFilter.ALL && topResult != null) {
                         item(key = "search:top-result:${topResult.song.videoId}") {
                             SwipeToQueueBox(
@@ -360,6 +363,7 @@ fun SearchScreen(
                                     onPlaylist = { onTopResultPlaylist(topResult.song) },
                                     onLongPress = { onSongLongPress(topResult.song) },
                                     pulseTrigger = topResultPulseTrigger,
+    reportKey = scrollResetTrigger,
     onBounds = { artwork, title, artist ->
                                         onTopResultBounds?.invoke(
                                             TopResultBounds(
@@ -376,7 +380,12 @@ fun SearchScreen(
                             }
                         }
                     }
-                    searchSections(results.data, filter).forEach { section ->
+                    val sectionRows = if (forceTopResult && topResult != null) {
+                        results.data.filterNot { it is SearchResult.Track && it.song.videoId == topResult.song.videoId }
+                    } else {
+                        results.data
+                    }
+                    searchSections(sectionRows, filter).forEach { section ->
                         section.title?.let { title ->
                             item(key = "search-section:$title") {
                                 Text(
@@ -534,6 +543,7 @@ private fun TopResultCard(
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
     pulseTrigger: Int = 0,
+    reportKey: Int = 0,
     onBounds: ((artwork: Rect, title: Rect, artist: Rect) -> Unit)? = null,
 ) {
     var artworkBounds by remember { mutableStateOf<Rect?>(null) }
@@ -550,6 +560,7 @@ private fun TopResultCard(
     val _ab = artworkBounds
     val _tb = titleBounds
     val _arb = artistBounds
+    val _rk = reportKey
     // Reported after every composition, not just when the rectangles move:
     // re-running a cached search can keep the same card in place while a
     // recognition sheet waits for it, and its start-of-search report is what
