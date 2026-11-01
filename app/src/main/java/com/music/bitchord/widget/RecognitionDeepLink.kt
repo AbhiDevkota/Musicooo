@@ -1,29 +1,37 @@
 package com.music.bitchord.widget
 
-import android.content.Intent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * A request from the recognition widget to start listening.
+ * A match on its way from [RecognitionActivity]'s microphone to the Search
+ * page that turns it into a playable song.
+ *
+ * Both ends share one process — the recorder is launched by the widget and
+ * launches the app itself — so a StateFlow is the entire channel. The
+ * ordering is the protocol: [postMatch] runs before MainActivity's launch
+ * does, because the hand-off is set on the way to opening the app, and
+ * the composition reads it whenever it starts — cold or warm — without
+ * anything riding on Intent extras or saved state. If the process instead
+ * died between the match and the launch, stopping here is the right
+ * response anyway: the user's tap was answered the first time, and the next
+ * tap is a whole new listen.
  */
 object RecognitionDeepLink {
 
-    const val EXTRA_START_RECOGNITION = "bitchord.startRecognition"
+    private val _pendingMatch = MutableStateFlow<String?>(null)
 
-    private val _pending = MutableStateFlow(false)
+    /** The matched song's search query, or null while nothing is pending. */
+    val pendingMatch: StateFlow<String?> = _pendingMatch.asStateFlow()
 
-    val pending: StateFlow<Boolean> = _pending.asStateFlow()
-
-    fun consume(intent: Intent?): Boolean {
-        if (intent == null || !intent.getBooleanExtra(EXTRA_START_RECOGNITION, false)) return false
-        intent.removeExtra(EXTRA_START_RECOGNITION)
-        _pending.value = true
-        return true
+    /** Called by [RecognitionActivity] once the fingerprint has a song's name. */
+    fun postMatch(query: String) {
+        _pendingMatch.value = query
     }
 
-    fun handled() {
-        _pending.value = false
+    /** Clears the hand-off; called by the composition that consumes it. */
+    fun matchHandled() {
+        _pendingMatch.value = null
     }
 }

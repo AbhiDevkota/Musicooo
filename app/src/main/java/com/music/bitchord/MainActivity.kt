@@ -465,7 +465,6 @@ class MainActivity : AppCompatActivity() {
         PlayerDeepLink.consume(intent)
         JamInviteLink.consume(intent)
         MusicLink.consume(intent)
-        com.music.bitchord.widget.RecognitionDeepLink.consume(intent)
     }
 }
 
@@ -4956,14 +4955,17 @@ private fun BitChordApp(
         }
 
         var widgetRecognitionMode by remember { mutableStateOf(false) }
-        val recognitionRequested by com.music.bitchord.widget.RecognitionDeepLink.pending.collectAsStateWithLifecycle()
-        LaunchedEffect(recognitionRequested) {
-            if (recognitionRequested) {
-                com.music.bitchord.widget.RecognitionDeepLink.handled()
-                widgetRecognitionMode = true
-                selectedTab = TAB_SEARCH
-                startSongRecognition()
-            }
+        val widgetMatch by com.music.bitchord.widget.RecognitionDeepLink.pendingMatch.collectAsStateWithLifecycle()
+        LaunchedEffect(widgetMatch) {
+            val query = widgetMatch ?: return@LaunchedEffect
+            com.music.bitchord.widget.RecognitionDeepLink.matchHandled()
+            widgetRecognitionMode = true
+            // The widget's recognizer found the song in its own window and
+            // handed the query over; this picks up exactly where the sheet's
+            // own hand-off resumes: Search on All, the query branded as a
+            // recognition hand-off, and the results running up behind the
+            // player that opens over them.
+            searchRecognizedSong(query)
         }
         LaunchedEffect(widgetRecognitionMode, results) {
             if (!widgetRecognitionMode) return@LaunchedEffect
