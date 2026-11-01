@@ -155,6 +155,10 @@
     <string name="widget_pill_label">กำลังเล่น 4×1</string>
     <string name="widget_pill_description">เพลงพร้อมปุ่มถูกใจ สุ่มเล่น และปุ่มควบคุมการเล่นในแถวเดียว</string>
     <string name="widget_preview_pill">ชื่อเพลง - ศิลปิน</string>
+    <string name="widget_recognition_description">แตะเพื่อจำแนกเพลงที่เล่นอยู่รอบตัวคุณ</string>
+    <string name="widget_recognition_label">จำแนกเพลง</string>
+    <string name="widget_recognition_listening">กำลังฟังเพลง…</string>
+    <string name="widget_recognition_no_match">ไม่สามารถจำแนกเพลงได้ ลองอีกครั้งขณะเพลงกำลังเล่นอยู่</string>
     <string name="download_quality">คุณภาพการดาวน์โหลด</string>
     <string name="download_wifi_only">ดาวน์โหลดผ่าน Wi-Fi เท่านั้น</string>
     <string name="convert_to_audio">แปลงเป็นเสียง</string>

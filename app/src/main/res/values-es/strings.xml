@@ -153,6 +153,10 @@
     <string name="widget_pill_label">Reproduciendo 4×1</string>
     <string name="widget_pill_description">La pista con Me gusta, orden aleatorio y controles de reproducción en una sola fila.</string>
     <string name="widget_preview_pill">Título de la canción - Artista</string>
+    <string name="widget_recognition_description">Toca para reconocer la canción que suena a tu alrededor.</string>
+    <string name="widget_recognition_label">Reconocer</string>
+    <string name="widget_recognition_listening">Escuchando…</string>
+    <string name="widget_recognition_no_match">No se reconoció nada. Inténtalo de nuevo mientras suena la música.</string>
     <string name="download_quality">Calidad de descarga</string>
     <string name="download_wifi_only">Descargar solo mediante Wi-Fi</string>
     <string name="spatial_audio">Audio espacial</string>

@@ -161,6 +161,10 @@
     <string name="widget_pill_label">Đang phát 4×1</string>
     <string name="widget_pill_description">Bản nhạc kèm Thích, trộn bài và điều khiển phát trên một hàng.</string>
     <string name="widget_preview_pill">Tên bài hát - Nghệ sĩ</string>
+    <string name="widget_recognition_description">Chạm để nhận diện bài hát đang phát xung quanh bạn.</string>
+    <string name="widget_recognition_label">Nhận diện</string>
+    <string name="widget_recognition_listening">Đang nghe nhạc…</string>
+    <string name="widget_recognition_no_match">Không nhận diện được bài hát nào. Thử lại khi nhạc đang phát.</string>
     <string name="download_quality">Chất lượng tải xuống</string>
     <string name="download_wifi_only">Chỉ tải xuống qua Wi-Fi</string>
     <string name="convert_to_audio">Chuyển đổi thành âm thanh</string>
