@@ -13,7 +13,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.WindowManager
+import android.view.MotionEvent
+import android.view.View
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.music.bitchord.MainActivity
@@ -56,6 +57,12 @@ import kotlin.math.sin
  * 4. Nothing found goes back to sleep: a toast from wherever the user is,
  *    and the window closes without ever having shown itself.
  *
+ * While a take is live the window — every touch of it — is the stop button.
+ * The second tap on the widget lands on this glass first, and stops there;
+ * a tap anywhere else stops just the same, like any tap-to-cancel overlay.
+ * Nothing below the glass can be reached while a take runs, and nothing has
+ * to be: there is no second meaning a touch could have.
+ *
  * Being backgrounded takes the microphone with it on Android's own rules, so
  * [onStop] mid-listen is treated as the user abandoning the request rather
  * than as something to finish in the background.
@@ -83,17 +90,27 @@ class RecognitionActivity : Activity() {
     /** The main looper's handler, for sleeps that must land after in-flight frames. */
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * The glass itself is the stop button: while a take is live, any touch
+     * on the window ends it — the second tap on the widget plainly lands
+     * here first, because this window sits over the launcher.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (listening) {
+            abandon()
+            finish()
+            return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // The window is hand-made pass-through. It paints nothing and lives
-        // over the launcher for the whole take — if it swallowed touches it
-        // would sit on top of the very widget the user is trying to tap
-        // again, and "tap to stop" would never reach the widget at all. Let
-        // every touch fall through to the launcher so the second tap lands
-        // on the pill itself, and the system's own dialogs (the permission
-        // ask among them) sit in windows above this one, untouched by the
-        // flag.
-        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+        // A paint-less content view, so the touches have a full pipeline to
+        // run down and [dispatchTouchEvent] receives them nowhere but here.
+        // The window keeps painting nothing: the view is transparent ink,
+        // the theme beneath it unchanged.
+        setContentView(View(this))
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {

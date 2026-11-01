@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Picker artwork for the recognition widget, on hosts older than API 31: the
+  solid black capsule with the sheet's five-bar waveform at rest, the widget's
+  own sleeping face. The bar geometry is ic_widget_wave_sleep's, centered in
+  the 2x2 cell the widget occupies; API 31+ hosts render the live layout
+  instead (previewLayout) and never see this.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="110dp"
+    android:viewportWidth="120"
+    android:viewportHeight="110">
+
+    <path
+        android:fillColor="#FF141619"
+        android:pathData="M55,0 L65,0 A55,55 0,0,1 120,55 A55,55 0,0,1 65,110 L55,110 A55,55 0,0,1 0,55 A55,55 0,0,1 55,0 Z" />
+
+    <!-- The five bars at rest, each a stadium 8.6 wide, h tall. -->
+    <group android:translateX="24" android:translateY="49.35">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,7 A4.3,4.3 0,0,1 0,7 L0,4.3 Z" />
+    </group>
+    <group android:translateX="39.8" android:translateY="48">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,9.7 A4.3,4.3 0,0,1 0,9.7 L0,4.3 Z" />
+    </group>
+    <group android:translateX="55.7" android:translateY="47.55">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,10.6 A4.3,4.3 0,0,1 0,10.6 L0,4.3 Z" />
+    </group>
+    <group android:translateX="71.5" android:translateY="48.35">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,9 A4.3,4.3 0,0,1 0,9 L0,4.3 Z" />
+    </group>
+    <group android:translateX="87.4" android:translateY="48.9">
+        <path android:fillColor="#9EFFFFFF" android:pathData="M0,4.3 A4.3,4.3 0,0,1 8.6,4.3 L8.6,7.9 A4.3,4.3 0,0,1 0,7.9 L0,4.3 Z" />
+    </group>
+</vector>
