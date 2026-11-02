@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The recognition widget's body: a solid black capsule, the same dark the
+  media widgets tint their own capsules towards instead of the clear one they
+  hand the launcher. The recognition pill reads as an object on its own, so
+  nothing here rolls over with the wallpaper.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="200dp" />
+    <solid android:color="#FF141619" />
+</shape>

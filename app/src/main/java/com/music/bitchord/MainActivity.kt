@@ -113,6 +113,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -277,6 +278,7 @@ import com.music.bitchord.ui.components.QueueActionNoticeHost
 import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
 import com.music.bitchord.ui.components.SearchField
+import com.music.bitchord.ui.components.SongRecognitionDialog
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
 import com.music.bitchord.sharedui.resources.search_addons_hint
@@ -322,6 +324,8 @@ import androidx.compose.foundation.layout.offset
 import com.music.bitchord.ui.components.MiniPlayerPull
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
 import com.music.bitchord.ui.player.PlayerDock
@@ -345,6 +349,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.TopResultBounds
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -617,6 +622,7 @@ private fun BitChordApp(
             PlayerDeepLink.handled()
         }
     }
+
     /**
      * What the in-app browser is open for, or null while it is closed —
      * signing in, or picking a channel in YouTube Music's own Accounts list.
@@ -774,6 +780,25 @@ private fun BitChordApp(
     // signal to focus the input field.
     var searchFocusRequested by remember { mutableStateOf(false) }
     val searchFieldFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val softwareKeyboard = LocalSoftwareKeyboardController.current
+    // The microphone opens the in-app recognition sheet, where the permission
+    // request and its denied state live. It no longer waits on a system speech
+    // recognizer, so the icon stays available even on de-Googled builds.
+    var showSongRecognition by remember { mutableStateOf(false) }
+    // Where the search field sits while recognition is up. The matched card is
+    // handed off into this rectangle, so it lands on the field it is searching
+    // rather than at an approximation of it.
+    var recognitionFieldBounds by remember { mutableStateOf<Rect?>(null) }
+    // Where Search's promoted "Top result" card sits. A match flies into this
+    // card, so the cover and title land on the result they became rather than
+    // stopping at the field that asked for it.
+    var recognitionTopBounds by remember { mutableStateOf<TopResultBounds?>(null) }
+    var recognitionLandedTrigger by remember { mutableIntStateOf(0) }
+    var recognitionFieldLandedTrigger by remember { mutableIntStateOf(0) }
+    // The query a recognition run produced; keeps its promoted Top result card
+    // on screen after the sheet closes, until the user searches something else.
+    var recognitionQuery by remember { mutableStateOf<String?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -1055,6 +1080,41 @@ private fun BitChordApp(
     }
     val controller = rememberMediaController()
     val player = rememberPlayerState(controller)
+    // Song recognition listens to the room, so anything this device was playing
+    // has to stop first. Only a take that actually paused playback resumes on
+    // cancel; a match leaves it paused while the Search tab opens.
+    var resumeAfterRecognition by remember { mutableStateOf(false) }
+    val startSongRecognition: () -> Unit = {
+        // The full-screen sheet replaces the search field, so leave it with no
+        // keyboard waiting underneath when the sheet closes.
+        focusManager.clearFocus()
+        softwareKeyboard?.hide()
+        resumeAfterRecognition = controller?.playWhenReady == true
+        if (resumeAfterRecognition) controller?.pause()
+        recognitionTopBounds = null
+        showSongRecognition = true
+    }
+    val dismissSongRecognition: () -> Unit = {
+        showSongRecognition = false
+        recognitionTopBounds = null
+        if (resumeAfterRecognition) controller?.play()
+        resumeAfterRecognition = false
+    }
+    val searchRecognizedSong: (String) -> Unit = { query ->
+        // The sheet is still on screen and runs its own hand-off out after
+        // this: the results are already arriving behind it by the time the
+        // matched card lands on the search field. Closing here would pull that
+        // animation off in the first frame.
+        resumeAfterRecognition = false
+        dismissPlayer()
+        navigator.clear()
+        selectedTab = TAB_SEARCH
+        // The handoff lands on the promoted result, so the page has to be on
+        // All even if the last search was filtered to albums or songs.
+        recognitionQuery = query
+        viewModel.onFilterChange(SearchFilter.ALL)
+        viewModel.searchFor(query, SearchSource.YOUTUBE)
+    }
     // A music video's picture follows this controller's clock — see [MusicVideoEngine].
     DisposableEffect(controller) {
         MusicVideoEngine.attach(controller)
@@ -3466,6 +3526,12 @@ private fun BitChordApp(
                                     ))
                                     playRadio(song, QueueSource(searchLabel, PlaybackSourceType.SEARCH))
                                 },
+                                onTopResultBounds = { bounds ->
+                                    if (showSongRecognition) recognitionTopBounds = bounds
+                                },
+                                topResultPulseTrigger = recognitionLandedTrigger,
+                                searchFieldPulseTrigger = recognitionFieldLandedTrigger,
+                                forceTopResult = (recognitionQuery != null && query == recognitionQuery),
                                 onTopResultPlaylist = { song ->
                                     viewModel.recordEntity(SearchHistoryEntity(
                                         id = song.videoId,
@@ -3802,21 +3868,28 @@ private fun BitChordApp(
                                     searchFocusRequested = false
                                 }
                             }
-                            SearchField(
-                                query = query,
-                                onQueryChange = viewModel::onQueryChange,
-                                onSubmit = viewModel::submitSearch,
-                                focusRequester = searchFieldFocus,
-                                placeholder = org.jetbrains.compose.resources.stringResource(
-                                    if (searchSource == SearchSource.LIBRARY) {
-                                        SharedRes.string.search_library_hint
-                                    } else if (searchSource == SearchSource.ADDONS) {
-                                        SharedRes.string.search_addons_hint
-                                    } else {
-                                        SharedRes.string.search_hint
-                                    },
-                                ),
-                            )
+                            Box(
+                                Modifier.onGloballyPositioned {
+                                    recognitionFieldBounds = it.boundsInWindow()
+                                },
+                            ) {
+                                SearchField(
+                                    query = query,
+                                    onQueryChange = viewModel::onQueryChange,
+                                    onSubmit = viewModel::submitSearch,
+                                    focusRequester = searchFieldFocus,
+                                    onVoiceSearch = startSongRecognition,
+                                    placeholder = org.jetbrains.compose.resources.stringResource(
+                                        if (searchSource == SearchSource.LIBRARY) {
+                                            SharedRes.string.search_library_hint
+                                        } else if (searchSource == SearchSource.ADDONS) {
+                                            SharedRes.string.search_addons_hint
+                                        } else {
+                                            SharedRes.string.search_hint
+                                        },
+                                    ),
+                                )
+                            }
                         }
                     } else null,
                     actions = {
@@ -5380,6 +5453,64 @@ private fun BitChordApp(
                     },
                 )
             }
+        }
+
+        var widgetRecognitionMode by remember { mutableStateOf(false) }
+        val widgetMatch by com.music.bitchord.widget.RecognitionDeepLink.pendingMatch.collectAsStateWithLifecycle()
+        LaunchedEffect(widgetMatch) {
+            val query = widgetMatch ?: return@LaunchedEffect
+            com.music.bitchord.widget.RecognitionDeepLink.matchHandled()
+            widgetRecognitionMode = true
+            // The widget's recognizer found the song in its own window and
+            // handed the query over; this picks up exactly where the sheet's
+            // own hand-off resumes: Search on All, the query branded as a
+            // recognition hand-off, and the results running up behind the
+            // player that opens over them.
+            searchRecognizedSong(query)
+        }
+        // Widget recognition auto-plays the matched song and opens the player.
+        LaunchedEffect(widgetRecognitionMode, results, controller) {
+            if (!widgetRecognitionMode) return@LaunchedEffect
+            when (val state = results) {
+                is UiState.Error -> widgetRecognitionMode = false
+                is UiState.Success -> {
+                    val data = state.data
+                    val song = data?.filterIsInstance<SearchResult.TopTrack>()?.firstOrNull()?.song
+                        ?: data?.filterIsInstance<SearchResult.Track>()?.firstOrNull()?.song
+                    if (song != null) {
+                        // A cold launch from the widget gets here before the
+                        // player session has connected, and playRadio would
+                        // step out silently — the card would open on a player
+                        // that never started. Controller is a key above, so
+                        // staying put here re-runs the whole effect the moment
+                        // the connection is live.
+                        val c = controller ?: return@LaunchedEffect
+                        widgetRecognitionMode = false
+                        playRadio(song, QueueSource("Recognition", PlaybackSourceType.SEARCH))
+                        showNowPlaying = true
+                    } else {
+                        // Nothing playable came out of the identify, so the
+                        // fresh queue never starts — but the widget left the
+                        // room's own song paused for its take. Hand it back
+                        // rather than end the ride on silence; play() is a
+                        // well-mannered no-op if nothing had been paused.
+                        widgetRecognitionMode = false
+                        controller?.play()
+                    }
+                }
+                else -> {}
+            }
+        }
+        // The recognition sheet has its own window, so it sits above the tabs
+        // and the player alike and owns the back press while it is open.
+        if (showSongRecognition) {
+            SongRecognitionDialog(
+                onDismiss = dismissSongRecognition,
+                onSearch = searchRecognizedSong,
+                searchFieldBounds = recognitionFieldBounds,
+                topResultBounds = recognitionTopBounds,
+                 onLanded = { onCard -> if (onCard) recognitionLandedTrigger++ else recognitionFieldLandedTrigger++ },
+            )
         }
 
         if (showLyricsSources) {
